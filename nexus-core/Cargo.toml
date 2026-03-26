@@ -1,0 +1,45 @@
+[package]
+name = "nexus-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "NexusStorage core engine: pixel encoding, fountain codes, encryption, compression."
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Image generation (pixel frames)
+image = "0.25"
+
+# Parallelism
+rayon = "1.10"
+
+# Encryption
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+
+# Compression
+zstd = "0.13"
+lz4_flex = "0.11"
+lzma-rs = "0.3"
+
+# Hashing / integrity
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+sha2 = "0.10"
+hex = "0.4"
+
+# Content-type detection
+infer = "0.15"
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

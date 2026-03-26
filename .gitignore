@@ -1,0 +1,23 @@
+.DS_Store
+
+# Rust
+target/
+Cargo.lock
+
+# Go
+nexus-daemon/vendor/
+
+# Node / Tauri
+nexus-gui/node_modules/
+nexus-gui/dist/
+nexus-gui/src-tauri/target/
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Keys / secrets
+*.key
+*.pem
+.env
