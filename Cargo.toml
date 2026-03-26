@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "nexus-core",
+    "nexus-core", "nexus-tui",
 ]
 resolver = "2"
 
