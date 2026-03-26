@@ -14,8 +14,9 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_uchar};
 use std::slice;
-use crate::{crypto, compress, hasher};
-use crate::types::CompressionLevel;
+use std::path::Path;
+use crate::{crypto, compress, hasher, encoder};
+use crate::types::{CompressionLevel, EncodingMode};
 
 const NEXUS_OK: c_int = 0;
 const NEXUS_ERR_NULL_PTR: c_int = -1;
@@ -179,4 +180,39 @@ pub unsafe extern "C" fn nexus_sha256_hex(
         std::ptr::copy_nonoverlapping(c_str.as_ptr(), out_hex, 65);
     }
     NEXUS_OK
+}
+
+// --------------------------
+//  Encoding
+// --------------------------
+
+/// Encode `in_len` bytes into PNG frames in `output_dir`.
+/// mode: 0=Tank, 1=Density
+/// Returns the number of frames written (positive) or a negative error code.
+#[no_mangle]
+pub unsafe extern "C" fn nexus_encode_to_frames(
+    in_ptr: *const c_uchar,
+    in_len: usize,
+    output_dir: *const c_char,
+    mode: c_int,
+) -> c_int {
+    if in_ptr.is_null() || output_dir.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let data = unsafe { slice::from_raw_parts(in_ptr, in_len) };
+    let path_str = match unsafe { CStr::from_ptr(output_dir) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return NEXUS_ERR_NULL_PTR,
+    };
+    let path = Path::new(path_str);
+    let encoding_mode = match mode {
+        0 => EncodingMode::Tank,
+        1 => EncodingMode::Density,
+        _ => EncodingMode::Tank,
+    };
+
+    match encoder::encode_to_frames(data, path, encoding_mode) {
+        Ok(n) => n as c_int,
+        Err(_) => -4, // NEXUS_ERR_ENCODE
+    }
 }
