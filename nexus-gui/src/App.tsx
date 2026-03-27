@@ -1,187 +1,442 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Cloud, 
-  HardDrive, 
-  Settings, 
-  Shield, 
-  Upload, 
-  Download, 
-  File, 
-  Folder, 
-  MoreVertical,
-  Search,
-  Plus,
-  Zap,
-  LayoutDashboard,
-  Clock,
-  Terminal
+import {
+  Search, Plus, HardDrive, Shield, Clock, Star, Trash2,
+  Grid3X3, List, FileText, FileImage, Archive, Lock,
+  X, MoreVertical, Moon, Sun, CloudLightning, ChevronRight,
+  Upload
 } from "lucide-react";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { open } from "@tauri-apps/plugin-dialog";
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type ViewMode = "grid" | "list";
+type Section = "my-drive" | "recent" | "starred" | "security" | "trash";
+
+interface NFile {
+  id: string;
+  name: string;
+  size: string;
+  type: "archive" | "image" | "doc" | "key" | "video";
+  modified: string;
+  shardId: string;
+  starred: boolean;
+  encrypted: boolean;
+  owner: string;
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const API_BASE = "http://localhost:8081/api";
+
+interface BackendFile {
+  ID: number;
+  Path: string;
+  VideoID: string;
+  Size: number;
+  Hash: string;
+  Key: string;
+  LastUpdate: string;
+}
+
+interface BackendTask {
+  ID: string;
+  Type: number;
+  FilePath: string;
+  Status: string;
+  Progress: number;
+  CreatedAt: string;
+}
+
+interface Stats {
+  file_count: number;
+  total_size: number;
+}
+
+function mapBackendToFile(bf: BackendFile): NFile {
+  const name = bf.Path.split(/[/\\]/).pop() || bf.Path;
+  const ext = name.split('.').pop()?.toLowerCase();
+  
+  let type: NFile["type"] = "archive";
+  if (["png", "jpg", "jpeg", "gif"].includes(ext || "")) type = "image";
+  else if (["pdf", "txt", "doc", "docx"].includes(ext || "")) type = "doc";
+  else if (["enc", "key"].includes(ext || "")) type = "key";
+  else if (["mp4", "mkv", "mov"].includes(ext || "")) type = "video";
+
+  return {
+    id: String(bf.ID),
+    name: name,
+    size: formatSize(bf.Size),
+    type: type,
+    modified: new Date(bf.LastUpdate).toLocaleDateString(),
+    shardId: bf.VideoID.substring(0, 8),
+    starred: false,
+    encrypted: true,
+    owner: "me"
+  };
+}
+
+function formatSize(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
+
+// Each file type gets a distinct icon, background color, and icon color
+const TYPE_CONFIG = {
+  archive: { icon: Archive,     bg: "#FEF3C7", color: "#D97706" },
+  image:   { icon: FileImage,   bg: "#FCE7F3", color: "#DB2777" },
+  doc:     { icon: FileText,    bg: "#DBEAFE", color: "#2563EB" },
+  key:     { icon: Lock,        bg: "#D1FAE5", color: "#059669" },
+  video:   { icon: FileText,    bg: "#EDE9FE", color: "#7C3AED" },
+};
+
+// ─── App ─────────────────────────────────────────────────────────────────────
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [isUploading, setIsUploading] = useState(false);
+  const [section, setSection] = useState<Section>("my-drive");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [search, setSearch] = useState("");
+  const [dark, setDark] = useState(false);
+  const [selected, setSelected] = useState<NFile | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  
+  const [dbFiles, setDbFiles] = useState<NFile[]>([]);
+  const [tasks, setTasks] = useState<Record<string, BackendTask>>({});
+  const [stats, setStats] = useState<Stats>({ file_count: 0, total_size: 0 });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
+
+  // Polling for files, tasks, and stats
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const [filesRes, tasksRes, statsRes] = await Promise.all([
+          fetch(`${API_BASE}/files`),
+          fetch(`${API_BASE}/tasks`),
+          fetch(`${API_BASE}/stats`)
+        ]);
+        
+        if (filesRes.ok) {
+          const data: BackendFile[] = await filesRes.json();
+          setDbFiles(data.map(mapBackendToFile));
+        }
+
+        if (tasksRes.ok) {
+          setTasks(await tasksRes.json());
+        }
+
+        if (statsRes.ok) {
+          setStats(await statsRes.json());
+        }
+      } catch (err) {
+        console.error("API Error:", err);
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleUploadClick = async () => {
+    try {
+      const selectedPath = await open({
+        multiple: false,
+        directory: false,
+      });
+
+      if (selectedPath) {
+        const res = await fetch(`${API_BASE}/upload`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: selectedPath })
+        });
+        if (res.ok) {
+          setUploadOpen(false);
+          // Trigger immediate poll
+        }
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+    }
+  };
+
+  const files = dbFiles.filter(f => {
+    const q = search.toLowerCase();
+    const matchSearch = f.name.toLowerCase().includes(q);
+    const matchSection =
+      section === "starred" ? f.starred :
+      section === "trash"   ? false : true;
+    return matchSearch && matchSection;
+  });
+
+  // Colors derived from dark/light mode
+  const c = dark ? DARK : LIGHT;
+
+  const SECTION_LABELS: Record<Section, string> = {
+    "my-drive": "My Drive",
+    recent:     "Recent",
+    starred:    "Starred",
+    security:   "Security",
+    trash:      "Trash",
+  };
 
   return (
-    <div className="flex h-screen w-full bg-[#09090b] text-foreground font-sans selection:bg-primary/30 gradient-bg">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-border flex flex-col glass z-10">
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
-            <Zap className="w-5 h-5 text-white" />
+    <div style={{ background: c.bgApp, color: c.textPrimary, fontFamily: "'Inter', system-ui, sans-serif", height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      
+      {/* ━━━━ HEADER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <header
+        data-tauri-drag-region
+        style={{
+          height: 64,
+          display: "flex",
+          alignItems: "center",
+          padding: "0 24px",
+          gap: 16,
+          background: dark ? "rgba(30,31,32,0.7)" : "rgba(240,244,249,0.7)",
+          backdropFilter: "blur(12px)",
+          borderBottom: `1px solid ${c.border}`,
+          flexShrink: 0,
+          cursor: "default",
+          zIndex: 50,
+        }}
+      >
+        {/* Logo - 256px to match sidebar */}
+        <div style={{ width: 256, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <CloudLightning size={22} color="white" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">Nexus</h1>
+          <span style={{ fontSize: 22, fontWeight: 400, color: c.textPrimary, letterSpacing: -0.3 }}>Nexus</span>
         </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-1">
-          <NavItem 
-            icon={<LayoutDashboard size={20} />} 
-            label="Dashboard" 
-            active={activeTab === "dashboard"} 
-            onClick={() => setActiveTab("dashboard")} 
+        {/* Search - grows to fill center */}
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, background: c.bgSearch, borderRadius: 24, padding: "0 20px", height: 46 }}>
+          <Search size={20} color={c.textSecondary} style={{ flexShrink: 0 }} />
+          <input
+            type="text"
+            placeholder="Search in Nexus"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{
+              flex: 1,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              fontSize: 16,
+              color: c.textPrimary,
+              lineHeight: "1.5",
+            }}
           />
-          <NavItem 
-            icon={<HardDrive size={20} />} 
-            label="My Storage" 
-            active={activeTab === "storage"} 
-            onClick={() => setActiveTab("storage")} 
-          />
-          <NavItem 
-            icon={<Clock size={20} />} 
-            label="Recent" 
-            active={activeTab === "recent"} 
-            onClick={() => setActiveTab("recent")} 
-          />
-          <NavItem 
-            icon={<Terminal size={20} />} 
-            label="Terminal" 
-            active={activeTab === "terminal"} 
-            onClick={() => setActiveTab("terminal")} 
-          />
-          <div className="pt-4 pb-2 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            System
-          </div>
-          <NavItem 
-            icon={<Shield size={20} />} 
-            label="Security" 
-            active={activeTab === "security"} 
-            onClick={() => setActiveTab("security")} 
-          />
-          <NavItem 
-            icon={<Settings size={20} />} 
-            label="Settings" 
-            active={activeTab === "settings"} 
-            onClick={() => setActiveTab("settings")} 
-          />
-        </nav>
+        </div>
 
-        <div className="p-4 mt-auto">
-          <div className="glass-card p-4 rounded-xl space-y-3">
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-muted-foreground">Unlimited Pool</span>
-              <span className="text-primary font-medium">Active</span>
-            </div>
-            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: "65%" }}
-                className="h-full bg-primary"
-              />
-            </div>
-            <p className="text-[10px] text-muted-foreground leading-tight">
-              Using YouTube infra for storage. No central limits apply.
-            </p>
+        {/* Actions on the right */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <IconBtn onClick={() => setDark(d => !d)} title="Toggle theme" dark={dark}>
+            {dark ? <Sun size={20} /> : <Moon size={20} />}
+          </IconBtn>
+          <IconBtn onClick={() => window.close()} title="Close" dark={dark} danger>
+            <X size={20} />
+          </IconBtn>
+          {/* Avatar */}
+          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 14, fontWeight: 600, marginLeft: 8, cursor: "pointer" }}>
+            AK
           </div>
         </div>
-      </aside>
+      </header>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col relative overflow-hidden">
-        {/* Header */}
-        <header className="h-16 border-b border-border flex items-center justify-between px-8 glass-card z-10">
-          <div className="flex items-center glass-card px-3 py-1.5 rounded-lg border-border w-96">
-            <Search size={18} className="text-muted-foreground mr-2" />
-            <input 
-              type="text" 
-              placeholder="Search files and videos..." 
-              className="bg-transparent border-none outline-none text-sm w-full"
-            />
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsUploading(true)}
-              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-primary/20 active:scale-95"
+      {/* ━━━━ BODY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        
+        {/* ━━━━ SIDEBAR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <aside style={{ 
+          width: 256, flexShrink: 0, 
+          background: dark ? "rgba(30,31,32,0.4)" : "rgba(240,244,249,0.4)", 
+          backdropFilter: "blur(12px)",
+          display: "flex", flexDirection: "column", paddingTop: 16, paddingBottom: 16, overflow: "hidden",
+          borderRight: `1px solid ${c.border}`
+        }}>
+          
+          {/* New Button */}
+          <div style={{ padding: "0 16px 16px" }}>
+            <button
+              onClick={handleUploadClick}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "14px 20px",
+                borderRadius: 16,
+                background: c.bgSurface,
+                border: "none",
+                boxShadow: c.btnShadow,
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: 500,
+                color: c.textPrimary,
+                width: "100%",
+                transition: "box-shadow 0.15s",
+              }}
             >
-              <Plus size={18} />
-              Upload file
+              <Plus size={20} color="#1A73E8" />
+              New
             </button>
-            <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center overflow-hidden">
-              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Aurel" alt="User" />
+          </div>
+
+          {/* Nav */}
+          <nav style={{ flex: 1, padding: "0 8px", display: "flex", flexDirection: "column", gap: 2 }}>
+            {[
+              { id: "my-drive" as Section, icon: HardDrive, label: "My Drive" },
+              { id: "recent"   as Section, icon: Clock,     label: "Recent" },
+              { id: "starred"  as Section, icon: Star,      label: "Starred" },
+            ].map(item => (
+              <NavItem key={item.id} item={item} active={section === item.id} onClick={() => { setSection(item.id); setSelected(null); }} c={c} />
+            ))}
+
+            <div style={{ height: 1, background: c.border, margin: "8px 8px" }} />
+
+            {[
+              { id: "security" as Section, icon: Shield, label: "Security Hub" },
+              { id: "trash"    as Section, icon: Trash2, label: "Trash" },
+            ].map(item => (
+              <NavItem key={item.id} item={item} active={section === item.id} onClick={() => { setSection(item.id); setSelected(null); }} c={c} />
+            ))}
+          </nav>
+
+          {/* Storage */}
+          <div style={{ padding: "12px 24px", borderTop: `1px solid ${c.border}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <HardDrive size={18} color={c.textSecondary} />
+              <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 500 }}>Storage</span>
+            </div>
+            <div style={{ height: 4, background: c.border, borderRadius: 4, overflow: "hidden", marginBottom: 6 }}>
+              <div style={{ width: `${Math.min(100, (stats.total_size / (1024 * 1024 * 1024 * 1024)) * 100)}%`, height: "100%", background: "#1A73E8", borderRadius: 4 }} />
+            </div>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>{formatSize(stats.total_size)} of 15 GB used</span>
+          </div>
+
+        </aside>
+
+        {/* ━━━━ MAIN CONTENT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <main
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            background: c.bgSurface,
+            margin: "8px 16px 8px 0",
+            borderRadius: 16,
+            border: `1px solid ${c.border}`,
+            overflow: "hidden",
+            position: "relative"
+          }}
+        >
+          <TaskOverlay tasks={tasks} c={c} />
+          {/* Toolbar */}
+          <div style={{
+            height: 56,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 20px",
+            borderBottom: `1px solid ${c.border}`,
+            flexShrink: 0,
+          }}>
+            {/* Breadcrumb */}
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary }}>
+                {SECTION_LABELS[section]}
+              </span>
+              <ChevronRight size={18} color={c.textSecondary} />
+            </div>
+
+            {/* View toggles */}
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <ViewToggleBtn active={viewMode === "list"} onClick={() => setViewMode("list")} title="List view" c={c}>
+                <List size={20} />
+              </ViewToggleBtn>
+              <ViewToggleBtn active={viewMode === "grid"} onClick={() => setViewMode("grid")} title="Grid view" c={c}>
+                <Grid3X3 size={20} />
+              </ViewToggleBtn>
             </div>
           </div>
-        </header>
 
-        {/* Scrollable Area */}
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-                {activeTab === 'dashboard' && 'Welcome back, Aurel'}
-                {activeTab === 'storage' && 'My YouTube Storage'}
-                {activeTab === 'security' && 'Security Protocol'}
-              </h2>
+          {/* File area */}
+          <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+            {/* File content */}
+            <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+              <AnimatePresence mode="wait">
+                <motion.div key={section} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}>
+                  {section === "security" ? (
+                    <SecuritySection c={c} stats={stats} />
+                  ) : section === "trash" ? (
+                    <EmptyState icon={<Trash2 size={64} />} title="Trash is empty" sub="Items deleted from Nexus are stored here temporarily." c={c} />
+                  ) : files.length === 0 ? (
+                    <EmptyState icon={<Search size={64} />} title="No files match your search" sub="Try a different search term." c={c} />
+                  ) : (
+                    <>
+                      <p style={{ fontSize: 14, fontWeight: 500, color: c.textSecondary, marginBottom: 16 }}>
+                        {section === "starred" ? "Starred" : "Suggested"}
+                      </p>
+                      {viewMode === "grid" ? (
+                        <FileGrid files={files} onSelect={setSelected} selected={selected} c={c} dark={dark} />
+                      ) : (
+                        <FileList files={files} onSelect={setSelected} selected={selected} c={c} dark={dark} />
+                      )}
+                    </>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
 
-              {activeTab === 'dashboard' && <DashboardView />}
-              {activeTab === 'storage' && <StorageView />}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </main>
+            {/* Detail panel */}
+            <AnimatePresence>
+              {selected && (
+                <motion.div
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: 280, opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  style={{ borderLeft: `1px solid ${c.border}`, overflow: "hidden", flexShrink: 0 }}
+                >
+                  <DetailPanel file={selected} onClose={() => setSelected(null)} c={c} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </main>
+      </div>
 
-      {/* Overlay Upload Panel */}
+      {/* ━━━━ UPLOAD MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <AnimatePresence>
-        {isUploading && (
+        {uploadOpen && (
           <>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsUploading(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setUploadOpen(false)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100 }}
             />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] glass p-8 z-[60] rounded-2xl"
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              transition={{ duration: 0.18 }}
+              style={{
+                position: "fixed", top: "50%", left: "50%",
+                transform: "translate(-50%, -50%)",
+                width: 460, zIndex: 101,
+                background: c.bgSurface,
+                border: `1px solid ${c.border}`,
+                borderRadius: 24,
+                overflow: "hidden",
+                boxShadow: "0 24px 60px rgba(0,0,0,0.2)",
+              }}
             >
-              <h3 className="text-xl font-bold mb-4">Upload to YouTube</h3>
-              <div className="border-2 border-dashed border-muted rounded-xl p-12 flex flex-col items-center justify-center gap-4 hover:border-primary/50 transition-colors group cursor-pointer">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Upload className="text-primary" size={32} />
-                </div>
-                <div className="text-center">
-                  <p className="font-medium">Drop files here or click to browse</p>
-                  <p className="text-sm text-muted-foreground mt-1">Files will be encrypted and encoded as pixels</p>
-                </div>
-              </div>
-              <div className="mt-8 flex justify-end gap-3">
-                <button onClick={() => setIsUploading(false)} className="px-4 py-2 text-sm font-medium hover:text-primary transition-colors">Cancel</button>
-                <button className="bg-primary text-white px-6 py-2 rounded-lg text-sm font-medium shadow-lg shadow-primary/20">Start Archive</button>
-              </div>
+              <UploadModal onClose={() => setUploadOpen(false)} onUpload={handleUploadClick} c={c} />
             </motion.div>
           </>
         )}
@@ -190,191 +445,422 @@ export default function App() {
   );
 }
 
-function NavItem({ icon, label, active, onClick }: { icon: any, label: string, active?: boolean, onClick: () => void }) {
+// ─── File Grid ────────────────────────────────────────────────────────────────
+
+function FileGrid({ files, onSelect, selected, c, dark }: { files: NFile[]; onSelect: (f: NFile | null) => void; selected: NFile | null; c: ColorSet; dark: boolean }) {
   return (
-    <button 
-      onClick={onClick}
-      className={cn(
-        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group",
-        active 
-          ? "bg-primary/10 text-primary shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]" 
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-      )}
-    >
-      <span className={cn(
-        "transition-transform duration-200 group-hover:scale-110",
-        active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-      )}>
-        {icon}
-      </span>
-      {label}
-      {active && <motion.div layoutId="active-pill" className="ml-auto w-1 h-4 bg-primary rounded-full" />}
-    </button>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+      {files.map((f, i) => {
+        const cfg = TYPE_CONFIG[f.type];
+        const Ico = cfg.icon;
+        const isSelected = selected?.id === f.id;
+        return (
+          <motion.div
+            key={f.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.03, duration: 0.15 }}
+            onClick={() => onSelect(isSelected ? null : f)}
+            title={f.name}
+            style={{
+              borderRadius: 12,
+              border: `1px solid ${isSelected ? "#1A73E8" : c.border}`,
+              background: isSelected ? (dark ? "#1A3456" : "#E8F0FE") : c.bgSurface,
+              cursor: "pointer",
+              overflow: "hidden",
+              transition: "border-color 0.15s, background 0.15s",
+            }}
+          >
+            {/* Thumbnail area */}
+            <div style={{ height: 100, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Ico size={40} color={cfg.color} strokeWidth={1.5} />
+            </div>
+            {/* Info area */}
+            <div style={{ padding: "10px 12px 12px", borderTop: `1px solid ${c.border}` }}>
+              <p style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
+                {f.name}
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {f.encrypted && <Lock size={11} color="#059669" />}
+                {f.starred && <Star size={11} color="#F59E0B" fill="#F59E0B" />}
+                <span style={{ fontSize: 12, color: c.textSecondary, marginLeft: "auto" }}>{f.size}</span>
+              </div>
+            </div>
+          </motion.div>
+        );
+      })}
+    </div>
   );
 }
 
-function DashboardView() {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <StatCard 
-        title="Stored Data" 
-        value="1.2 TB" 
-        sub="Unlimited pool active" 
-        icon={<Cloud className="text-blue-400" />} 
-        trend="+12 GB today"
-      />
-      <StatCard 
-        title="Security Score" 
-        value="A+" 
-        sub="End-to-End Encrypted" 
-        icon={<Shield className="text-green-400" />} 
-        trend="Perfect health"
-      />
-      <StatCard 
-        title="Upload Queue" 
-        value="4 Files" 
-        sub="Pending processing" 
-        icon={<Upload className="text-orange-400" />} 
-        trend="Auto-transcoding"
-      />
+// ─── File List ────────────────────────────────────────────────────────────────
 
-      <div className="md:col-span-2 glass-card rounded-2xl p-6">
-        <h3 className="text-lg font-bold mb-4">Recent Activity</h3>
-        <div className="space-y-4">
-          <ActivityItem 
-            type="file" 
-            name="nexus_v1_backup.rar" 
-            status="Uploaded to YT: h6Xw9Gk2..." 
-            time="2 mins ago" 
-            size="450 MB"
-          />
-          <ActivityItem 
-            type="folder" 
-            name="Photos_Work_2024" 
-            status="Synced with drive" 
-            time="1 hour ago" 
-            size="12 GB"
-          />
-          <ActivityItem 
-            type="file" 
-            name="private_keys.enc" 
-            status="Decrypted locally" 
-            time="3 hours ago" 
-            size="2 KB"
-          />
-        </div>
+function FileList({ files, onSelect, selected, c, dark }: { files: NFile[]; onSelect: (f: NFile | null) => void; selected: NFile | null; c: ColorSet; dark: boolean }) {
+  return (
+    <div style={{ borderRadius: 12, border: `1px solid ${c.border}`, overflow: "hidden" }}>
+      {/* Header row */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 160px 100px 40px", alignItems: "center", height: 44, padding: "0 16px", background: c.bgApp, borderBottom: `1px solid ${c.border}` }}>
+        {["Name", "Shard ID", "Modified", "Size", ""].map(col => (
+          <span key={col} style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, letterSpacing: 0.3 }}>{col}</span>
+        ))}
+      </div>
+      {files.map((f, i) => {
+        const cfg = TYPE_CONFIG[f.type];
+        const Ico = cfg.icon;
+        const isSelected = selected?.id === f.id;
+        return (
+          <div
+            key={f.id}
+            onClick={() => onSelect(isSelected ? null : f)}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 120px 160px 100px 40px",
+              alignItems: "center",
+              height: 52,
+              padding: "0 16px",
+              background: isSelected ? (dark ? "#1A3456" : "#E8F0FE") : "transparent",
+              borderBottom: i < files.length - 1 ? `1px solid ${c.border}` : "none",
+              cursor: "pointer",
+              transition: "background 0.1s",
+            }}
+            onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = c.bgHover; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = isSelected ? (dark ? "#1A3456" : "#E8F0FE") : "transparent"; }}
+          >
+            {/* Name */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Ico size={16} color={cfg.color} />
+              </div>
+              <span style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+              {f.encrypted && <Lock size={12} color="#059669" style={{ flexShrink: 0 }} />}
+              {f.starred && <Star size={12} color="#F59E0B" fill="#F59E0B" style={{ flexShrink: 0 }} />}
+            </div>
+            {/* Shard */}
+            <span style={{ fontSize: 12, fontFamily: "monospace", color: c.textSecondary }}>{f.shardId}</span>
+            {/* Modified */}
+            <span style={{ fontSize: 13, color: c.textSecondary }}>{f.modified}</span>
+            {/* Size */}
+            <span style={{ fontSize: 13, color: c.textSecondary }}>{f.size}</span>
+            {/* Actions */}
+            <button style={{ border: "none", background: "transparent", cursor: "pointer", padding: 4, borderRadius: 8, color: c.textSecondary }}>
+              <MoreVertical size={16} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Detail Panel ─────────────────────────────────────────────────────────────
+
+function DetailPanel({ file, onClose, c }: { file: NFile; onClose: () => void; c: ColorSet }) {
+  const cfg = TYPE_CONFIG[file.type];
+  const Ico = cfg.icon;
+  return (
+    <div style={{ width: 280, height: "100%", display: "flex", flexDirection: "column", padding: 20, overflowY: "auto" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5 }}>File info</span>
+        <button onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", color: c.textSecondary, padding: 4, borderRadius: 8 }}>
+          <X size={18} />
+        </button>
       </div>
 
-      <div className="glass-card rounded-2xl p-6">
-        <h3 className="text-lg font-bold mb-4">Quick Links</h3>
-        <div className="space-y-2">
-          <QuickLink label="Generate Magic Link" icon={<Download size={16} />} />
-          <QuickLink label="Mount Virtual Drive" icon={<HardDrive size={16} />} />
-          <QuickLink label="View Tube Metadata" icon={<Search size={16} />} />
-          <QuickLink label="API Quota Prediction" icon={<Zap size={16} />} />
-        </div>
+      {/* Preview */}
+      <div style={{ height: 140, borderRadius: 12, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16, border: `1px solid ${c.border}` }}>
+        <Ico size={56} color={cfg.color} strokeWidth={1.5} />
+      </div>
+
+      {/* Filename */}
+      <p style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary, marginBottom: 4, wordBreak: "break-all" }}>{file.name}</p>
+      <p style={{ fontSize: 13, color: c.textSecondary, marginBottom: 20 }}>{file.size}</p>
+
+      {/* Properties */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, borderTop: `1px solid ${c.border}`, paddingTop: 16 }}>
+        {[
+          { label: "Shard ID", value: file.shardId },
+          { label: "Last modified", value: file.modified },
+          { label: "Encryption", value: file.encrypted ? "XChaCha20-Poly1305" : "None" },
+          { label: "Status", value: "Verified ✓" },
+          { label: "Owner", value: file.owner },
+        ].map(row => (
+          <div key={row.label}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>{row.label}</p>
+            <p style={{ fontSize: 13, color: c.textPrimary, fontFamily: row.label === "Shard ID" ? "monospace" : "inherit" }}>{row.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Actions */}
+      <div style={{ marginTop: "auto", paddingTop: 20, display: "flex", flexDirection: "column", gap: 8 }}>
+        <button style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "#1A73E8", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+          Open Shard
+        </button>
+        <button style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "transparent", color: "#EA4335", border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+          Delete
+        </button>
       </div>
     </div>
   );
 }
 
-function StorageView() {
-  const files = [
-    { name: "Project_Aurora_Source.zip", size: "1.2 GB", id: "xP91kL2", date: "Mar 24, 2024" },
-    { name: "Family_Holidays_4K.mp4", size: "8.5 GB", id: "mJ00zW9", date: "Mar 22, 2024" },
-    { name: "Secrets_Vault.nexus", size: "12 KB", id: "kK88vR4", date: "Mar 21, 2024" },
-    { name: "Work_Documents_PDF.7z", size: "240 MB", id: "tU44nH7", date: "Mar 19, 2024" },
+// ─── Task Overlay ─────────────────────────────────────────────────────────────
+
+function TaskOverlay({ tasks, c }: { tasks: Record<string, BackendTask>; c: ColorSet }) {
+  const activeTasks = Object.values(tasks).filter(t => t.Status !== "Completed" && !t.Status.startsWith("Error"));
+  if (activeTasks.length === 0) return null;
+
+  return (
+    <div style={{
+      position: "absolute", bottom: 16, right: 16,
+      width: 320, background: c.bgSurface,
+      borderRadius: 12, border: `1px solid ${c.border}`,
+      boxShadow: "0 12px 32px rgba(0,0,0,0.15)",
+      zIndex: 100, overflow: "hidden"
+    }}>
+      <div style={{ padding: "12px 16px", background: c.bgApp, borderBottom: `1px solid ${c.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>Processing Files</span>
+        <span style={{ fontSize: 11, background: "#1A73E8", color: "white", padding: "2px 6px", borderRadius: 10 }}>{activeTasks.length}</span>
+      </div>
+      <div style={{ maxHeight: 240, overflowY: "auto" }}>
+        {activeTasks.map(t => (
+          <div key={t.ID} style={{ padding: "12px 16px", borderBottom: `1px solid ${c.border}` }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                {t.FilePath.split('/').pop()}
+              </span>
+              <span style={{ fontSize: 11, color: c.textSecondary }}>{t.Status}</span>
+            </div>
+            <div style={{ height: 4, background: c.border, borderRadius: 2, overflow: "hidden" }}>
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${t.Progress}%` }}
+                style={{ height: "100%", background: "#1A73E8" }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Security Section ─────────────────────────────────────────────────────────
+
+function SecuritySection({ c, stats }: { c: ColorSet; stats: Stats }) {
+  const protocols = [
+    { name: "XChaCha20-Poly1305 Encryption", detail: `${stats.file_count} files secured with unique keys`, active: true },
+    { name: "Argon2id Key Derivation", detail: "64 MB memory, 3 passes — GPU resistant", active: true },
+    { name: "SHA-256 + xxHash3 Integrity", detail: "Dual fingerprint verification on every shard", active: true },
+    { name: "Tank Pixel Encoding (4×4 B&W)", detail: "High-resilience YouTube archival", active: true },
+    { name: "Zero-Server Architecture", detail: "Local private index, no central database", active: true },
+    { name: "Post-Quantum Cryptography", detail: "Kyber-768 planned for Phase 8", active: false },
   ];
 
   return (
-    <div className="glass-card rounded-2x overflow-hidden">
-      <table className="w-full text-left">
-        <thead>
-          <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
-            <th className="px-6 py-4 font-semibold">File Name</th>
-            <th className="px-6 py-4 font-semibold">Size</th>
-            <th className="px-6 py-4 font-semibold">YouTube ID</th>
-            <th className="px-6 py-4 font-semibold">Created</th>
-            <th className="px-6 py-4 font-semibold"></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {files.map((file, i) => (
-            <tr key={i} className="hover:bg-muted/50 transition-colors group cursor-pointer">
-              <td className="px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                    <File size={18} />
-                  </div>
-                  <span className="font-medium">{file.name}</span>
-                </div>
-              </td>
-              <td className="px-6 py-4 text-sm text-muted-foreground">{file.size}</td>
-              <td className="px-6 py-4">
-                <code className="text-[10px] bg-muted px-2 py-1 rounded text-primary">{file.id}</code>
-              </td>
-              <td className="px-6 py-4 text-sm text-muted-foreground">{file.date}</td>
-              <td className="px-6 py-4 text-right">
-                <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-muted rounded text-muted-foreground">
-                  <MoreVertical size={18} />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div style={{ maxWidth: 640 }}>
+      <p style={{ fontSize: 14, fontWeight: 500, color: c.textSecondary, marginBottom: 20 }}>Security Protocols</p>
+      <div style={{ borderRadius: 12, border: `1px solid ${c.border}`, overflow: "hidden" }}>
+        {protocols.map((p, i) => (
+          <div key={p.name} style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            padding: "16px 20px",
+            borderBottom: i < protocols.length - 1 ? `1px solid ${c.border}` : "none",
+          }}>
+            <div style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: p.active ? "#34A853" : c.border,
+              boxShadow: p.active ? "0 0 6px #34A853" : "none",
+              flexShrink: 0,
+            }} />
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, marginBottom: 2 }}>{p.name}</p>
+              <p style={{ fontSize: 13, color: c.textSecondary }}>{p.detail}</p>
+            </div>
+            <span style={{
+              fontSize: 11, fontWeight: 700,
+              padding: "3px 8px", borderRadius: 6,
+              background: p.active ? "#E6F4EA" : c.bgHover,
+              color: p.active ? "#137333" : c.textSecondary,
+              letterSpacing: 0.5,
+              textTransform: "uppercase",
+            }}>
+              {p.active ? "Active" : "Pending"}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-function StatCard({ title, value, sub, icon, trend }: any) {
+// ─── Upload Modal ─────────────────────────────────────────────────────────────
+
+function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: () => void; c: ColorSet }) {
+  const [mode, setMode] = useState<"tank" | "density">("tank");
   return (
-    <div className="glass p-6 rounded-2xl space-y-4">
-      <div className="flex justify-between items-start">
-        <div className="p-2 rounded-xl bg-background border border-border">
-          {icon}
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: `1px solid ${c.border}` }}>
+        <span style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary }}>Upload to Nexus</span>
+        <button onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", color: c.textSecondary }}>
+          <X size={20} />
+        </button>
+      </div>
+      <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+        {/* Drop zone */}
+        <div 
+          onClick={onUpload}
+          style={{
+            border: `2px dashed ${c.border}`, borderRadius: 16,
+            padding: "40px 24px", display: "flex", flexDirection: "column",
+            alignItems: "center", gap: 12, cursor: "pointer", textAlign: "center",
+          }}>
+          <div style={{ width: 56, height: 56, borderRadius: 16, background: "#E8F0FE", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Upload size={28} color="#1A73E8" />
+          </div>
+          <p style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>Drop files here, or click to browse</p>
+          <p style={{ fontSize: 13, color: c.textSecondary }}>Encrypted and sharded across the YouTube network</p>
         </div>
-        <span className="text-[10px] font-bold text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-          {trend}
-        </span>
-      </div>
-      <div>
-        <p className="text-sm text-muted-foreground">{title}</p>
-        <p className="text-3xl font-bold tracking-tight">{value}</p>
-        <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+        {/* Mode */}
+        <div>
+          <p style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Encoding Mode</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {[
+              { id: "tank" as const, name: "Tank (Safe)", desc: "4×4 B&W — Maximum resilience" },
+              { id: "density" as const, name: "Density (Fast)", desc: "2×2 nibbles — 4× throughput" },
+            ].map(m => (
+              <button
+                key={m.id}
+                onClick={() => setMode(m.id)}
+                style={{
+                  padding: "12px 14px", borderRadius: 10, textAlign: "left",
+                  background: mode === m.id ? "#E8F0FE" : "transparent",
+                  border: `1.5px solid ${mode === m.id ? "#1A73E8" : c.border}`,
+                  cursor: "pointer", transition: "all 0.15s",
+                }}
+              >
+                <p style={{ fontSize: 13, fontWeight: 600, color: mode === m.id ? "#1A73E8" : c.textPrimary, marginBottom: 3 }}>{m.name}</p>
+                <p style={{ fontSize: 12, color: c.textSecondary }}>{m.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+        <button 
+          onClick={onUpload}
+          style={{ width: "100%", padding: "13px 20px", borderRadius: 12, background: "#1A73E8", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+          Start Upload
+        </button>
       </div>
     </div>
   );
 }
 
-function ActivityItem({ type, name, status, time, size }: any) {
+// ─── Small Helpers ────────────────────────────────────────────────────────────
+
+function NavItem({ item, active, onClick, c }: { item: { id: string; icon: any; label: string }; active: boolean; onClick: () => void; c: ColorSet }) {
+  const Ico = item.icon;
   return (
-    <div className="flex items-center gap-4 group">
-      <div className={cn(
-        "w-10 h-10 rounded-xl flex items-center justify-center border border-border",
-        type === 'file' ? "bg-blue-400/10 text-blue-400" : "bg-orange-400/10 text-orange-400"
-      )}>
-        {type === 'file' ? <File size={20} /> : <Folder size={20} />}
-      </div>
-      <div className="flex-1">
-        <p className="text-sm font-medium leading-none">{name}</p>
-        <p className="text-xs text-muted-foreground mt-1">{status}</p>
-      </div>
-      <div className="text-right">
-        <p className="text-xs font-medium">{size}</p>
-        <p className="text-[10px] text-muted-foreground">{time}</p>
-      </div>
+    <div
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 14,
+        padding: "9px 16px", borderRadius: 24,
+        background: active ? c.bgActive : "transparent",
+        color: active ? c.textActive : c.textPrimary,
+        fontSize: 14, fontWeight: active ? 600 : 400,
+        cursor: "pointer", transition: "background 0.15s",
+        userSelect: "none",
+      }}
+      onMouseEnter={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = c.bgHover; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = active ? c.bgActive : "transparent"; }}
+    >
+      <Ico size={20} color={active ? c.iconActive : c.textSecondary} />
+      {item.label}
     </div>
   );
 }
 
-function QuickLink({ label, icon }: any) {
+function IconBtn({ onClick, title, children, dark, danger }: { onClick: () => void; title: string; children: React.ReactNode; dark: boolean; danger?: boolean }) {
   return (
-    <button className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted transition-colors text-sm font-medium group">
-      <div className="text-muted-foreground group-hover:text-primary transition-colors">
-        {icon}
-      </div>
-      {label}
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        width: 40, height: 40, borderRadius: "50%",
+        border: "none", background: "transparent",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: "pointer", color: danger ? "#EA4335" : (dark ? "#E3E3E3" : "#444746"),
+        transition: "background 0.15s",
+      }}
+    >
+      {children}
     </button>
   );
 }
+
+function ViewToggleBtn({ active, onClick, title, children, c }: { active: boolean; onClick: () => void; title: string; children: React.ReactNode; c: ColorSet }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        width: 36, height: 36, borderRadius: 8,
+        border: "none",
+        background: active ? c.bgActive : "transparent",
+        color: active ? c.iconActive : c.textSecondary,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: "pointer", transition: "background 0.15s",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function EmptyState({ icon, title, sub, c }: { icon: React.ReactNode; title: string; sub: string; c: ColorSet }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 40px", textAlign: "center", color: c.textSecondary }}>
+      <div style={{ marginBottom: 16, opacity: 0.35 }}>{icon}</div>
+      <p style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, marginBottom: 8 }}>{title}</p>
+      <p style={{ fontSize: 14, maxWidth: 320 }}>{sub}</p>
+    </div>
+  );
+}
+
+// ─── Color Palettes ───────────────────────────────────────────────────────────
+
+interface ColorSet {
+  bgApp: string; bgSurface: string; bgSearch: string; bgHover: string; bgActive: string;
+  textPrimary: string; textSecondary: string; textActive: string; iconActive: string;
+  border: string; btnShadow: string;
+}
+
+const LIGHT: ColorSet = {
+  bgApp:         "#F0F4F9",
+  bgSurface:     "#FFFFFF",
+  bgSearch:      "#DDE3EA",
+  bgHover:       "#E2E8F0",
+  bgActive:      "#C2E7FF",
+  textPrimary:   "#1F1F1F",
+  textSecondary: "#444746",
+  textActive:    "#001D35",
+  iconActive:    "#0842A0",
+  border:        "#E0E0E0",
+  btnShadow:     "0 1px 3px rgba(60,64,67,.3), 0 4px 8px rgba(60,64,67,.15)",
+};
+
+const DARK: ColorSet = {
+  bgApp:         "#131314",
+  bgSurface:     "#1E1F20",
+  bgSearch:      "#2A2B2C",
+  bgHover:       "#2D2E30",
+  bgActive:      "#004A77",
+  textPrimary:   "#E3E3E3",
+  textSecondary: "#9AA0A6",
+  textActive:    "#C2E7FF",
+  iconActive:    "#8AB4F8",
+  border:        "#3C4043",
+  btnShadow:     "0 1px 3px rgba(0,0,0,.5), 0 4px 8px rgba(0,0,0,.3)",
+};
