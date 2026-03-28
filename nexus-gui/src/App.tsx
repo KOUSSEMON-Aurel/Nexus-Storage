@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Search, Plus, HardDrive, Shield, Clock, Star, Trash2,
+import { Search, Plus, HardDrive, Shield, Clock, Star, Trash2,
   Grid3X3, List, FileText, FileImage, Archive, Lock,
   X, MoreVertical, Moon, Sun, CloudLightning, ChevronRight,
-  Upload
+  Upload, Minus, Square
 } from "lucide-react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,8 @@ interface NFile {
   starred: boolean;
   encrypted: boolean;
   owner: string;
+  deleted: boolean;
+  rawDate: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -37,6 +40,8 @@ interface BackendFile {
   Hash: string;
   Key: string;
   LastUpdate: string;
+  Starred: boolean;
+  DeletedAt: string | null;
 }
 
 interface BackendTask {
@@ -51,6 +56,14 @@ interface BackendTask {
 interface Stats {
   file_count: number;
   total_size: number;
+  starred_count?: number;
+  trash_count?: number;
+  active_tasks?: number;
+}
+
+interface AuthStatus {
+  authenticated: boolean;
+  user: string;
 }
 
 function mapBackendToFile(bf: BackendFile): NFile {
@@ -70,9 +83,11 @@ function mapBackendToFile(bf: BackendFile): NFile {
     type: type,
     modified: new Date(bf.LastUpdate).toLocaleDateString(),
     shardId: bf.VideoID.substring(0, 8),
-    starred: false,
+    starred: bf.Starred,
     encrypted: true,
-    owner: "me"
+    owner: "me",
+    deleted: !!bf.DeletedAt,
+    rawDate: new Date(bf.LastUpdate).getTime(),
   };
 }
 
@@ -102,10 +117,18 @@ export default function App() {
   const [dark, setDark] = useState(false);
   const [selected, setSelected] = useState<NFile | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   
   const [dbFiles, setDbFiles] = useState<NFile[]>([]);
   const [tasks, setTasks] = useState<Record<string, BackendTask>>({});
   const [stats, setStats] = useState<Stats>({ file_count: 0, total_size: 0 });
+  const [auth, setAuth] = useState<AuthStatus>({ authenticated: false, user: "" });
+  const [accountOpen, setAccountOpen] = useState(false);
+
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -115,8 +138,9 @@ export default function App() {
   useEffect(() => {
     const poll = async () => {
       try {
+        const fetchFilesUrl = section === "trash" ? `${API_BASE}/trash` : `${API_BASE}/files`;
         const [filesRes, tasksRes, statsRes] = await Promise.all([
-          fetch(`${API_BASE}/files`),
+          fetch(fetchFilesUrl),
           fetch(`${API_BASE}/tasks`),
           fetch(`${API_BASE}/stats`)
         ]);
@@ -126,54 +150,111 @@ export default function App() {
           setDbFiles(data.map(mapBackendToFile));
         }
 
-        if (tasksRes.ok) {
-          setTasks(await tasksRes.json());
-        }
+        if (tasksRes.ok) setTasks(await tasksRes.json());
+        if (statsRes.ok) setStats(await statsRes.json());
 
-        if (statsRes.ok) {
-          setStats(await statsRes.json());
-        }
+        const authRes = await fetch(`${API_BASE}/auth/status`);
+        if (authRes.ok) setAuth(await authRes.json());
+        
       } catch (err) {
         console.error("API Error:", err);
       }
     };
 
     poll();
-    const interval = setInterval(poll, 5000);
+    const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [section]);
 
-  const handleUploadClick = async () => {
+  const handleUploadClick = async (mode: "tank" | "density") => {
     try {
-      const selectedPath = await open({
+      const selectedPath = await openDialog({
         multiple: false,
         directory: false,
       });
 
       if (selectedPath) {
+        showToast("Starting upload...", "success");
         const res = await fetch(`${API_BASE}/upload`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: selectedPath })
+          body: JSON.stringify({ path: selectedPath, mode })
         });
         if (res.ok) {
           setUploadOpen(false);
-          // Trigger immediate poll
+          showToast("Upload task added to queue.", "success");
+        } else {
+          showToast(`Error: ${await res.text()}`, "error");
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Upload error:", err);
+      showToast(`Upload error: ${err.message || err}`, "error");
     }
   };
 
-  const files = dbFiles.filter(f => {
+  const handleAction = async (action: "download" | "delete" | "star" | "restore" | "permanent", file: NFile) => {
+    try {
+      if (action === "download") {
+        showToast("Starting download...", "success");
+        const res = await fetch(`${API_BASE}/download`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ video_id: file.shardId, path: file.name })
+        });
+        if (res.ok) showToast("Download started", "success");
+        else showToast("Download failed", "error");
+      }
+      else if (action === "delete") {
+        if (!confirm(`Move ${file.name} to trash?`)) return;
+        const res = await fetch(`${API_BASE}/files/${file.id}`, { method: "DELETE" });
+        if (res.ok) { showToast("Moved to trash"); setDbFiles(dbFiles.map(f => f.id === file.id ? { ...f, deleted: true } : f)); setSelected(null); }
+      }
+      else if (action === "permanent") {
+        if (!confirm(`Permanently delete ${file.name}? This cannot be undone.`)) return;
+        const res = await fetch(`${API_BASE}/files/${file.id}/permanent`, { method: "DELETE" });
+        if (res.ok) { showToast("Permanently deleted"); setDbFiles(dbFiles.filter(f => f.id !== file.id)); setSelected(null); }
+      }
+      else if (action === "restore") {
+        const res = await fetch(`${API_BASE}/files/${file.id}/restore`, { method: "POST" });
+        if (res.ok) { showToast("File restored"); setDbFiles(dbFiles.map(f => f.id === file.id ? { ...f, deleted: false } : f)); }
+      }
+      else if (action === "star") {
+        const newStarred = !file.starred;
+        const res = await fetch(`${API_BASE}/files/${file.id}/star`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ starred: newStarred })
+        });
+        if (res.ok) {
+          showToast(newStarred ? "Starred" : "Unstarred");
+          const updatedFiles = dbFiles.map(f => f.id === file.id ? { ...f, starred: newStarred } : f);
+          setDbFiles(updatedFiles);
+          if (selected?.id === file.id) {
+            setSelected({ ...file, starred: newStarred });
+          }
+        }
+      }
+    } catch (err: any) {
+      showToast(`Action failed: ${err.message}`, "error");
+    }
+  };
+
+  let files = dbFiles.filter(f => {
     const q = search.toLowerCase();
     const matchSearch = f.name.toLowerCase().includes(q);
-    const matchSection =
-      section === "starred" ? f.starred :
-      section === "trash"   ? false : true;
-    return matchSearch && matchSection;
+    if (!matchSearch) return false;
+
+    if (section === "trash") return f.deleted;
+    if (f.deleted) return false;
+    
+    if (section === "starred") return f.starred;
+    return true;
   });
+
+  if (section === "recent") {
+    files = [...files].sort((a, b) => b.rawDate - a.rawDate).slice(0, 20);
+  }
 
   // Colors derived from dark/light mode
   const c = dark ? DARK : LIGHT;
@@ -187,7 +268,9 @@ export default function App() {
   };
 
   return (
-    <div style={{ background: c.bgApp, color: c.textPrimary, fontFamily: "'Inter', system-ui, sans-serif", height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div 
+      data-tauri-drag-region
+      style={{ background: c.bgApp, color: c.textPrimary, fontFamily: "'Inter', system-ui, sans-serif", height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       
       {/* ━━━━ HEADER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <header
@@ -198,16 +281,14 @@ export default function App() {
           alignItems: "center",
           padding: "0 24px",
           gap: 16,
-          background: dark ? "rgba(30,31,32,0.7)" : "rgba(240,244,249,0.7)",
-          backdropFilter: "blur(12px)",
-          borderBottom: `1px solid ${c.border}`,
+          background: c.bgApp,
           flexShrink: 0,
           cursor: "default",
           zIndex: 50,
         }}
       >
         {/* Logo - 256px to match sidebar */}
-        <div style={{ width: 256, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        <div style={{ width: 256, display: "flex", alignItems: "center", gap: 10, flexShrink: 0, pointerEvents: "none", userSelect: "none" }}>
           <div style={{ width: 40, height: 40, borderRadius: 12, background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <CloudLightning size={22} color="white" />
           </div>
@@ -216,7 +297,7 @@ export default function App() {
 
         {/* Search - grows to fill center */}
         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, background: c.bgSearch, borderRadius: 24, padding: "0 20px", height: 46 }}>
-          <Search size={20} color={c.textSecondary} style={{ flexShrink: 0 }} />
+          <Search size={20} color={c.textSecondary} style={{ flexShrink: 0, pointerEvents: "none" }} />
           <input
             type="text"
             placeholder="Search in Nexus"
@@ -230,6 +311,7 @@ export default function App() {
               fontSize: 16,
               color: c.textPrimary,
               lineHeight: "1.5",
+              pointerEvents: "auto", // Ensure the input itself is interactive
             }}
           />
         </div>
@@ -239,32 +321,45 @@ export default function App() {
           <IconBtn onClick={() => setDark(d => !d)} title="Toggle theme" dark={dark}>
             {dark ? <Sun size={20} /> : <Moon size={20} />}
           </IconBtn>
-          <IconBtn onClick={() => window.close()} title="Close" dark={dark} danger>
-            <X size={20} />
-          </IconBtn>
           {/* Avatar */}
-          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 14, fontWeight: 600, marginLeft: 8, cursor: "pointer" }}>
-            AK
+          <div 
+            onClick={() => setAccountOpen(true)}
+            style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 14, fontWeight: 600, marginLeft: 8, cursor: "pointer", pointerEvents: "auto" }}>
+            {auth.authenticated ? auth.user.charAt(0).toUpperCase() : "!"}
+          </div>
+          <div style={{ pointerEvents: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+            <IconBtn onClick={() => getCurrentWindow().minimize()} title="Minimize" dark={dark}>
+              <Minus size={20} />
+            </IconBtn>
+            <IconBtn onClick={async () => await getCurrentWindow().toggleMaximize()} title="Maximize" dark={dark}>
+              <Square size={16} />
+            </IconBtn>
+            <IconBtn onClick={() => getCurrentWindow().close()} title="Close" dark={dark}>
+              <X size={20} />
+            </IconBtn>
           </div>
         </div>
       </header>
 
       {/* ━━━━ BODY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      {!auth.authenticated ? (
+        <SignInView c={c} />
+      ) : (
+        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         
         {/* ━━━━ SIDEBAR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <aside style={{ 
+        <aside 
+          data-tauri-drag-region
+          style={{ 
           width: 256, flexShrink: 0, 
-          background: dark ? "rgba(30,31,32,0.4)" : "rgba(240,244,249,0.4)", 
-          backdropFilter: "blur(12px)",
+          background: c.bgApp,
           display: "flex", flexDirection: "column", paddingTop: 16, paddingBottom: 16, overflow: "hidden",
-          borderRight: `1px solid ${c.border}`
         }}>
           
           {/* New Button */}
           <div style={{ padding: "0 16px 16px" }}>
             <button
-              onClick={handleUploadClick}
+              onClick={() => setUploadOpen(true)}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -316,7 +411,7 @@ export default function App() {
             <div style={{ height: 4, background: c.border, borderRadius: 4, overflow: "hidden", marginBottom: 6 }}>
               <div style={{ width: `${Math.min(100, (stats.total_size / (1024 * 1024 * 1024 * 1024)) * 100)}%`, height: "100%", background: "#1A73E8", borderRadius: 4 }} />
             </div>
-            <span style={{ fontSize: 12, color: c.textSecondary }}>{formatSize(stats.total_size)} of 15 GB used</span>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>{formatSize(stats.total_size)} secured (unlimited quota)</span>
           </div>
 
         </aside>
@@ -372,7 +467,7 @@ export default function App() {
               <AnimatePresence mode="wait">
                 <motion.div key={section} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}>
                   {section === "security" ? (
-                    <SecuritySection c={c} stats={stats} />
+                    <SecuritySection c={c} />
                   ) : section === "trash" ? (
                     <EmptyState icon={<Trash2 size={64} />} title="Trash is empty" sub="Items deleted from Nexus are stored here temporarily." c={c} />
                   ) : files.length === 0 ? (
@@ -403,13 +498,14 @@ export default function App() {
                   transition={{ duration: 0.2, ease: "easeInOut" }}
                   style={{ borderLeft: `1px solid ${c.border}`, overflow: "hidden", flexShrink: 0 }}
                 >
-                  <DetailPanel file={selected} onClose={() => setSelected(null)} c={c} />
+                  <DetailPanel file={selected} onClose={() => setSelected(null)} onAction={handleAction} c={c} section={section} />
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
         </main>
       </div>
+    )}
 
       {/* ━━━━ UPLOAD MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <AnimatePresence>
@@ -421,13 +517,12 @@ export default function App() {
               style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100 }}
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              initial={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
+              animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+              exit={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
               transition={{ duration: 0.18 }}
               style={{
                 position: "fixed", top: "50%", left: "50%",
-                transform: "translate(-50%, -50%)",
                 width: 460, zIndex: 101,
                 background: c.bgSurface,
                 border: `1px solid ${c.border}`,
@@ -441,6 +536,149 @@ export default function App() {
           </>
         )}
       </AnimatePresence>
+
+      {/* ━━━━ ACCOUNT MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <AnimatePresence>
+        {accountOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setAccountOpen(false)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200 }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
+              animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+              exit={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
+              style={{
+                position: "fixed", top: "50%", left: "50%",
+                width: 380, zIndex: 201,
+                background: c.bgSurface,
+                border: `1px solid ${c.border}`,
+                borderRadius: 24,
+                overflow: "hidden",
+                boxShadow: "0 24px 60px rgba(0,0,0,0.3)",
+                padding: 32,
+                display: "flex", flexDirection: "column", alignItems: "center"
+              }}
+            >
+              <div style={{ width: 80, height: 80, borderRadius: "50%", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 32, fontWeight: 600, marginBottom: 16 }}>
+                {auth.authenticated ? auth.user.charAt(0).toUpperCase() : "!"}
+              </div>
+              <h2 style={{ fontSize: 20, fontWeight: 600, color: c.textPrimary, marginBottom: 4 }}>
+                {auth.authenticated ? "Aurel" : "Guest User"}
+              </h2>
+              <p style={{ fontSize: 14, color: c.textSecondary, marginBottom: 24 }}>
+                {auth.authenticated ? auth.user : "No YouTube account connected"}
+              </p>
+              
+              <div style={{ width: "100%", height: 1, background: c.border, marginBottom: 24 }} />
+              
+              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 13, color: c.textSecondary }}>System Access</span>
+                  <span style={{ fontSize: 13, color: "#34A853", fontWeight: 600 }}>Active</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 13, color: c.textSecondary }}>Encryption</span>
+                  <span style={{ fontSize: 13, color: c.textPrimary }}>XChaCha20</span>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => setAccountOpen(false)}
+                style={{ marginTop: 32, width: "100%", padding: "12px", borderRadius: 12, background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, cursor: "pointer", fontWeight: 500 }}
+              >
+                Close Profile
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ━━━━ TOAST ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            style={{
+              position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+              background: toast.type === "error" ? "#EA4335" : "#323232",
+              color: "white", padding: "12px 24px", borderRadius: 8,
+              fontSize: 14, fontWeight: 500, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              zIndex: 9999, display: "flex", alignItems: "center", gap: 12
+            }}
+          >
+            {toast.msg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
+}
+
+// ─── SignInView ──────────────────────────────────────────────────────────────
+
+function SignInView({ c }: { c: ColorSet }) {
+  const [loading, setLoading] = useState(false);
+  const lock = useRef(false);
+
+  const handleLogin = async () => {
+    if (lock.current) return;
+    lock.current = true;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          await openUrl(data.url);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      // Keep it locked for 5 seconds to prevent any weird bounce
+      setTimeout(() => {
+        lock.current = false;
+        setLoading(false);
+      }, 5000);
+    }
+  };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: c.bgApp, padding: 40, textAlign: "center" }}>
+      <div style={{ width: 80, height: 80, borderRadius: 24, background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 32, boxShadow: "0 20px 40px rgba(26,115,232,0.3)" }}>
+        <CloudLightning size={44} color="white" />
+      </div>
+      <h1 style={{ fontSize: 32, fontWeight: 700, color: c.textPrimary, marginBottom: 12 }}>Welcome to Nexus</h1>
+      <p style={{ fontSize: 16, color: c.textSecondary, maxWidth: 400, marginBottom: 40, lineHeight: 1.6 }}>
+        Your ultra-secure, decentralized storage backed by high-resilience YouTube archival.
+      </p>
+      
+      <button 
+        onClick={handleLogin}
+        disabled={loading}
+        style={{
+          display: "flex", alignItems: "center", gap: 12,
+          padding: "16px 32px", borderRadius: 16,
+          background: "#1A73E8", color: "white",
+          border: "none", fontSize: 16, fontWeight: 600,
+          cursor: "pointer", boxShadow: "0 8px 16px rgba(26,115,232,0.2)",
+          transition: "transform 0.1s, opacity 0.1s",
+          opacity: loading ? 0.7 : 1,
+        }}
+      >
+        <Plus size={20} color="white" />
+        {loading ? "Check your browser..." : "Connect YouTube Account"}
+      </button>
+      
+      <p style={{ marginTop: 32, fontSize: 13, color: c.textSecondary }}>
+        Safe. Private. Unlimited.
+      </p>
     </div>
   );
 }
@@ -554,7 +792,7 @@ function FileList({ files, onSelect, selected, c, dark }: { files: NFile[]; onSe
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ file, onClose, c }: { file: NFile; onClose: () => void; c: ColorSet }) {
+function DetailPanel({ file, onClose, onAction, c, section }: { file: NFile; onClose: () => void; onAction: (action: "download" | "delete" | "star" | "restore" | "permanent", file: NFile) => void; c: ColorSet; section: Section }) {
   const cfg = TYPE_CONFIG[file.type];
   const Ico = cfg.icon;
   return (
@@ -593,12 +831,28 @@ function DetailPanel({ file, onClose, c }: { file: NFile; onClose: () => void; c
 
       {/* Actions */}
       <div style={{ marginTop: "auto", paddingTop: 20, display: "flex", flexDirection: "column", gap: 8 }}>
-        <button style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "#1A73E8", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-          Open Shard
-        </button>
-        <button style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "transparent", color: "#EA4335", border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-          Delete
-        </button>
+        {file.deleted || section === "trash" ? (
+          <>
+            <button onClick={() => onAction("restore", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "#34A853", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+              Restore File
+            </button>
+            <button onClick={() => onAction("permanent", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "transparent", color: "#EA4335", border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+              Delete Permanently
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={() => onAction("download", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "#1A73E8", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+              Open Shard
+            </button>
+            <button onClick={() => onAction("star", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "transparent", color: file.starred ? "#F59E0B" : c.textPrimary, border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+              {file.starred ? "Unstar" : "Star"}
+            </button>
+            <button onClick={() => onAction("delete", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "transparent", color: "#EA4335", border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+              Delete to Trash
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -647,15 +901,17 @@ function TaskOverlay({ tasks, c }: { tasks: Record<string, BackendTask>; c: Colo
 
 // ─── Security Section ─────────────────────────────────────────────────────────
 
-function SecuritySection({ c, stats }: { c: ColorSet; stats: Stats }) {
-  const protocols = [
-    { name: "XChaCha20-Poly1305 Encryption", detail: `${stats.file_count} files secured with unique keys`, active: true },
-    { name: "Argon2id Key Derivation", detail: "64 MB memory, 3 passes — GPU resistant", active: true },
-    { name: "SHA-256 + xxHash3 Integrity", detail: "Dual fingerprint verification on every shard", active: true },
-    { name: "Tank Pixel Encoding (4×4 B&W)", detail: "High-resilience YouTube archival", active: true },
-    { name: "Zero-Server Architecture", detail: "Local private index, no central database", active: true },
-    { name: "Post-Quantum Cryptography", detail: "Kyber-768 planned for Phase 8", active: false },
-  ];
+function SecuritySection({ c }: { c: ColorSet }) {
+  const [protocols, setProtocols] = useState<{name: string, detail: string, active: boolean}[]>([]);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/security`)
+      .then(res => res.json())
+      .then(data => setProtocols(data))
+      .catch(console.error);
+  }, []);
+
+  if (protocols.length === 0) return <div style={{ color: c.textSecondary }}>Loading security info...</div>;
 
   return (
     <div style={{ maxWidth: 640 }}>
@@ -698,7 +954,7 @@ function SecuritySection({ c, stats }: { c: ColorSet; stats: Stats }) {
 
 // ─── Upload Modal ─────────────────────────────────────────────────────────────
 
-function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: () => void; c: ColorSet }) {
+function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: (mode: "tank" | "density") => void; c: ColorSet }) {
   const [mode, setMode] = useState<"tank" | "density">("tank");
   return (
     <div>
@@ -711,7 +967,7 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
       <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
         {/* Drop zone */}
         <div 
-          onClick={onUpload}
+          onClick={() => onUpload(mode)}
           style={{
             border: `2px dashed ${c.border}`, borderRadius: 16,
             padding: "40px 24px", display: "flex", flexDirection: "column",
@@ -748,7 +1004,7 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
           </div>
         </div>
         <button 
-          onClick={onUpload}
+          onClick={() => onUpload(mode)}
           style={{ width: "100%", padding: "13px 20px", borderRadius: 12, background: "#1A73E8", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
           Start Upload
         </button>

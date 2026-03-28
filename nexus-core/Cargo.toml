@@ -5,6 +5,8 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 description = "NexusStorage core engine: pixel encoding, fountain codes, encryption, compression."
+
+[lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]

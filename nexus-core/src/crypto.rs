@@ -8,7 +8,7 @@
 //   [40..]   — ciphertext + 16-byte Poly1305 authentication tag
 
 use chacha20poly1305::{
-    aead::{Aead, KeyInit, OsRng as AeadOsRng},
+    aead::{Aead, KeyInit},
     XChaCha20Poly1305, XNonce,
 };
 use argon2::{Argon2, Params, Version};

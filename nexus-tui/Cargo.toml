@@ -7,13 +7,12 @@ license.workspace = true
 description = "NexusStorage Terminal Interactive UI (TUI)."
 
 [dependencies]
-ratatui = "0.26"
-crossterm = { version = "0.27", features = ["event-stream"] }
+ratatui = "0.29"
+crossterm = { version = "0.28", features = ["event-stream"] }
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
-tui-logger = "0.11"
 futures = "0.3"
-lucide-icons = "0.1.0" # Note: fake or custom, I'll use text for symbols
+sysinfo = "0.30"

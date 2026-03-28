@@ -92,6 +92,19 @@ int32_t nexus_encode_to_frames(
     int32_t mode
 );
 
+/**
+ * Decode a payload from PNG frames in frame_dir.
+ * mode: 0=Tank, 1=Density
+ * out_ptr will point to a buffer that must be freed with nexus_free_bytes.
+ * Returns 0 on success or a negative error code.
+ */
+int32_t nexus_decode_from_frames(
+    const char* frame_dir,
+    int32_t mode,
+    uint8_t** out_ptr,
+    size_t* out_len
+);
+
 #ifdef __cplusplus
 }
 #endif

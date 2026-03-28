@@ -38,7 +38,7 @@ pub fn decode_from_frames(frame_dir: &Path, mode: EncodingMode) -> NexusResult<V
     // Frame 0: calibration frame — compute the dynamic threshold
     let threshold = read_calibration_threshold(&frame_paths[0])?;
 
-    let bytes_per_frame = match mode {
+    let _bytes_per_frame = match mode {
         EncodingMode::Tank => TANK_BYTES_PER_FRAME,
         EncodingMode::Density => DENSITY_BYTES_PER_FRAME,
     };
@@ -56,7 +56,7 @@ pub fn decode_from_frames(frame_dir: &Path, mode: EncodingMode) -> NexusResult<V
         .collect::<NexusResult<Vec<_>>>()?;
 
     // Flatten all frame chunks into a single byte stream
-    let mut raw: Vec<u8> = frame_chunks.into_iter().flatten().collect();
+    let raw: Vec<u8> = frame_chunks.into_iter().flatten().collect();
 
     // Read the 8-byte payload length header
     if raw.len() < 8 {

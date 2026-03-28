@@ -14,7 +14,7 @@
 //  that the decoder reads to compute the compression matrix YouTube applied.
 //  This makes the system resilient against *future* YouTube codec changes.
 
-use image::{ImageBuffer, Luma, Rgb};
+use image::{ImageBuffer, Luma};
 use rayon::prelude::*;
 use std::path::Path;
 use crate::types::{EncodingMode, NexusError, NexusResult};
@@ -94,7 +94,7 @@ fn write_calibration_frame(path: &Path, mode: EncodingMode) -> NexusResult<()> {
     // 16 vertical bands of evenly-spaced gray levels (0, 17, 34, … 255)
     let mut img = ImageBuffer::new(w, h);
     let band_w = w / 16;
-    for (x, y, pixel) in img.enumerate_pixels_mut() {
+    for (x, _y, pixel) in img.enumerate_pixels_mut() {
         let band = (x / band_w).min(15) as u8;
         let gray = band * 17; // 0, 17, 34, … 255
         // Encode the expected level also in the alpha channel for self-description

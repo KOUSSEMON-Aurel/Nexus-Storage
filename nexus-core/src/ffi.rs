@@ -22,7 +22,6 @@ const NEXUS_OK: c_int = 0;
 const NEXUS_ERR_NULL_PTR: c_int = -1;
 const NEXUS_ERR_CRYPTO: c_int = -2;
 const NEXUS_ERR_COMPRESS: c_int = -3;
-const NEXUS_ERR_IO: c_int = -6;
 
 // --------------------------
 //  Helpers
@@ -216,3 +215,34 @@ pub unsafe extern "C" fn nexus_encode_to_frames(
         Err(_) => -4, // NEXUS_ERR_ENCODE
     }
 }
+
+/// Decode a payload from a folder of PNG frames.
+/// On success: writes the output pointer to `*out_ptr`, its length to `*out_len`, returns 0.
+/// On failure: returns a negative error code.
+#[no_mangle]
+pub unsafe extern "C" fn nexus_decode_from_frames(
+    frame_dir: *const c_char,
+    mode: c_int,
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if frame_dir.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let path_str = match unsafe { CStr::from_ptr(frame_dir) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return NEXUS_ERR_NULL_PTR,
+    };
+    let path = Path::new(path_str);
+    let encoding_mode = match mode {
+        0 => EncodingMode::Tank,
+        1 => EncodingMode::Density,
+        _ => EncodingMode::Tank,
+    };
+
+    match crate::decoder::decode_from_frames(path, encoding_mode) {
+        Ok(data) => unsafe { alloc_bytes(data, out_ptr, out_len) },
+        Err(_) => -5, // NEXUS_ERR_DECODE
+    }
+}
+

@@ -3,6 +3,7 @@ package main
 /*
 #cgo LDFLAGS: -L${SRCDIR}/../target/debug -lnexus_core
 #cgo CFLAGS: -I${SRCDIR}/../nexus-core/include
+#include <stdlib.h>
 #include "nexus_core.h"
 */
 import "C"
@@ -158,7 +159,26 @@ func (nc *NexusCore) EncodeToFrames(data []byte, outputDir string, mode int) (in
 	return int(res), nil
 }
 
-func main() {
-	fmt.Println("Nexus-Daemon: testing core bindings...")
-	// This main function is temporary for testing.
+func (nc *NexusCore) DecodeFromFrames(outputDir string, mode int) ([]byte, error) {
+	cDir := C.CString(outputDir)
+	defer C.free(unsafe.Pointer(cDir))
+
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+
+	res := C.nexus_decode_from_frames(
+		cDir,
+		C.int32_t(mode),
+		&outPtr,
+		&outLen,
+	)
+
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("decoding error (code %d)", res)
+	}
+
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
 }
+
+
