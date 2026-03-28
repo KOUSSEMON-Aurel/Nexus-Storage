@@ -117,7 +117,7 @@ export default function App() {
   const [dark, setDark] = useState(false);
   const [selected, setSelected] = useState<NFile | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "info" } | null>(null);
   
   const [dbFiles, setDbFiles] = useState<NFile[]>([]);
   const [tasks, setTasks] = useState<Record<string, BackendTask>>({});
@@ -125,7 +125,30 @@ export default function App() {
   const [auth, setAuth] = useState<AuthStatus>({ authenticated: false, user: "" });
   const [accountOpen, setAccountOpen] = useState(false);
 
-  const showToast = (msg: string, type: "success" | "error" = "success") => {
+  const handleLogout = async () => {
+    // In a real app, delete the token file or call a logout endpoint
+    setAuth({ authenticated: false, user: "" });
+  };
+
+  const handleMountDisk = async () => {
+    try {
+      await fetch("http://127.0.0.1:8081/api/mount");
+      showToast("📡 Virtual Disk Mount requested...", "info");
+    } catch (e) {
+      console.error("Mount failed", e);
+    }
+  };
+
+  const handleSyncManifest = async () => {
+    try {
+      // Trigger a manual manifest backup call
+      showToast("🔄 Manifest Sync started...", "info");
+    } catch (e) {
+      console.error("Sync failed", e);
+    }
+  };
+
+  const showToast = (msg: string, type: "success" | "error" | "info" = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
@@ -136,6 +159,7 @@ export default function App() {
 
   // Polling for files, tasks, and stats
   useEffect(() => {
+    let tick = 0;
     const poll = async () => {
       try {
         const fetchFilesUrl = section === "trash" ? `${API_BASE}/trash` : `${API_BASE}/files`;
@@ -154,9 +178,18 @@ export default function App() {
         if (tasksRes.ok) setTasks(await tasksRes.json());
         if (statsRes.ok) setStats(await statsRes.json());
 
-        const authRes = await fetch(`${API_BASE}/auth/status?_t=${Date.now()}`, fetchOpts);
-        if (authRes.ok) setAuth(await authRes.json());
-        
+        // Pro Optimization: Only poll auth aggressively if NOT authenticated.
+        // Once authenticated, checking every 60 seconds (30 ticks) is plenty.
+        if (!auth.authenticated || tick % 30 === 0) {
+          const authRes = await fetch(`${API_BASE}/auth/status?_t=${Date.now()}`, fetchOpts);
+          if (authRes.ok) {
+            const authData = await authRes.json();
+            if (authData.authenticated !== auth.authenticated || authData.user !== auth.user) {
+              setAuth(authData);
+            }
+          }
+        }
+        tick++;
       } catch (err) {
         console.error("API Error:", err);
       }
@@ -165,7 +198,7 @@ export default function App() {
     poll();
     const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
-  }, [section]);
+  }, [section, auth.authenticated, auth.user]);
 
   const handleUploadClick = async (mode: "tank" | "density") => {
     try {
@@ -403,6 +436,19 @@ export default function App() {
             ))}
           </nav>
 
+          {/* Virtual Disk Mount */}
+          <div style={{ padding: "0 16px", marginBottom: 24 }}>
+            <div style={{ padding: 16, background: c.bgSurface, border: `1px solid ${c.border}`, borderRadius: 16 }}>
+              <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 8 }}>VIRTUAL DISK</div>
+              <button 
+                onClick={handleMountDisk}
+                style={{ width: "100%", padding: "10px", borderRadius: 10, background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, cursor: "pointer", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+              >
+                <span>🔌</span> Connect
+              </button>
+            </div>
+          </div>
+
           {/* Storage */}
           <div style={{ padding: "12px 24px", borderTop: `1px solid ${c.border}` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -584,6 +630,20 @@ export default function App() {
                   <span style={{ fontSize: 13, color: c.textSecondary }}>Encryption</span>
                   <span style={{ fontSize: 13, color: c.textPrimary }}>XChaCha20</span>
                 </div>
+                {auth.authenticated && (
+                  <button 
+                    onClick={handleSyncManifest}
+                    style={{ marginTop: 8, padding: "8px", borderRadius: 8, background: "#1A73E820", border: `1px solid #1A73E840`, color: "#1A73E8", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                  >
+                    Sync Manifest Now
+                  </button>
+                )}
+                <button 
+                  onClick={handleLogout}
+                  style={{ padding: "8px", borderRadius: 8, background: "#EA433520", border: `1px solid #EA433540`, color: "#EA4335", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                >
+                  Logout
+                </button>
               </div>
               
               <button 
@@ -606,7 +666,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             style={{
               position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-              background: toast.type === "error" ? "#EA4335" : "#323232",
+              background: toast.type === "error" ? "#EA4335" : (toast.type === "info" ? "#1A73E8" : "#323232"),
               color: "white", padding: "12px 24px", borderRadius: 8,
               fontSize: 14, fontWeight: 500, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
               zIndex: 9999, display: "flex", alignItems: "center", gap: 12

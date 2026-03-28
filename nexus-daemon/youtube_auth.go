@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
 	"golang.org/x/oauth2"
@@ -60,6 +61,23 @@ func NewYouTubeManager() *YouTubeManager {
 	config.RedirectURL = "http://localhost:8080"
 	m.config = config
 	m.TryLoadToken()
+
+	// VALIDATION: If authenticated, check if we have the 'Search' scope by doing a tiny test call
+	if m.authed {
+		go func() {
+			svc := m.GetService()
+			if svc == nil { return }
+			_, err := svc.Search.List([]string{"id"}).MaxResults(1).ForMine(true).Do()
+			if err != nil && strings.Contains(err.Error(), "insufficientPermissions") {
+				log.Printf("⚠️  OAuth Scope mismatch detected (Old Token). Forcing Re-Auth...")
+				m.mu.Lock()
+				m.authed = false
+				m.mu.Unlock()
+				// Delete old token file to prevent loop
+				os.Remove(filepath.Join(getConfigDir(), "token.json"))
+			}
+		}()
+	}
 	return m
 }
 

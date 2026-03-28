@@ -50,10 +50,9 @@ func main() {
 	queue := TaskQueue{}
 	queue.Init(core, db, ytManager)
 
-	// 5. Start Event-Driven DB Manifest Backup
-	db.OnConfigChange = queue.RequestManifestBackup
-	// Initial backup 1 minute after startup
-	time.AfterFunc(1 * time.Minute, queue.QueueManifestBackup)
+	// 5. Manifest Backup is now triggered only after successful uploads (more efficient)
+	// (hooks removed from here to avoid over-frequent cloud sync)
+
 
 	// 6. Start API & WebDAV Server for GUI
 	api := &APIServer{db: db, queue: &queue, ytManager: ytManager}

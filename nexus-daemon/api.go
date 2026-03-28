@@ -39,6 +39,7 @@ func (s *APIServer) Start(port int) {
 	// Auth
 	mux.HandleFunc("/api/auth/status", s.handleAuthStatus)
 	mux.HandleFunc("/api/auth/login", s.handleAuthLogin)
+	mux.HandleFunc("/api/mount", s.handleMount)
 
 	handler := corsMiddleware(mux)
 	fmt.Printf("🌐 API Server starting on http://localhost:%d\n", port)
@@ -263,7 +264,6 @@ func (s *APIServer) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	s.ytManager.mu.RLock()
 	defer s.ytManager.mu.RUnlock()
-	log.Printf("📡 Auth Status Request: authenticated=%v, user=%s", s.ytManager.authed, s.ytManager.user)
 	jsonOK(w, map[string]any{
 		"authenticated": s.ytManager.authed,
 		"user":          s.ytManager.user,
@@ -327,6 +327,11 @@ func corsMiddleware(next http.Handler) http.Handler {
 func jsonOK(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
+}
+
+func (s *APIServer) handleMount(w http.ResponseWriter, r *http.Request) {
+	go autoMountLinux()
+	jsonOK(w, map[string]string{"status": "mount-requested"})
 }
 
 func httpError(w http.ResponseWriter, err error, code int) {

@@ -191,9 +191,10 @@ func (fs *NexusFS) Stat(ctx context.Context, name string) (os.FileInfo, error) {
 // NexusFile wraps os.File to intercept Close for Uploads
 type NexusFile struct {
 	webdav.File
-	fs      *NexusFS
-	name    string
-	isWrite bool
+	fs       *NexusFS
+	name     string
+	isWrite  bool
+	parentID *int64
 }
 
 func (f *NexusFile) Close() error {
@@ -207,17 +208,10 @@ func (f *NexusFile) Close() error {
 			Mode:      "tank",
 			Status:    "Pending",
 			CreatedAt: time.Now(),
+			ParentID:  f.parentID,
 		})
 	}
 	return err
-}
-
-type NexusFile struct {
-	webdav.File
-	fs       *NexusFS
-	name     string
-	isWrite  bool
-	parentID *int64
 }
 
 // NexusDir for directory listing

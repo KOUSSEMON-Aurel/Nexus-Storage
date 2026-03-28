@@ -99,18 +99,19 @@ func (d *Database) GetKV(key string) (string, bool) {
 	return value, true
 }
 
-func (d *Database) SaveFile(path, videoID string, size int64, hash, key string) error {
+func (d *Database) SaveFile(path, videoID string, size int64, hash, key string, parentID *int64) error {
 	query := `
-	INSERT INTO files (path, video_id, size, hash, key)
-	VALUES (?, ?, ?, ?, ?)
+	INSERT INTO files (path, video_id, size, hash, key, parent_id)
+	VALUES (?, ?, ?, ?, ?, ?)
 	ON CONFLICT(path) DO UPDATE SET
 		video_id = excluded.video_id,
 		size = excluded.size,
 		hash = excluded.hash,
 		key = excluded.key,
+		parent_id = excluded.parent_id,
 		last_update = CURRENT_TIMESTAMP;
 	`
-	if _, err := d.db.Exec(query, path, videoID, size, hash, key); err != nil {
+	if _, err := d.db.Exec(query, path, videoID, size, hash, key, parentID); err != nil {
 		return fmt.Errorf("could not save file: %w", err)
 	}
 	if d.OnConfigChange != nil {
@@ -121,7 +122,7 @@ func (d *Database) SaveFile(path, videoID string, size int64, hash, key string) 
 
 func (d *Database) GetFile(path string) (*FileRecord, error) {
 	row := d.db.QueryRow(`
-		SELECT id, path, video_id, size, hash, key, starred, deleted_at, last_update
+		SELECT id, path, video_id, size, hash, key, starred, deleted_at, last_update, parent_id
 		FROM files WHERE path = ?`, path)
 	return scanFile(row)
 }

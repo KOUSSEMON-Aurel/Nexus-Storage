@@ -30,6 +30,7 @@ type Task struct {
 	Status     string
 	Progress   float64
 	CreatedAt  time.Time
+	ParentID   *int64
 }
 
 type TaskQueue struct {
@@ -228,7 +229,12 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 
 	t.Status = "Finalizing"
 	t.Progress = 95
-	return q.db.SaveFile(filepath.Base(t.FilePath), response.Id, int64(len(data)), hash, "encrypted-key")
+	err = q.db.SaveFile(filepath.Base(t.FilePath), response.Id, int64(len(data)), hash, "encrypted-key", t.ParentID)
+	if err == nil {
+		log.Println("📁 File Upload successful. Requesting Manifest Sync...")
+		q.RequestManifestBackup()
+	}
+	return err
 }
 
 func (q *TaskQueue) RequestManifestBackup() {
