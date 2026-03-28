@@ -1,4 +1,5 @@
-.DS_Store
+# Local Go Env
+go_env/
 
 # Rust
 target/
@@ -12,6 +13,12 @@ nexus-gui/node_modules/
 nexus-gui/dist/
 nexus-gui/src-tauri/target/
 
+# Tauri Binaries & Sidecars
+nexus-gui/src-tauri/bin/nexus-daemon*
+nexus-gui/src-tauri/bin/*.so
+nexus-gui/src-tauri/bin/*.json
+nexus-gui/src-tauri/bin/nexus.db
+
 # SQLite
 *.db
 *.db-shm
@@ -21,3 +28,4 @@ nexus-gui/src-tauri/target/
 *.key
 *.pem
 .env
+client_secret.json
