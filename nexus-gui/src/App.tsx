@@ -30,7 +30,7 @@ interface NFile {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const API_BASE = "http://localhost:8081/api";
+const API_BASE = "http://127.0.0.1:8081/api";
 
 interface BackendFile {
   ID: number;
@@ -139,10 +139,11 @@ export default function App() {
     const poll = async () => {
       try {
         const fetchFilesUrl = section === "trash" ? `${API_BASE}/trash` : `${API_BASE}/files`;
+        const fetchOpts: RequestInit = { cache: "no-store", headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" } };
         const [filesRes, tasksRes, statsRes] = await Promise.all([
-          fetch(fetchFilesUrl),
-          fetch(`${API_BASE}/tasks`),
-          fetch(`${API_BASE}/stats`)
+          fetch(fetchFilesUrl, fetchOpts),
+          fetch(`${API_BASE}/tasks`, fetchOpts),
+          fetch(`${API_BASE}/stats`, fetchOpts)
         ]);
         
         if (filesRes.ok) {
@@ -153,7 +154,7 @@ export default function App() {
         if (tasksRes.ok) setTasks(await tasksRes.json());
         if (statsRes.ok) setStats(await statsRes.json());
 
-        const authRes = await fetch(`${API_BASE}/auth/status`);
+        const authRes = await fetch(`${API_BASE}/auth/status?_t=${Date.now()}`, fetchOpts);
         if (authRes.ok) setAuth(await authRes.json());
         
       } catch (err) {
@@ -861,8 +862,13 @@ function DetailPanel({ file, onClose, onAction, c, section }: { file: NFile; onC
 // ─── Task Overlay ─────────────────────────────────────────────────────────────
 
 function TaskOverlay({ tasks, c }: { tasks: Record<string, BackendTask>; c: ColorSet }) {
-  const activeTasks = Object.values(tasks).filter(t => t.Status !== "Completed" && !t.Status.startsWith("Error"));
-  if (activeTasks.length === 0) return null;
+  const [closedTasks, setClosedTasks] = useState<string[]>([]);
+  
+  const allTasks = Object.values(tasks).filter(t => !closedTasks.includes(t.ID));
+  const activeTasks = allTasks.filter(t => t.Status !== "Completed" && !t.Status.startsWith("Error"));
+  const finishedTasks = allTasks.filter(t => t.Status === "Completed" || t.Status.startsWith("Error"));
+
+  if (activeTasks.length === 0 && finishedTasks.length === 0) return null;
 
   return (
     <div style={{
@@ -874,26 +880,47 @@ function TaskOverlay({ tasks, c }: { tasks: Record<string, BackendTask>; c: Colo
     }}>
       <div style={{ padding: "12px 16px", background: c.bgApp, borderBottom: `1px solid ${c.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>Processing Files</span>
-        <span style={{ fontSize: 11, background: "#1A73E8", color: "white", padding: "2px 6px", borderRadius: 10 }}>{activeTasks.length}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {activeTasks.length > 0 && <span style={{ fontSize: 11, background: "#1A73E8", color: "white", padding: "2px 6px", borderRadius: 10 }}>{activeTasks.length}</span>}
+          {finishedTasks.length > 0 && (
+            <button 
+              onClick={() => setClosedTasks([...closedTasks, ...finishedTasks.map(t => t.ID)])}
+              style={{ border: "none", background: "transparent", color: "#1A73E8", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>
+              Clear all
+            </button>
+          )}
+        </div>
       </div>
-      <div style={{ maxHeight: 240, overflowY: "auto" }}>
-        {activeTasks.map(t => (
-          <div key={t.ID} style={{ padding: "12px 16px", borderBottom: `1px solid ${c.border}` }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                {t.FilePath.split('/').pop()}
-              </span>
-              <span style={{ fontSize: 11, color: c.textSecondary }}>{t.Status}</span>
+      <div style={{ maxHeight: 320, overflowY: "auto" }}>
+        {[...activeTasks, ...finishedTasks].map(t => {
+          const isError = t.Status.startsWith("Error");
+          const isDone = t.Status === "Completed";
+
+          return (
+            <div key={t.ID} style={{ padding: "12px 16px", borderBottom: `1px solid ${c.border}`, position: "relative" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, paddingRight: 20 }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                  {t.FilePath.split('/').pop()}
+                </span>
+                <span style={{ fontSize: 11, color: isError ? "#EA4335" : (isDone ? "#34A853" : c.textSecondary), fontWeight: (isError || isDone) ? 600 : 400 }}>
+                  {t.Status}
+                </span>
+              </div>
+              <button 
+                onClick={() => setClosedTasks([...closedTasks, t.ID])}
+                style={{ position: "absolute", top: 10, right: 10, border: "none", background: "transparent", cursor: "pointer", color: c.textSecondary, padding: 2 }}>
+                <X size={14} />
+              </button>
+              <div style={{ height: 4, background: c.border, borderRadius: 2, overflow: "hidden" }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${t.Progress}%` }}
+                  style={{ height: "100%", background: isError ? "#EA4335" : (isDone ? "#34A853" : "#1A73E8") }}
+                />
+              </div>
             </div>
-            <div style={{ height: 4, background: c.border, borderRadius: 2, overflow: "hidden" }}>
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${t.Progress}%` }}
-                style={{ height: "100%", background: "#1A73E8" }}
-              />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

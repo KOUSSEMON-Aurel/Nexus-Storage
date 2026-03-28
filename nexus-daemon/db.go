@@ -8,7 +8,8 @@ import (
 )
 
 type Database struct {
-	db *sql.DB
+	db             *sql.DB
+	OnConfigChange func()
 }
 
 type FileRecord struct {
@@ -21,6 +22,13 @@ type FileRecord struct {
 	LastUpdate string
 	Starred   bool
 	DeletedAt  *string
+	ParentID  *int64
+}
+
+type FolderRecord struct {
+	ID       int64
+	Name     string
+	ParentID *int64
 }
 
 func (d *Database) Init(dbPath string) error {
@@ -31,6 +39,7 @@ func (d *Database) Init(dbPath string) error {
 	d.db = db
 
 	query := `
+	PRAGMA journal_mode=WAL;
 	CREATE TABLE IF NOT EXISTS files (
 		id         INTEGER PRIMARY KEY AUTOINCREMENT,
 		path       TEXT UNIQUE,
@@ -51,9 +60,17 @@ func (d *Database) Init(dbPath string) error {
 	migrations := []string{
 		`ALTER TABLE files ADD COLUMN starred BOOLEAN DEFAULT 0`,
 		`ALTER TABLE files ADD COLUMN deleted_at TIMESTAMP`,
+		`CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT)`,
+		`CREATE TABLE IF NOT EXISTS folders (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT,
+			parent_id INTEGER REFERENCES folders(id) ON DELETE CASCADE,
+			UNIQUE(name, parent_id)
+		)`,
+		`ALTER TABLE files ADD COLUMN parent_id INTEGER REFERENCES folders(id) ON DELETE CASCADE`,
 	}
 	for _, m := range migrations {
-		db.Exec(m) // Ignore errors (column already exists)
+		db.Exec(m) // Ignore errors (already exists)
 	}
 
 	return nil
@@ -63,6 +80,23 @@ func (d *Database) Close() {
 	if d.db != nil {
 		d.db.Close()
 	}
+}
+
+func (d *Database) SetKV(key, value string) error {
+	_, err := d.db.Exec(`INSERT INTO kv_store (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
+	if err == nil && d.OnConfigChange != nil {
+		d.OnConfigChange()
+	}
+	return err
+}
+
+func (d *Database) GetKV(key string) (string, bool) {
+	var value string
+	err := d.db.QueryRow(`SELECT value FROM kv_store WHERE key = ?`, key).Scan(&value)
+	if err != nil {
+		return "", false
+	}
+	return value, true
 }
 
 func (d *Database) SaveFile(path, videoID string, size int64, hash, key string) error {
@@ -78,6 +112,9 @@ func (d *Database) SaveFile(path, videoID string, size int64, hash, key string) 
 	`
 	if _, err := d.db.Exec(query, path, videoID, size, hash, key); err != nil {
 		return fmt.Errorf("could not save file: %w", err)
+	}
+	if d.OnConfigChange != nil {
+		d.OnConfigChange()
 	}
 	return nil
 }
@@ -126,28 +163,93 @@ func (d *Database) ListTrash() ([]FileRecord, error) {
 func (d *Database) SoftDelete(id int64) error {
 	_, err := d.db.Exec(
 		`UPDATE files SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
+	if err == nil && d.OnConfigChange != nil {
+		d.OnConfigChange()
+	}
 	return err
 }
 
 // RestoreFile moves a file out of trash.
 func (d *Database) RestoreFile(id int64) error {
 	_, err := d.db.Exec(`UPDATE files SET deleted_at = NULL WHERE id = ?`, id)
+	if err == nil && d.OnConfigChange != nil {
+		d.OnConfigChange()
+	}
 	return err
 }
 
 // PermanentDelete removes the record entirely.
 func (d *Database) PermanentDelete(id int64) error {
 	_, err := d.db.Exec(`DELETE FROM files WHERE id = ?`, id)
+	if err == nil && d.OnConfigChange != nil {
+		d.OnConfigChange()
+	}
 	return err
 }
 
 // ToggleStar sets the starred status.
+// CreateFolder ensures a folder exists and returns its ID.
+func (d *Database) CreateFolder(name string, parentID *int64) (int64, error) {
+	res, err := d.db.Exec(`INSERT INTO folders (name, parent_id) VALUES (?, ?) ON CONFLICT(name, parent_id) DO UPDATE SET name=name`, name, parentID)
+	if err != nil {
+		return 0, err
+	}
+	id, _ := res.LastInsertId()
+	if id == 0 {
+		// Conflict happened, fetch the existing ID
+		err = d.db.QueryRow(`SELECT id FROM folders WHERE name = ? AND parent_id IS ?`, name, parentID).Scan(&id)
+	}
+	if err == nil && d.OnConfigChange != nil {
+		d.OnConfigChange()
+	}
+	return id, err
+}
+
+func (d *Database) GetFolderByID(id int64) (*FolderRecord, error) {
+	var f FolderRecord
+	err := d.db.QueryRow(`SELECT id, name, parent_id FROM folders WHERE id = ?`, id).Scan(&f.ID, &f.Name, &f.ParentID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return &f, err
+}
+
+func (d *Database) ListSubfolders(parentID *int64) ([]FolderRecord, error) {
+	rows, err := d.db.Query(`SELECT id, name, parent_id FROM folders WHERE parent_id IS ?`, parentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var folders []FolderRecord
+	for rows.Next() {
+		var f FolderRecord
+		rows.Scan(&f.ID, &f.Name, &f.ParentID)
+		folders = append(folders, f)
+	}
+	return folders, nil
+}
+
+func (d *Database) ListFilesByFolder(parentID *int64) ([]FileRecord, error) {
+	rows, err := d.db.Query(`
+		SELECT id, path, video_id, size, hash, key, starred, deleted_at, last_update, parent_id
+		FROM files
+		WHERE deleted_at IS NULL AND parent_id IS ?`, parentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanFiles(rows)
+}
+
 func (d *Database) ToggleStar(id int64, starred bool) error {
 	v := 0
 	if starred {
 		v = 1
 	}
 	_, err := d.db.Exec(`UPDATE files SET starred = ? WHERE id = ?`, v, id)
+	if err == nil && d.OnConfigChange != nil {
+		d.OnConfigChange()
+	}
 	return err
 }
 
@@ -182,7 +284,7 @@ func (d *Database) GetStats() (Stats, error) {
 func scanFile(row *sql.Row) (*FileRecord, error) {
 	var fr FileRecord
 	if err := row.Scan(&fr.ID, &fr.Path, &fr.VideoID, &fr.Size, &fr.Hash,
-		&fr.Key, &fr.Starred, &fr.DeletedAt, &fr.LastUpdate); err != nil {
+		&fr.Key, &fr.Starred, &fr.DeletedAt, &fr.LastUpdate, &fr.ParentID); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -196,7 +298,7 @@ func scanFiles(rows *sql.Rows) ([]FileRecord, error) {
 	for rows.Next() {
 		var fr FileRecord
 		if err := rows.Scan(&fr.ID, &fr.Path, &fr.VideoID, &fr.Size, &fr.Hash,
-			&fr.Key, &fr.Starred, &fr.DeletedAt, &fr.LastUpdate); err != nil {
+			&fr.Key, &fr.Starred, &fr.DeletedAt, &fr.LastUpdate, &fr.ParentID); err != nil {
 			return nil, err
 		}
 		files = append(files, fr)

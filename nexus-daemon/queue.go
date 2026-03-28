@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -21,21 +22,24 @@ const (
 )
 
 type Task struct {
-	ID        string
-	Type      TaskType
-	FilePath  string
-	Mode      string
-	Status    string
-	Progress  float64
-	CreatedAt time.Time
+	ID         string
+	Type       TaskType
+	FilePath   string
+	Mode       string
+	IsManifest bool
+	Status     string
+	Progress   float64
+	CreatedAt  time.Time
 }
 
 type TaskQueue struct {
-	tasks     map[string]*Task
-	mu        sync.Mutex
-	core      *NexusCore
-	db        *Database
-	ytManager *YouTubeManager
+	tasks         map[string]*Task
+	mu            sync.Mutex
+	core          *NexusCore
+	db            *Database
+	ytManager     *YouTubeManager
+	manifestMu    sync.Mutex
+	manifestTimer *time.Timer
 }
 
 func ensureYtDlp() {
@@ -109,17 +113,20 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 
 	t.Status = "Hashing"
 	hash, err := q.core.Sha256(data)
-    if err != nil {
+	if err != nil {
 		return fmt.Errorf("sha256 failed: %w", err)
 	}
+	log.Printf("[%s] ✅ Step 1/6 Hashing done. Hash: %s", t.ID, hash[:16])
 
 	t.Status = "Encrypting"
 	t.Progress = 15
 	compressed, _ := q.core.Compress(data, 0)
+	log.Printf("[%s] ✅ Step 2/6 Compressed: %d → %d bytes", t.ID, len(data), len(compressed))
 	encrypted, err := q.core.Encrypt(compressed, "default-secret")
 	if err != nil {
 		return fmt.Errorf("encryption failed: %w", err)
 	}
+	log.Printf("[%s] ✅ Step 3/6 Encrypted: %d bytes", t.ID, len(encrypted))
 
 	t.Status = "Generating Frames"
 	t.Progress = 30
@@ -134,23 +141,49 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	if err != nil {
 		return fmt.Errorf("frame encoding failed: %w", err)
 	}
-	log.Printf("Generated %d frames in %s", frameCount, tempDir)
+	log.Printf("[%s] ✅ Step 4/6 Generated %d frames in %s", t.ID, frameCount, tempDir)
+
+	// YouTube aggressively rejects extremely short videos ("Traitement abandonné").
+	// We pad the video to a minimum of 90 frames (3 seconds at 30 fps) by duplicating the last frame.
+	// The Rust decoder ignores trailing data thanks to the 8-byte length header.
+	if frameCount < 90 {
+		log.Printf("[%s] ⏳ Padding video from %d to 90 frames to avoid YouTube rejection...", t.ID, frameCount)
+		lastFramePath := filepath.Join(tempDir, fmt.Sprintf("frame_%06d.png", frameCount))
+		lastFrameData, rbErr := os.ReadFile(lastFramePath)
+		if rbErr == nil {
+			for i := frameCount + 1; i <= 90; i++ {
+				os.WriteFile(filepath.Join(tempDir, fmt.Sprintf("frame_%06d.png", i)), lastFrameData, 0644)
+			}
+		} else {
+			log.Printf("[%s] ⚠️ Warning: could not read last frame for padding: %v", t.ID, rbErr)
+		}
+	}
 
 	t.Status = "FFmpeg: MP4"
 	t.Progress = 50
 	outputVideo := filepath.Join(tempDir, "upload.mp4")
-	cmd := exec.Command("ffmpeg", "-y", "-framerate", "30", "-i", filepath.Join(tempDir, "frame_%06d.png"),
+	log.Printf("[%s] ⏳ Step 5/6 Running FFmpeg to assemble MP4...", t.ID)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-framerate", "30", "-i", filepath.Join(tempDir, "frame_%06d.png"),
 		"-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", outputVideo)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("ffmpeg MP4 creation failed: %w", err)
+	cmdOutput, cmdErr := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		cmdErr = fmt.Errorf("ffmpeg timed out after 15 minutes")
 	}
+	if cmdErr != nil {
+		log.Printf("[%s] ❌ FFmpeg failed: %v\nOutput: %s", t.ID, cmdErr, string(cmdOutput))
+		return fmt.Errorf("ffmpeg MP4 creation failed: %w", cmdErr)
+	}
+	log.Printf("[%s] ✅ Step 5/6 FFmpeg done. Video: %s", t.ID, outputVideo)
 
 	t.Status = "YouTube: Uploading"
 	t.Progress = 70
+	log.Printf("[%s] ⏳ Step 6/6 Starting YouTube upload. Auth status: %s", t.ID, q.ytManager.GetAuthStatus())
 	if q.ytManager == nil || !q.ytManager.IsAuthenticated() {
-		log.Println("⚠️  YouTube service offline. File saved locally only.")
-		t.Status = "Saved (Local Only - No YouTube Auth)"
-		return q.db.SaveFile(filepath.Base(t.FilePath), "local-"+hash[:8], int64(len(data)), hash, "mock-key")
+		log.Println("⚠️  Upload failed: YouTube service is offline or not authenticated.")
+		t.Status = "Error: YouTube Not Authenticated"
+		return fmt.Errorf("youtube not authenticated, please sign in via GUI")
 	}
 
 	ytService := q.ytManager.GetService()
@@ -160,13 +193,20 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	}
 	defer uploadFile.Close()
 
+	title := "NexusStorage Shard - " + filepath.Base(t.FilePath)
+	desc := fmt.Sprintf("NEXUS_SHARD | Hash: %s | Size: %d | Mode: %s", hash, len(data), t.Mode)
+	if t.IsManifest {
+		title = "NEXUS_MANIFEST"
+		desc = fmt.Sprintf("NEXUS_MANIFEST | Backup of nexus.db | Date: %v", time.Now().Format(time.RFC3339))
+	}
+
 	upload := &youtube.Video{
 		Snippet: &youtube.VideoSnippet{
-			Title:       "NexusStorage Shard - " + filepath.Base(t.FilePath),
-			Description: "Encrypted data shard. Hash: " + hash,
+			Title:       title,
+			Description: desc,
 			CategoryId:  "22",
 		},
-		Status: &youtube.VideoStatus{PrivacyStatus: "private"},
+		Status: &youtube.VideoStatus{PrivacyStatus: "unlisted"},
 	}
 
 	call := ytService.Videos.Insert([]string{"snippet", "status"}, upload)
@@ -174,15 +214,91 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	if err != nil {
 		log.Printf("⚠️  YouTube API error: %v", err)
 		log.Println("💡 If you see 'forbidden', add your email as Test User in Google Cloud Console > OAuth Consent Screen.")
-		t.Status = "Error: YouTube API - check daemon logs"
-		// Still save locally so user doesn't lose their work
-		q.db.SaveFile(filepath.Base(t.FilePath), "local-"+hash[:8], int64(len(data)), hash, "mock-key")
-		return fmt.Errorf("YouTube upload failed (file saved locally): %w", err)
+		t.Status = "Error: YouTube API (Check Test Users)"
+		return fmt.Errorf("youtube api rejected upload: %w", err)
+	}
+
+	if t.IsManifest {
+		log.Printf("[%s] ✅ Manifest successfully uploaded. Sweeping old backups...", t.ID)
+		q.SweepOldManifests(response.Id)
+		t.Status = "Complete"
+		t.Progress = 100
+		return nil
 	}
 
 	t.Status = "Finalizing"
 	t.Progress = 95
 	return q.db.SaveFile(filepath.Base(t.FilePath), response.Id, int64(len(data)), hash, "encrypted-key")
+}
+
+func (q *TaskQueue) RequestManifestBackup() {
+	q.manifestMu.Lock()
+	defer q.manifestMu.Unlock()
+
+	if q.manifestTimer != nil {
+		q.manifestTimer.Stop()
+	}
+
+	// Debounce for 30 seconds
+	q.manifestTimer = time.AfterFunc(30*time.Second, func() {
+		log.Println("🔄 Debounced Manifest Backup triggered after DB changes.")
+		q.QueueManifestBackup()
+	})
+}
+
+func (q *TaskQueue) QueueManifestBackup() {
+	if q.ytManager == nil || !q.ytManager.IsAuthenticated() {
+		return
+	}
+	dbPath := filepath.Join(getConfigDir(), "nexus.db")
+	t := &Task{
+		ID:         fmt.Sprintf("manifest-%d", time.Now().UnixNano()),
+		Type:       TaskUpload,
+		FilePath:   dbPath,
+		Mode:       "tank",
+		IsManifest: true,
+		Status:     "Pending Manifest",
+		CreatedAt:  time.Now(),
+	}
+	q.AddTask(t)
+}
+
+func (q *TaskQueue) SweepOldManifests(newId string) {
+	ytService := q.ytManager.GetService()
+	if ytService == nil {
+		return
+	}
+
+	// 1. Always update the local KV store first
+	q.db.SetKV("manifest_video_id", newId)
+
+	// 2. Intelligent Cleanup: Search for ANY video titled 'NEXUS_MANIFEST' 
+	// This cleans up "ghosts" even if the local DB was deleted or out of sync.
+	call := ytService.Search.List([]string{"id", "snippet"}).
+		Q("NEXUS_MANIFEST").
+		Type("video").
+		ForMine(true).
+		MaxResults(50)
+
+	response, err := call.Do()
+	if err != nil {
+		log.Printf("⚠️  Manifest Sweep: search failed: %v", err)
+		// Fallback: try to delete just the one we knew about from KV
+		if oldId, ok := q.db.GetKV("manifest_video_id"); ok && oldId != "" && oldId != newId {
+			ytService.Videos.Delete(oldId).Do()
+		}
+		return
+	}
+
+	for _, item := range response.Items {
+		id := item.Id.VideoId
+		if id != newId {
+			log.Printf("🗑️  Manifest Sweep: Deleting orphan manifest %s (%s)", id, item.Snippet.Title)
+			if err := ytService.Videos.Delete(id).Do(); err != nil {
+				log.Printf("⚠️  Manifest Sweep: could not delete %s: %v", id, err)
+			}
+		}
+	}
 }
 
 func (q *TaskQueue) handleDownload(t *Task) error {

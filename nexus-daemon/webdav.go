@@ -28,27 +28,84 @@ func NewNexusFS(db *Database, queue *TaskQueue) *NexusFS {
 }
 
 func (fs *NexusFS) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
-	// Nexus is flat for now, but we'll allow mkdir for compatibility
-	return os.MkdirAll(filepath.Join(fs.cache, name), perm)
+	cleanName := strings.TrimPrefix(name, "/")
+	parts := strings.Split(cleanName, "/")
+	
+	var currentParent *int64
+	for i, part := range parts {
+		if part == "" { continue }
+		id, err := fs.db.CreateFolder(part, currentParent)
+		if err != nil {
+			return err
+		}
+		if i < len(parts)-1 {
+			currentParent = &id
+		}
+	}
+	return nil
 }
 
 func (fs *NexusFS) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (webdav.File, error) {
 	cleanName := strings.TrimPrefix(name, "/")
 	if cleanName == "" {
-		return &NexusDir{fs: fs, path: "/"}, nil
+		return &NexusDir{fs: fs, folderID: nil}, nil
 	}
 
-	// Check if it's a known file in DB
-	files, _ := fs.db.ListFiles()
-	var record *FileRecord
-	for _, f := range files {
-		if filepath.Base(f.Path) == cleanName {
-			record = &f
-			break
+	// Resolve the path to get the parent and name
+	parts := strings.Split(cleanName, "/")
+	var currentParent *int64
+	for i, part := range parts {
+		if part == "" { continue }
+		
+		// If last part, check if it's a file or folder
+		if i == len(parts)-1 {
+			// Check for folder first
+			subfolders, _ := fs.db.ListSubfolders(currentParent)
+			for _, sf := range subfolders {
+				if sf.Name == part {
+					return &NexusDir{fs: fs, folderID: &sf.ID}, nil
+				}
+			}
+			
+			// Check for file
+			files, _ := fs.db.ListFilesByFolder(currentParent)
+			var record *FileRecord
+			for _, f := range files {
+				if filepath.Base(f.Path) == part {
+					record = &f
+					break
+				}
+			}
+			
+			if record != nil || (flag&os.O_CREATE != 0) {
+				return fs.openFileInternal(cleanName, record, flag, perm, currentParent)
+			}
+			return nil, os.ErrNotExist
+		}
+		
+		// Intermediate part MUST be a folder
+		subfolders, _ := fs.db.ListSubfolders(currentParent)
+		found := false
+		for _, sf := range subfolders {
+			if sf.Name == part {
+				currentParent = &sf.ID
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, os.ErrNotExist
 		}
 	}
+	
+	return nil, os.ErrNotExist
+}
 
+func (fs *NexusFS) openFileInternal(cleanName string, record *FileRecord, flag int, perm os.FileMode, parentID *int64) (webdav.File, error) {
 	fullPath := filepath.Join(fs.cache, cleanName)
+	
+	// Create cache dir if it doesn't exist
+	os.MkdirAll(filepath.Dir(fullPath), 0755)
 
 	// If opening for writing
 	if flag&os.O_WRONLY != 0 || flag&os.O_RDWR != 0 || flag&os.O_CREATE != 0 {
@@ -56,30 +113,15 @@ func (fs *NexusFS) OpenFile(ctx context.Context, name string, flag int, perm os.
 		if err != nil {
 			return nil, err
 		}
-		return &NexusFile{File: f, fs: fs, name: cleanName, isWrite: true}, nil
+		return &NexusFile{File: f, fs: fs, name: cleanName, isWrite: true, parentID: parentID}, nil
 	}
 
-	// Opening for reading
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) && record != nil {
-		// Trigger background download if not in cache
-		log.Printf("WebDAV: File %s not in cache, triggering download...", cleanName)
-		fs.queue.AddTask(&Task{
-			ID:        record.VideoID,
-			Type:      TaskDownload,
-			FilePath:  cleanName,
-			Status:    "Pending",
-			CreatedAt: time.Now(),
-		})
-		// We can't easily block WebDAV here without UI freeze, 
-		// but since it's "Réseau-Local", standard clients will retry or wait.
-		return nil, os.ErrNotExist 
-	}
-
-	f, err := os.OpenFile(fullPath, flag, perm)
+	// Opening for reading (already handled in OpenFile for non-existent)
+	f, err := os.Open(fullPath)
 	if err != nil {
 		return nil, err
 	}
-	return &NexusFile{File: f, fs: fs, name: cleanName, isWrite: false}, nil
+	return &NexusFile{File: f, fs: fs, name: cleanName, isWrite: false, parentID: parentID}, nil
 }
 
 func (fs *NexusFS) RemoveAll(ctx context.Context, name string) error {
@@ -109,11 +151,39 @@ func (fs *NexusFS) Stat(ctx context.Context, name string) (os.FileInfo, error) {
 		return fi, nil
 	}
 
-	files, _ := fs.db.ListFiles()
-	for _, f := range files {
-		if filepath.Base(f.Path) == cleanName {
-			return &FakeFileInfo{name: cleanName, size: f.Size, modTime: time.Now()}, nil
+	// Resolve hierarchy to find record
+	parts := strings.Split(cleanName, "/")
+	var currentParent *int64
+	for i, part := range parts {
+		if part == "" { continue }
+		if i == len(parts)-1 {
+			// Check folders
+			subfolders, _ := fs.db.ListSubfolders(currentParent)
+			for _, sf := range subfolders {
+				if sf.Name == part {
+					return &FakeFileInfo{name: part, size: 0, modTime: time.Now(), isDir: true}, nil
+				}
+			}
+			// Check files
+			files, _ := fs.db.ListFilesByFolder(currentParent)
+			for _, f := range files {
+				if filepath.Base(f.Path) == part {
+					return &FakeFileInfo{name: part, size: f.Size, modTime: time.Now(), isDir: false}, nil
+				}
+			}
+			return nil, os.ErrNotExist
 		}
+		// Resolve parent folder
+		subfolders, _ := fs.db.ListSubfolders(currentParent)
+		found := false
+		for _, sf := range subfolders {
+			if sf.Name == part {
+				currentParent = &sf.ID
+				found = true
+				break
+			}
+		}
+		if !found { return nil, os.ErrNotExist }
 	}
 	return nil, os.ErrNotExist
 }
@@ -142,38 +212,46 @@ func (f *NexusFile) Close() error {
 	return err
 }
 
+type NexusFile struct {
+	webdav.File
+	fs       *NexusFS
+	name     string
+	isWrite  bool
+	parentID *int64
+}
+
 // NexusDir for directory listing
 type NexusDir struct {
-	fs   *NexusFS
-	path string
+	fs       *NexusFS
+	folderID *int64
 }
 
 func (d *NexusDir) Close() error               { return nil }
 func (d *NexusDir) Read(p []byte) (int, error) { return 0, os.ErrInvalid }
 func (d *NexusDir) Seek(offset int64, whence int) (int64, error) { return 0, os.ErrInvalid }
-func (d *NexusDir) Stat() (os.FileInfo, error) { return os.Stat(d.fs.cache) }
+func (d *NexusDir) Stat() (os.FileInfo, error) { 
+	if d.folderID == nil {
+		return os.Stat(d.fs.cache)
+	}
+	f, _ := d.fs.db.GetFolderByID(*d.folderID)
+	return &FakeFileInfo{name: f.Name, size: 0, modTime: time.Now(), isDir: true}, nil
+}
 func (d *NexusDir) Write(p []byte) (int, error) { return 0, os.ErrInvalid }
 func (d *NexusDir) Readdir(count int) ([]os.FileInfo, error) {
-	// Merge local cache files and DB files
-	files, _ := d.fs.db.ListFiles()
+	// List files in this folder
+	files, _ := d.fs.db.ListFilesByFolder(d.folderID)
+	// List subfolders
+	subfolders, _ := d.fs.db.ListSubfolders(d.folderID)
+
 	infos := []os.FileInfo{}
-	seen := make(map[string]bool)
-
-	// Add local files
-	entries, _ := os.ReadDir(d.fs.cache)
-	for _, e := range entries {
-		info, _ := e.Info()
-		infos = append(infos, info)
-		seen[e.Name()] = true
+	
+	for _, sf := range subfolders {
+		infos = append(infos, &FakeFileInfo{name: sf.Name, size: 0, modTime: time.Now(), isDir: true})
 	}
-
-	// Add virtual files from DB
 	for _, f := range files {
-		name := filepath.Base(f.Path)
-		if !seen[name] {
-			infos = append(infos, &FakeFileInfo{name: name, size: f.Size, modTime: time.Now()})
-		}
+		infos = append(infos, &FakeFileInfo{name: filepath.Base(f.Path), size: f.Size, modTime: time.Now(), isDir: false})
 	}
+	
 	return infos, nil
 }
 
@@ -181,13 +259,17 @@ type FakeFileInfo struct {
 	name    string
 	size    int64
 	modTime time.Time
+	isDir   bool
 }
 
 func (f *FakeFileInfo) Name() string       { return f.name }
 func (f *FakeFileInfo) Size() int64        { return f.size }
-func (f *FakeFileInfo) Mode() os.FileMode  { return 0644 }
+func (f *FakeFileInfo) Mode() os.FileMode  { 
+	if f.isDir { return 0755 | os.ModeDir }
+	return 0644 
+}
 func (f *FakeFileInfo) ModTime() time.Time { return f.modTime }
-func (f *FakeFileInfo) IsDir() bool        { return false }
+func (f *FakeFileInfo) IsDir() bool        { return f.isDir }
 func (f *FakeFileInfo) Sys() interface{}   { return nil }
 
 func NewWebDAVHandler(db *Database, queue *TaskQueue) http.Handler {

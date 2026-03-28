@@ -257,8 +257,13 @@ func (s *APIServer) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if s.ytManager == nil {
+		jsonOK(w, map[string]any{"authenticated": false, "user": ""})
+		return
+	}
 	s.ytManager.mu.RLock()
 	defer s.ytManager.mu.RUnlock()
+	log.Printf("📡 Auth Status Request: authenticated=%v, user=%s", s.ytManager.authed, s.ytManager.user)
 	jsonOK(w, map[string]any{
 		"authenticated": s.ytManager.authed,
 		"user":          s.ytManager.user,
@@ -308,7 +313,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS, PROPFIND, MKCOL, MOVE, COPY, PROPPATCH, LOCK, UNLOCK")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Depth, If-Modified-Since, User-Agent, X-Expected-Entity-Length")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Depth, If-Modified-Since, User-Agent, X-Expected-Entity-Length, Pragma, Cache-Control")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
