@@ -42,8 +42,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "bin/client_secret.json",
-      "bin/nexus.db"
+      "bin/client_secret.json"
     ]
   }
 }

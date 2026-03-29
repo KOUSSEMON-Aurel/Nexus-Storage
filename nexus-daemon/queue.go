@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -22,15 +24,16 @@ const (
 )
 
 type Task struct {
-	ID         string
-	Type       TaskType
-	FilePath   string
-	Mode       string
-	IsManifest bool
-	Status     string
-	Progress   float64
-	CreatedAt  time.Time
-	ParentID   *int64
+	ID         string    `json:"id"`
+	Type       TaskType  `json:"type"`
+	FilePath   string    `json:"filePath"`
+	Mode       string    `json:"mode"`
+	IsManifest bool      `json:"isManifest"`
+	Status     string    `json:"status"`
+	Progress   float64   `json:"progress"`
+	CreatedAt  time.Time `json:"createdAt"`
+	ParentID   *int64    `json:"parentId"`
+	SHA256     string    `json:"sha256,omitempty"`
 }
 
 type TaskQueue struct {
@@ -41,6 +44,7 @@ type TaskQueue struct {
 	ytManager     *YouTubeManager
 	manifestMu    sync.Mutex
 	manifestTimer *time.Timer
+	pm            *PlaylistManager
 }
 
 func ensureYtDlp() {
@@ -65,11 +69,12 @@ func ensureYtDlp() {
 	log.Println("yt-dlp successfully downloaded.")
 }
 
-func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManager) {
+func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManager, pm *PlaylistManager) {
 	q.tasks = make(map[string]*Task)
 	q.core = core
 	q.db = db
 	q.ytManager = ytManager
+	q.pm = pm
 	ensureYtDlp() // synchronous - must complete before any tasks
 }
 
@@ -105,29 +110,31 @@ func (q *TaskQueue) processTask(t *Task) {
 }
 
 func (q *TaskQueue) handleUpload(t *Task) error {
-	t.Status = "Reading file"
-	t.Progress = 5
+	t.Status = "Checking Deduplication"
 	data, err := os.ReadFile(t.FilePath)
 	if err != nil {
 		return fmt.Errorf("could not read file: %w", err)
 	}
 
-	t.Status = "Hashing"
-	hash, err := q.core.Sha256(data)
-	if err != nil {
-		return fmt.Errorf("sha256 failed: %w", err)
+	sha := sha256.Sum256(data)
+	t.SHA256 = hex.EncodeToString(sha[:])
+
+	// Quota-Thrifty: Avoid upload if file already exists in cloud (0 units)
+	existing, _ := q.db.GetFileByHash(t.SHA256)
+	if existing != nil {
+		log.Printf("[%s] ♻️  Deduplication: File already exists as %s. Linking locally...", t.ID, existing.VideoID)
+		t.Status = "Linked (Dedupe)"
+		t.Progress = 100
+		return q.db.SaveFile(filepath.Base(t.FilePath), existing.VideoID, int64(len(data)), "dedupe", "dedupe", t.ParentID, t.SHA256)
 	}
-	log.Printf("[%s] ✅ Step 1/6 Hashing done. Hash: %s", t.ID, hash[:16])
 
 	t.Status = "Encrypting"
 	t.Progress = 15
 	compressed, _ := q.core.Compress(data, 0)
-	log.Printf("[%s] ✅ Step 2/6 Compressed: %d → %d bytes", t.ID, len(data), len(compressed))
 	encrypted, err := q.core.Encrypt(compressed, "default-secret")
 	if err != nil {
 		return fmt.Errorf("encryption failed: %w", err)
 	}
-	log.Printf("[%s] ✅ Step 3/6 Encrypted: %d bytes", t.ID, len(encrypted))
 
 	t.Status = "Generating Frames"
 	t.Progress = 30
@@ -142,96 +149,81 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	if err != nil {
 		return fmt.Errorf("frame encoding failed: %w", err)
 	}
-	log.Printf("[%s] ✅ Step 4/6 Generated %d frames in %s", t.ID, frameCount, tempDir)
 
-	// YouTube aggressively rejects extremely short videos ("Traitement abandonné").
-	// We pad the video to a minimum of 90 frames (3 seconds at 30 fps) by duplicating the last frame.
-	// The Rust decoder ignores trailing data thanks to the 8-byte length header.
 	if frameCount < 90 {
-		log.Printf("[%s] ⏳ Padding video from %d to 90 frames to avoid YouTube rejection...", t.ID, frameCount)
+		log.Printf("[%s] ⏳ Padding video to 90 frames...", t.ID)
 		lastFramePath := filepath.Join(tempDir, fmt.Sprintf("frame_%06d.png", frameCount))
-		lastFrameData, rbErr := os.ReadFile(lastFramePath)
-		if rbErr == nil {
-			for i := frameCount + 1; i <= 90; i++ {
-				os.WriteFile(filepath.Join(tempDir, fmt.Sprintf("frame_%06d.png", i)), lastFrameData, 0644)
-			}
-		} else {
-			log.Printf("[%s] ⚠️ Warning: could not read last frame for padding: %v", t.ID, rbErr)
+		lastFrameData, _ := os.ReadFile(lastFramePath)
+		for i := frameCount + 1; i <= 90; i++ {
+			os.WriteFile(filepath.Join(tempDir, fmt.Sprintf("frame_%06d.png", i)), lastFrameData, 0644)
 		}
 	}
 
 	t.Status = "FFmpeg: MP4"
 	t.Progress = 50
 	outputVideo := filepath.Join(tempDir, "upload.mp4")
-	log.Printf("[%s] ⏳ Step 5/6 Running FFmpeg to assemble MP4...", t.ID)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-framerate", "30", "-i", filepath.Join(tempDir, "frame_%06d.png"),
 		"-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", outputVideo)
-	cmdOutput, cmdErr := cmd.CombinedOutput()
-	if ctx.Err() == context.DeadlineExceeded {
-		cmdErr = fmt.Errorf("ffmpeg timed out after 15 minutes")
+	if _, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("ffmpeg failed: %w", err)
 	}
-	if cmdErr != nil {
-		log.Printf("[%s] ❌ FFmpeg failed: %v\nOutput: %s", t.ID, cmdErr, string(cmdOutput))
-		return fmt.Errorf("ffmpeg MP4 creation failed: %w", cmdErr)
-	}
-	log.Printf("[%s] ✅ Step 5/6 FFmpeg done. Video: %s", t.ID, outputVideo)
 
 	t.Status = "YouTube: Uploading"
 	t.Progress = 70
-	log.Printf("[%s] ⏳ Step 6/6 Starting YouTube upload. Auth status: %s", t.ID, q.ytManager.GetAuthStatus())
 	if q.ytManager == nil || !q.ytManager.IsAuthenticated() {
-		log.Println("⚠️  Upload failed: YouTube service is offline or not authenticated.")
-		t.Status = "Error: YouTube Not Authenticated"
-		return fmt.Errorf("youtube not authenticated, please sign in via GUI")
+		return fmt.Errorf("youtube not authenticated")
 	}
 
 	ytService := q.ytManager.GetService()
-	uploadFile, err := os.Open(outputVideo)
-	if err != nil {
-		return fmt.Errorf("could not open generated MP4: %w", err)
-	}
+	uploadFile, _ := os.Open(outputVideo)
 	defer uploadFile.Close()
 
-	title := "NexusStorage Shard - " + filepath.Base(t.FilePath)
-	desc := fmt.Sprintf("NEXUS_SHARD | Hash: %s | Size: %d | Mode: %s", hash, len(data), t.Mode)
+	title := "NexusStorage - " + filepath.Base(t.FilePath)
+	desc := fmt.Sprintf("NEXUS_SHARD | SHA256: %s | Size: %d", t.SHA256, len(data))
 	if t.IsManifest {
 		title = "NEXUS_MANIFEST"
-		desc = fmt.Sprintf("NEXUS_MANIFEST | Backup of nexus.db | Date: %v", time.Now().Format(time.RFC3339))
+		desc = fmt.Sprintf("NEXUS_MANIFEST | Backup: %v", time.Now().Format(time.RFC3339))
 	}
 
 	upload := &youtube.Video{
-		Snippet: &youtube.VideoSnippet{
-			Title:       title,
-			Description: desc,
-			CategoryId:  "22",
-		},
-		Status: &youtube.VideoStatus{PrivacyStatus: "unlisted"},
+		Snippet: &youtube.VideoSnippet{Title: title, Description: desc, CategoryId: "22"},
+		Status:  &youtube.VideoStatus{PrivacyStatus: "unlisted"},
 	}
 
 	call := ytService.Videos.Insert([]string{"snippet", "status"}, upload)
 	response, err := call.Media(uploadFile).Do()
 	if err != nil {
-		log.Printf("⚠️  YouTube API error: %v", err)
-		log.Println("💡 If you see 'forbidden', add your email as Test User in Google Cloud Console > OAuth Consent Screen.")
-		t.Status = "Error: YouTube API (Check Test Users)"
-		return fmt.Errorf("youtube api rejected upload: %w", err)
+		return fmt.Errorf("youtube upload failed: %w", err)
+	}
+	q.db.LogQuotaUsage(1600)
+
+	// Automatic Playlist Placement (V2 Cloud Structure)
+	targetPlaylist, _ := q.db.GetKV("playlist_root_id")
+	if t.IsManifest {
+		targetPlaylist, _ = q.db.GetKV("playlist_manifest_id")
+	} else if t.ParentID != nil {
+		// If folder has a playlist, move it there (50 units)
+		pID, pErr := q.pm.SyncFolderToPlaylist(*t.ParentID)
+		if pErr == nil {
+			targetPlaylist = pID
+		}
+	}
+
+	if targetPlaylist != "" {
+		q.pm.AddVideoToPlaylist(targetPlaylist, response.Id)
 	}
 
 	if t.IsManifest {
-		log.Printf("[%s] ✅ Manifest successfully uploaded. Sweeping old backups...", t.ID)
 		q.SweepOldManifests(response.Id)
-		t.Status = "Complete"
-		t.Progress = 100
 		return nil
 	}
 
 	t.Status = "Finalizing"
 	t.Progress = 95
-	err = q.db.SaveFile(filepath.Base(t.FilePath), response.Id, int64(len(data)), hash, "encrypted-key", t.ParentID)
+	err = q.db.SaveFile(filepath.Base(t.FilePath), response.Id, int64(len(data)), t.SHA256[:16], "default-key", t.ParentID, t.SHA256)
 	if err == nil {
-		log.Println("📁 File Upload successful. Requesting Manifest Sync...")
 		q.RequestManifestBackup()
 	}
 	return err

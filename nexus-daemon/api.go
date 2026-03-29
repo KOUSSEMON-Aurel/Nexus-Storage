@@ -23,6 +23,7 @@ func (s *APIServer) Start(port int) {
 	// File collection
 	mux.HandleFunc("/api/files", s.handleFiles)
 	mux.HandleFunc("/api/files/", s.handleFileByID) // /api/files/{id}[/star|/restore|/permanent]
+	mux.HandleFunc("/api/search", s.handleSearch)
 
 	// Uploads & downloads
 	mux.HandleFunc("/api/upload", s.handleUpload)
@@ -36,10 +37,12 @@ func (s *APIServer) Start(port int) {
 	mux.HandleFunc("/api/stats", s.handleStats)
 	mux.HandleFunc("/api/security", s.handleSecurity)
 
-	// Auth
+	// Auth & Quota
 	mux.HandleFunc("/api/auth/status", s.handleAuthStatus)
 	mux.HandleFunc("/api/auth/login", s.handleAuthLogin)
+	mux.HandleFunc("/api/quota", s.handleQuota)
 	mux.HandleFunc("/api/mount", s.handleMount)
+	mux.HandleFunc("/api/studio", s.handleStudio)
 
 	handler := corsMiddleware(mux)
 	fmt.Printf("🌐 API Server starting on http://localhost:%d\n", port)
@@ -107,7 +110,7 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 
 	// POST /api/files/{id}/restore
 	case action == "restore" && r.Method == http.MethodPost:
-		if err := s.db.RestoreFile(id); err != nil {
+		if err := s.db.Restore(id); err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
 		}
@@ -277,7 +280,11 @@ func (s *APIServer) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	// Run login in background to not block API
 	go s.ytManager.StartLoginServer()
-	jsonOK(w, map[string]string{"status": "login_flow_started", "url": s.ytManager.GetAuthURL()})
+	
+	url := s.ytManager.GetAuthURL()
+	go openBrowser(url)
+	
+	jsonOK(w, map[string]string{"status": "login_flow_started", "url": url})
 }
 
 // ─── /api/security ─────────────────────────────────────────────────────────────
@@ -314,10 +321,16 @@ func corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS, PROPFIND, MKCOL, MOVE, COPY, PROPPATCH, LOCK, UNLOCK")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Depth, If-Modified-Since, User-Agent, X-Expected-Entity-Length, Pragma, Cache-Control")
+		
 		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
+			// Do not intercept OPTIONS for webdav so the net/webdav
+			// handler can inject DAV: 1, 2 and Allow capabilities.
+			if !strings.HasPrefix(r.URL.Path, "/webdav/") && !strings.HasPrefix(r.URL.Path, "/webdav") {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
 		}
+		
 		next.ServeHTTP(w, r)
 	})
 }
@@ -330,8 +343,43 @@ func jsonOK(w http.ResponseWriter, v any) {
 }
 
 func (s *APIServer) handleMount(w http.ResponseWriter, r *http.Request) {
-	go autoMountLinux()
+	go autoMountVirtualDisk()
 	jsonOK(w, map[string]string{"status": "mount-requested"})
+}
+
+func (s *APIServer) handleStudio(w http.ResponseWriter, r *http.Request) {
+	channelID := s.ytManager.GetChannelID()
+	url := "https://studio.youtube.com/videos/upload" // Fallback
+
+	if channelID != "" {
+		// Exact working format provided by the user
+		url = fmt.Sprintf("https://studio.youtube.com/channel/%s/videos/upload?filter=%%5B%%5D&sort=%%7B%%22columnType%%22%%3A%%22date%%22%%2C%%22sortOrder%%22%%3A%%22DESCENDING%%22%%7D", channelID)
+	}
+	
+	go openBrowser(url)
+	jsonOK(w, map[string]string{"status": "browser-launched", "url": url})
+}
+
+func (s *APIServer) handleSearch(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		s.handleFiles(w, r)
+		return
+	}
+	files, err := s.db.SearchFiles(query)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, files)
+}
+
+func (s *APIServer) handleQuota(w http.ResponseWriter, r *http.Request) {
+	used := s.db.GetDailyQuota()
+	jsonOK(w, map[string]any{
+		"used":  used,
+		"limit": 10000,
+	})
 }
 
 func httpError(w http.ResponseWriter, err error, code int) {

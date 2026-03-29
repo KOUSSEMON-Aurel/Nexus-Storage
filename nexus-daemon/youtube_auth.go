@@ -23,8 +23,9 @@ type YouTubeManager struct {
 	config  *oauth2.Config
 	service *youtube.Service
 	mu      sync.RWMutex
-	authed  bool
-	user    string
+	authed    bool
+	user      string
+	channelID string
 }
 
 func getConfigDir() string {
@@ -101,8 +102,11 @@ func (m *YouTubeManager) TryLoadToken() bool {
 	m.mu.Lock()
 	m.service = service
 	m.authed = true
-	m.user = "koussemonaurel@gmail.com" // Mocking for now, could fetch from API
 	m.mu.Unlock()
+
+	// Async fetch channel info
+	go m.FetchChannelID()
+
 	return true
 }
 
@@ -125,6 +129,32 @@ func (m *YouTubeManager) GetService() *youtube.Service {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.service
+}
+
+func (m *YouTubeManager) FetchChannelID() {
+	svc := m.GetService()
+	if svc == nil { return }
+
+	call := svc.Channels.List([]string{"id", "snippet"}).Mine(true)
+	resp, err := call.Do()
+	if err != nil {
+		log.Printf("⚠️  YouTube: Failed to fetch channel ID: %v", err)
+		return
+	}
+
+	if len(resp.Items) > 0 {
+		m.mu.Lock()
+		m.channelID = resp.Items[0].Id
+		m.user = resp.Items[0].Snippet.Title
+		m.mu.Unlock()
+		log.Printf("👤 YouTube Authenticated: %s (%s)", m.user, m.channelID)
+	}
+}
+
+func (m *YouTubeManager) GetChannelID() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.channelID
 }
 
 func (m *YouTubeManager) GetAuthURL() string {
@@ -204,18 +234,25 @@ func saveToken(path string, token *oauth2.Token) {
 }
 
 func openBrowser(url string) {
-	var err error
+	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "linux":
-		err = exec.Command("xdg-open", url).Start()
+		cmd = exec.Command("xdg-open", url)
+		var cleanEnv []string
+		for _, e := range os.Environ() {
+			if !strings.HasPrefix(e, "LD_LIBRARY_PATH=") {
+				cleanEnv = append(cleanEnv, e)
+			}
+		}
+		cmd.Env = cleanEnv
 	case "windows":
-		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
 	case "darwin":
-		err = exec.Command("open", url).Start()
+		cmd = exec.Command("open", url)
 	default:
-		err = fmt.Errorf("unsupported platform")
+		return
 	}
-	if err != nil {
-		log.Printf("Failed to open browser: %v", err)
+	if err := cmd.Start(); err != nil {
+		log.Printf("⚠️  Failed to open browser: %v", err)
 	}
 }

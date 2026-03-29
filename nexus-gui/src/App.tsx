@@ -6,7 +6,6 @@ import { Search, Plus, HardDrive, Shield, Clock, Star, Trash2,
   Upload, Minus, Square
 } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,6 +25,8 @@ interface NFile {
   owner: string;
   deleted: boolean;
   rawDate: number;
+  sha256: string;
+  parentId?: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -42,6 +43,8 @@ interface BackendFile {
   LastUpdate: string;
   Starred: boolean;
   DeletedAt: string | null;
+  ParentID: number | null;
+  SHA256: string;
 }
 
 interface BackendTask {
@@ -71,28 +74,30 @@ function mapBackendToFile(bf: BackendFile): NFile {
   const ext = name.split('.').pop()?.toLowerCase();
   
   let type: NFile["type"] = "archive";
-  if (["png", "jpg", "jpeg", "gif"].includes(ext || "")) type = "image";
-  else if (["pdf", "txt", "doc", "docx"].includes(ext || "")) type = "doc";
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext || "")) type = "image";
+  else if (["pdf", "txt", "doc", "docx", "odt", "md"].includes(ext || "")) type = "doc";
   else if (["enc", "key"].includes(ext || "")) type = "key";
-  else if (["mp4", "mkv", "mov"].includes(ext || "")) type = "video";
+  else if (["mp4", "mkv", "mov", "avi"].includes(ext || "")) type = "video";
 
   return {
     id: String(bf.ID),
     name: name,
-    size: formatSize(bf.Size),
+    size: formatSize(bf.Size ?? 0),
     type: type,
-    modified: new Date(bf.LastUpdate).toLocaleDateString(),
-    shardId: bf.VideoID.substring(0, 8),
-    starred: bf.Starred,
+    modified: bf.LastUpdate ? new Date(bf.LastUpdate).toLocaleDateString() : "-",
+    shardId: (bf.VideoID || "").substring(0, 8),
+    starred: bf.Starred ?? false,
     encrypted: true,
     owner: "me",
     deleted: !!bf.DeletedAt,
-    rawDate: new Date(bf.LastUpdate).getTime(),
+    rawDate: bf.LastUpdate ? new Date(bf.LastUpdate).getTime() : 0,
+    sha256: bf.SHA256 ?? "",
+    parentId: bf.ParentID ?? undefined,
   };
 }
 
 function formatSize(bytes: number): string {
-  if (bytes === 0) return "0 B";
+  if (!bytes || bytes <= 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -123,6 +128,7 @@ export default function App() {
   const [tasks, setTasks] = useState<Record<string, BackendTask>>({});
   const [stats, setStats] = useState<Stats>({ file_count: 0, total_size: 0 });
   const [auth, setAuth] = useState<AuthStatus>({ authenticated: false, user: "" });
+  const [quota, setQuota] = useState({ used: 0, limit: 10000 });
   const [accountOpen, setAccountOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -178,6 +184,10 @@ export default function App() {
         if (tasksRes.ok) setTasks(await tasksRes.json());
         if (statsRes.ok) setStats(await statsRes.json());
 
+        // Fetch Quota
+        const quotaRes = await fetch(`${API_BASE}/quota`, fetchOpts);
+        if (quotaRes.ok) setQuota(await quotaRes.json());
+
         // Pro Optimization: Only poll auth aggressively if NOT authenticated.
         // Once authenticated, checking every 60 seconds (30 ticks) is plenty.
         if (!auth.authenticated || tick % 30 === 0) {
@@ -199,6 +209,23 @@ export default function App() {
     const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
   }, [section, auth.authenticated, auth.user]);
+
+  // Handle Dynamic Search (V2 FTS5)
+  useEffect(() => {
+    if (!search) return;
+    const delay = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(search)}`, { cache: "no-store" });
+        if (res.ok) {
+          const data: BackendFile[] = await res.json();
+          setDbFiles(data.map(mapBackendToFile));
+        }
+      } catch (e) {
+        console.error("Search failed", e);
+      }
+    }, 300);
+    return () => clearTimeout(delay);
+  }, [search]);
 
   const handleUploadClick = async (mode: "tank" | "density") => {
     try {
@@ -329,12 +356,12 @@ export default function App() {
           <span style={{ fontSize: 22, fontWeight: 400, color: c.textPrimary, letterSpacing: -0.3 }}>Nexus</span>
         </div>
 
-        {/* Search - grows to fill center */}
+        {/* Search - FTS5 Optimized */}
         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, background: c.bgSearch, borderRadius: 24, padding: "0 20px", height: 46 }}>
           <Search size={20} color={c.textSecondary} style={{ flexShrink: 0, pointerEvents: "none" }} />
           <input
             type="text"
-            placeholder="Search in Nexus"
+            placeholder="Search across thousands of shards (V2 Instant)..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{
@@ -345,7 +372,7 @@ export default function App() {
               fontSize: 16,
               color: c.textPrimary,
               lineHeight: "1.5",
-              pointerEvents: "auto", // Ensure the input itself is interactive
+              pointerEvents: "auto",
             }}
           />
         </div>
@@ -434,6 +461,30 @@ export default function App() {
             ].map(item => (
               <NavItem key={item.id} item={item} active={section === item.id} onClick={() => { setSection(item.id); setSelected(null); }} c={c} />
             ))}
+
+            <div style={{ height: 1, background: c.border, margin: "8px 8px" }} />
+
+            <div
+              onClick={async () => {
+                try {
+                  await fetch(`${API_BASE}/studio`);
+                } catch (e) {
+                  console.error("Studio link failed", e);
+                }
+              }}
+              style={{
+                display: "flex", alignItems: "center", gap: 14,
+                padding: "9px 16px", borderRadius: 24,
+                color: c.textPrimary,
+                fontSize: 14, cursor: "pointer", transition: "background 0.15s",
+                userSelect: "none",
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = c.bgHover}
+              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
+            >
+              <CloudLightning size={20} color="#FF0000" />
+              YouTube Studio
+            </div>
           </nav>
 
           {/* Virtual Disk Mount */}
@@ -449,16 +500,26 @@ export default function App() {
             </div>
           </div>
 
-          {/* Storage */}
+          {/* Storage & Quota */}
           <div style={{ padding: "12px 24px", borderTop: `1px solid ${c.border}` }}>
+            {/* Real Storage Stats */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <HardDrive size={18} color={c.textSecondary} />
-              <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 500 }}>Storage</span>
+              <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 500 }}>{formatSize(stats.total_size)} Secured</span>
             </div>
-            <div style={{ height: 4, background: c.border, borderRadius: 4, overflow: "hidden", marginBottom: 6 }}>
-              <div style={{ width: `${Math.min(100, (stats.total_size / (1024 * 1024 * 1024 * 1024)) * 100)}%`, height: "100%", background: "#1A73E8", borderRadius: 4 }} />
+            
+            {/* Quota Progress */}
+            <div style={{ display: "flex", alignItems: "center", justifyItems: "space-between", gap: 10, marginBottom: 8, marginTop: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <CloudLightning size={18} color="#1A73E8" />
+                <span style={{ fontSize: 13, color: c.textPrimary, fontWeight: 600 }}>YouTube Quota</span>
+              </div>
+              <span style={{ fontSize: 11, color: c.textSecondary, marginLeft: "auto" }}>{quota.used}/10k</span>
             </div>
-            <span style={{ fontSize: 12, color: c.textSecondary }}>{formatSize(stats.total_size)} secured (unlimited quota)</span>
+            <div style={{ height: 6, background: c.border, borderRadius: 4, overflow: "hidden", marginBottom: 6 }}>
+              <div style={{ width: `${Math.min(100, (quota.used / 10000) * 100)}%`, height: "100%", background: "#1A73E8" }} />
+            </div>
+            <p style={{ fontSize: 10, color: c.textSecondary, lineHeight: 1.4 }}>Daily limit resets at midnight PT.</p>
           </div>
 
         </aside>
@@ -525,9 +586,9 @@ export default function App() {
                         {section === "starred" ? "Starred" : "Suggested"}
                       </p>
                       {viewMode === "grid" ? (
-                        <FileGrid files={files} onSelect={setSelected} selected={selected} c={c} dark={dark} />
+                        <FileGrid files={files} onSelect={setSelected} selected={selected!} c={c} dark={dark} />
                       ) : (
-                        <FileList files={files} onSelect={setSelected} selected={selected} c={c} dark={dark} />
+                        <FileList files={files} onSelect={setSelected} selected={selected!} c={c} dark={dark} />
                       )}
                     </>
                   )}
@@ -613,7 +674,7 @@ export default function App() {
                 {auth.authenticated ? auth.user.charAt(0).toUpperCase() : "!"}
               </div>
               <h2 style={{ fontSize: 20, fontWeight: 600, color: c.textPrimary, marginBottom: 4 }}>
-                {auth.authenticated ? "Aurel" : "Guest User"}
+                {auth.authenticated ? (auth.user || "Aurel") : "Guest User"}
               </h2>
               <p style={{ fontSize: 14, color: c.textSecondary, marginBottom: 24 }}>
                 {auth.authenticated ? auth.user : "No YouTube account connected"}
@@ -631,12 +692,23 @@ export default function App() {
                   <span style={{ fontSize: 13, color: c.textPrimary }}>XChaCha20</span>
                 </div>
                 {auth.authenticated && (
-                  <button 
-                    onClick={handleSyncManifest}
-                    style={{ marginTop: 8, padding: "8px", borderRadius: 8, background: "#1A73E820", border: `1px solid #1A73E840`, color: "#1A73E8", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
-                  >
-                    Sync Manifest Now
-                  </button>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                    <button 
+                      onClick={handleSyncManifest}
+                      style={{ padding: "8px", borderRadius: 8, background: "#1A73E820", border: `1px solid #1A73E840`, color: "#1A73E8", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                    >
+                      Sync Manifest Now
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        setAccountOpen(false);
+                        await fetch(`${API_BASE}/studio`);
+                      }}
+                      style={{ padding: "8px", borderRadius: 8, background: "#FF000015", border: `1px solid #FF000030`, color: "#CC0000", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                    >
+                      <CloudLightning size={16} /> Open YouTube Studio
+                    </button>
+                  </div>
                 )}
                 <button 
                   onClick={handleLogout}
@@ -666,13 +738,13 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             style={{
               position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-              background: toast.type === "error" ? "#EA4335" : (toast.type === "info" ? "#1A73E8" : "#323232"),
+              background: toast?.type === "error" ? "#EA4335" : (toast?.type === "info" ? "#1A73E8" : "#323232"),
               color: "white", padding: "12px 24px", borderRadius: 8,
               fontSize: 14, fontWeight: 500, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
               zIndex: 9999, display: "flex", alignItems: "center", gap: 12
             }}
           >
-            {toast.msg}
+            {toast?.msg}
           </motion.div>
         )}
       </AnimatePresence>
@@ -694,10 +766,8 @@ function SignInView({ c }: { c: ColorSet }) {
     try {
       const res = await fetch(`${API_BASE}/auth/login`, { method: "POST" });
       if (res.ok) {
-        const data = await res.json();
-        if (data.url) {
-          await openUrl(data.url);
-        }
+        // Backend now handles securely launching the browser
+        console.log("Login flow started by backend");
       }
     } catch (e) {
       console.error(e);
