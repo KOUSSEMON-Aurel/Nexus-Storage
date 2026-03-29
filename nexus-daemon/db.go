@@ -113,6 +113,20 @@ func (d *Database) Init(dbPath string) error {
 		position INTEGER
 	)`)
 
+	runMigrate("create_tasks", `CREATE TABLE IF NOT EXISTS tasks (
+		id TEXT PRIMARY KEY,
+		type INTEGER,
+		file_path TEXT,
+		mode TEXT,
+		is_manifest BOOLEAN,
+		status TEXT,
+		progress REAL,
+		created_at TIMESTAMP,
+		parent_id INTEGER,
+		sha256 TEXT
+	)`)
+
+
 	// Final check: if files_fts is empty but files has data, rebuild it
 	var count int
 	db.QueryRow("SELECT count(*) FROM files_fts").Scan(&count)
@@ -200,6 +214,11 @@ func (d *Database) GetKV(key string) (string, bool) {
 	return value, true
 }
 
+func (d *Database) IsStealthMode() bool {
+	val, ok := d.GetKV("stealth_mode")
+	return ok && val == "true"
+}
+
 func (d *Database) SaveFile(path, videoID string, size int64, hash, key string, parentID *int64, sha256 string) error {
 	query := `
 	INSERT INTO files (path, video_id, size, hash, key, parent_id, sha256)
@@ -217,6 +236,54 @@ func (d *Database) SaveFile(path, videoID string, size int64, hash, key string, 
 		return fmt.Errorf("could not save file: %w", err)
 	}
 	return nil
+}
+
+func (d *Database) SaveTask(id string, tType int, filePath, mode string, isManifest bool, status string, progress float64, createdAt time.Time, parentID *int64, sha256 string) error {
+	_, err := d.db.Exec(`
+		INSERT INTO tasks (id, type, file_path, mode, is_manifest, status, progress, created_at, parent_id, sha256)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			status = excluded.status,
+			progress = excluded.progress,
+			sha256 = excluded.sha256
+	`, id, tType, filePath, mode, isManifest, status, progress, createdAt, parentID, sha256)
+	if err == nil && d.OnConfigChange != nil {
+		d.OnConfigChange()
+	}
+	return err
+}
+
+func (d *Database) GetPendingTasks() (*sql.Rows, error) {
+	return d.db.Query(`SELECT id, type, file_path, mode, is_manifest, status, progress, created_at, parent_id, sha256 FROM tasks ORDER BY created_at ASC`)
+}
+
+func (d *Database) DeleteTask(id string) error {
+	_, err := d.db.Exec(`DELETE FROM tasks WHERE id = ?`, id)
+	if err == nil && d.OnConfigChange != nil {
+		d.OnConfigChange()
+	}
+	return err
+}
+
+func (d *Database) SaveShard(fileID int64, videoID string, position int) error {
+	_, err := d.db.Exec(`INSERT INTO shards (file_id, video_id, position) VALUES (?, ?, ?)`, fileID, videoID, position)
+	return err
+}
+
+func (d *Database) GetShardsForFile(fileID int64) ([]string, error) {
+	rows, err := d.db.Query(`SELECT video_id FROM shards WHERE file_id = ? ORDER BY position ASC`, fileID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var videoIDs []string
+	for rows.Next() {
+		var vid string
+		if err := rows.Scan(&vid); err == nil {
+			videoIDs = append(videoIDs, vid)
+		}
+	}
+	return videoIDs, nil
 }
 
 func (d *Database) GetFile(path string) (*FileRecord, error) {

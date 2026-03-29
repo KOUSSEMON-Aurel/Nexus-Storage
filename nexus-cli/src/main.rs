@@ -1,0 +1,236 @@
+use clap::Parser;
+use console::style;
+use nexus_daemon_client::client::NexusClient;
+use nexus_daemon_client::error::NexusError;
+
+mod cli;
+mod output;
+
+use cli::{Cli, Commands, AuthCommands, FileCommands, TaskCommands, DaemonCommands};
+
+#[tokio::main]
+async fn main() {
+    let cli = Cli::parse();
+    
+    // Create the shared daemon client
+    let client = NexusClient::new(&cli.daemon_url);
+
+    let res = match &cli.command {
+        Commands::Auth { cmd } => handle_auth(&client, cmd, cli.json).await,
+        Commands::Quota { warn_at } => handle_quota(&client, *warn_at, cli.json).await,
+        Commands::File { cmd } => handle_file(&client, cmd, cli.json).await,
+        Commands::Upload { path, no_progress } => handle_upload(&client, path, *no_progress, cli.json).await,
+        Commands::Mount { path } => handle_mount(&client, path, cli.json).await,
+        Commands::Umount => handle_umount(&client, cli.json).await,
+        Commands::Studio => handle_studio(&client, cli.json).await,
+        Commands::Task { cmd } => handle_task(&client, cmd, cli.json).await,
+        Commands::Daemon { cmd } => handle_daemon(&client, cmd, cli.json).await,
+    };
+
+    if let Err(e) = res {
+        if cli.json {
+            eprintln!(r#"{{"error": "{}"}}"#, e.to_string().replace("\"", "\\\""));
+        } else {
+            eprintln!("✗ Error: {}", e);
+        }
+        std::process::exit(1);
+    }
+}
+
+async fn handle_auth(client: &NexusClient, cmd: &AuthCommands, json: bool) -> Result<(), NexusError> {
+    match cmd {
+        AuthCommands::Status => {
+            let status = client.get_auth_status().await?;
+            if json {
+                output::print_json(&status);
+            } else {
+                output::print_auth_status(&status);
+            }
+        }
+        AuthCommands::Login => {
+            println!("Lancement du processus de connexion...");
+            // Polling approach not yet optimized for CLI in Go sidecar
+        }
+    }
+    Ok(())
+}
+
+async fn handle_quota(client: &NexusClient, warn_at: Option<u32>, json: bool) -> Result<(), NexusError> {
+    let quota = client.get_quota().await?;
+    
+    if json {
+        output::print_json(&quota);
+    } else {
+        output::print_quota(&quota);
+    }
+
+    if let Some(w) = warn_at {
+        let percent = (quota.used as f64 / quota.total as f64) * 100.0;
+        if percent >= w as f64 {
+            if !json { eprintln!("⚠️  ALERTE : Quota dépassé ({}%)", w); }
+            std::process::exit(1);
+        }
+    }
+    Ok(())
+}
+
+async fn handle_file(client: &NexusClient, cmd: &FileCommands, json: bool) -> Result<(), NexusError> {
+    match cmd {
+        FileCommands::List { sort: _ } => {
+            let files = client.get_files().await?;
+            if json {
+                output::print_json(&files);
+            } else {
+                output::print_files(&files);
+            }
+        }
+        FileCommands::Search { query } => {
+            let files = client.search(query).await?;
+            if json {
+                output::print_json(&files);
+            } else {
+                println!("{} Résultats pour : {}", style("🔍").bold(), style(query).cyan());
+                output::print_files(&files);
+            }
+        }
+        FileCommands::Delete { id, force } => {
+            let id_i64 = id.parse::<i64>().map_err(|_| NexusError::ApiError("L'ID doit être un nombre".into()))?;
+            
+            if !force && !json {
+                println!("{} Êtes-vous sûr de vouloir supprimer définitivement le fichier ID {} ? [y/N]", 
+                    style("⚠️").yellow(), style(id).bold());
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input).unwrap();
+                if input.trim().to_lowercase() != "y" {
+                    println!("Annulé.");
+                    return Ok(());
+                }
+            }
+
+            client.delete_file(id_i64).await?;
+            if !json { println!("{} Fichier supprimé avec succès.", style("✓").green()); }
+        }
+        _ => eprintln!("Commande non implémentée."),
+    }
+    Ok(())
+}
+
+async fn handle_upload(client: &NexusClient, path: &str, no_progress: bool, json: bool) -> Result<(), NexusError> {
+    if !json { println!("{} Préparation de l'upload : {}", style("🚀").bold(), style(path).cyan()); }
+    
+    let task = client.upload(path).await?;
+    let task_id = task.id.clone();
+    
+    if json {
+        output::print_json(&task);
+        return Ok(());
+    }
+
+    if no_progress {
+        println!("Tâche démarrée : {}", task_id);
+        return Ok(());
+    }
+
+    // Progress bar setup
+    let pb = indicatif::ProgressBar::new(100);
+    pb.set_style(indicatif::ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}% {msg}")
+        .unwrap()
+        .progress_chars("##-"));
+    
+    pb.set_message("Initialisation...");
+
+    // Polling loop
+    loop {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        let tasks = client.get_tasks().await?;
+        if let Some(t) = tasks.iter().find(|t| t.id == task_id) {
+            pb.set_position(t.progress as u64);
+            pb.set_message(t.status.clone());
+            
+            if t.status == "Completed" {
+                pb.finish_with_message("Terminé !");
+                break;
+            } else if t.status.starts_with("Error") {
+                pb.abandon_with_message(format!("Erreur : {}", t.status));
+                return Err(NexusError::ApiError(t.status.clone()));
+            }
+        } else {
+            // Task might be finished and removed from queue
+            pb.finish_with_message("Terminé (tâche archivée).");
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+async fn handle_mount(client: &NexusClient, _path: &Option<String>, _json: bool) -> Result<(), NexusError> {
+    let msg = client.execute_command("/mount", &[]).await?;
+    println!("✓ {}", msg);
+    Ok(())
+}
+
+async fn handle_umount(_client: &NexusClient, _json: bool) -> Result<(), NexusError> {
+    eprintln!("Le démontage n'est pas encore géré par l'API.");
+    Ok(())
+}
+
+async fn handle_studio(client: &NexusClient, _json: bool) -> Result<(), NexusError> {
+    let msg = client.execute_command("/studio", &[]).await?;
+    println!("✓ {}", msg);
+    Ok(())
+}
+
+async fn handle_task(client: &NexusClient, cmd: &TaskCommands, json: bool) -> Result<(), NexusError> {
+    match cmd {
+        TaskCommands::List { watch: _ } => {
+            let tasks = client.get_tasks().await?;
+            if json {
+                output::print_json(&tasks);
+            } else {
+                output::print_tasks(&tasks);
+            }
+        }
+        _ => eprintln!("Commande non implémentée."),
+    }
+    Ok(())
+}
+
+async fn handle_daemon(_client: &NexusClient, cmd: &DaemonCommands, json: bool) -> Result<(), NexusError> {
+    use std::process::Command;
+
+    match cmd {
+        DaemonCommands::Status => {
+            let output = Command::new("fuser").arg("8081/tcp").output();
+            let running = output.is_ok() && !output.unwrap().stdout.is_empty();
+            
+            if json {
+                println!(r#"{{"running": {}}}"#, running);
+            } else {
+                if running {
+                    println!("{} Daemon actif sur le port 8081", style("✓").green());
+                } else {
+                    println!("{} Daemon inactif", style("✗").red());
+                }
+            }
+        }
+        DaemonCommands::Start => {
+            if !json { println!("→ Démarrage du daemon..."); }
+            let status = Command::new("./nexus-gui/src-tauri/bin/nexus-daemon-x86_64-unknown-linux-gnu")
+                .spawn();
+            
+            if status.is_ok() {
+                if !json { println!("{} Daemon démarré.", style("✓").green()); }
+            } else {
+                return Err(NexusError::ApiError("Impossible de lancer le binaire du daemon".into()));
+            }
+        }
+        DaemonCommands::Stop => {
+            if !json { println!("→ Arrêt du daemon..."); }
+            let _ = Command::new("pkill").arg("-f").arg("nexus-daemon").output();
+            if !json { println!("{} Daemon arrêté.", style("✓").green()); }
+        }
+    }
+    Ok(())
+}

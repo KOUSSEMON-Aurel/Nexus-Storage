@@ -34,13 +34,37 @@ fuser -k 1420/tcp 2>/dev/null || true
 fuser -k 8081/tcp 2>/dev/null || true
 pkill -f nexus-daemon 2>/dev/null || true
 
-echo "🖥️ 4. Lancement de l'application Tauri..."
-cd nexus-gui
-# On installe les dépendances si le dossier node_modules n'existe pas
-if [ ! -d "node_modules" ]; then
-    echo "📦 Installation des dépendances npm..."
-    npm install
-fi
+echo "🖥️  4. Choix de l'interface..."
+echo "1) GUI (Tauri + React/Vite) - Recommandé pour le confort"
+echo "2) TUI (Terminal Pro) - Recommandé pour le monitoring & SSH"
+read -p "Choisissez (1/2) : " choice
 
-echo "✨ Lancement de Tauri (Frontend + Backend Sidecar)..."
-npm run tauri dev
+if [ "$choice" == "2" ]; then
+    echo "✨ Lancement du TUI Nexus..."
+    # On lance d'abord le daemon en arrière-plan
+    echo "📡 Démarrage du daemon en arrière-plan..."
+    ./nexus-gui/src-tauri/bin/nexus-daemon-x86_64-unknown-linux-gnu &
+    DAEMON_PID=$!
+    
+    # Nettoyage automatique à la fermeture du script
+    trap "kill $DAEMON_PID 2>/dev/null || true" EXIT
+    
+    # On attend que le daemon soit prêt
+    sleep 2
+    
+    echo "📟 Lancement de l'interface Terminal..."
+    cd nexus-tui
+    cargo run
+    
+    # Nettoyage à la sortie
+    kill $DAEMON_PID 2>/dev/null || true
+else
+    echo "✨ Lancement de Tauri (Frontend + Backend Sidecar)..."
+    cd nexus-gui
+    # On installe les dépendances si le dossier node_modules n'existe pas
+    if [ ! -d "node_modules" ]; then
+        echo "📦 Installation des dépendances npm..."
+        npm install
+    fi
+    npm run tauri dev
+fi

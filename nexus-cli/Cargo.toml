@@ -1,0 +1,16 @@
+[package]
+name = "nexus-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Command-line interface for Nexus-Storage automation"
+
+[dependencies]
+nexus-daemon-client = { path = "../nexus-daemon-client" }
+clap = { version = "4", features = ["derive", "color", "suggestions"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+console = "0.15"
+indicatif = "0.17"
