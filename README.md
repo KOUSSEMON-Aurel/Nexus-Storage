@@ -1,74 +1,109 @@
-# Nexus Storage
+<div align="center">
+  <img src="https://img.shields.io/badge/Nexus--Storage-2.1-1A73E8?style=for-the-badge&logoColor=white" alt="Nexus Version" />
+  <img src="https://img.shields.io/badge/Security-XChaCha20--Poly1305-10B981?style=for-the-badge" alt="Security" />
+  <img src="https://img.shields.io/badge/Backend-YouTube--Refinery-FF0000?style=for-the-badge&logo=youtube" alt="Backend" />
+</div>
 
-Nexus Storage is a high-density, encrypted cloud storage system that utilizes the YouTube infrastructure as a persistent backend. By transforming binary data into secure video streams, it achieves virtually unlimited capacity with decentralized redundancy.
+<br />
 
-## System Architecture
+<div align="center">
+  <h1>Nexus Storage</h1>
+  <p><strong>Universal Decentralized Persistence through High-Density Video Archival</strong></p>
+  <p><i>A professional-grade, encrypted cloud storage system utilizing YouTube's global infrastructure as a high-resilience block storage backend.</i></p>
+</div>
 
-The project is built on a multi-language stack designed for high performance and native desktop integration:
+---
 
-* **Nexus Core (Rust)**: The signal processing engine. It handles XChaCha20-Poly1305 authenticated encryption, RaptorQ (fountain code) error correction, and pixel-grid video encoding.
-* **Nexus Daemon (Go)**: The orchestration layer. It manages the OAuth2 authentication lifecycle, maintains the local SQLite/FTS5 metadata index, and provides a Rclone server for native file manager integration.
-* **Nexus GUI (Tauri/React)**: The desktop interface. It provides real-time telemetry, quota monitoring, and high-performance search capabilities through a unified dashboard.
+## Overview
 
-## Technical Specifications
+Nexus Storage transforms binary data into high-entropy video streams, achieving virtually unlimited capacity with multi-regional redundancy. By abstracting the "video" layer into a raw block storage device, Nexus allows for traditional file management workflows while benefiting from the most robust content delivery network on the planet.
 
-### Security & Integrity
+## 🏗️ System Architecture
 
-* **Encryption**: All data is encrypted locally using XChaCha20-Poly1305 before leaving the machine. Pathnames and metadata are never exposed to the backend.
-* **Deduplication**: SHA-256 content-addressable storage ensures that identical files are linked locally, saving bandwidth and API quota.
-* **Resilience**: Automated manifest backups are sharded and uploaded to dedicated YouTube playlists, allowing for full disaster recovery from a naked Google account.
+Nexus follows a decoupled, three-tier architecture designed for maximum performance and native operating system integration.
 
-### Integration
-
-* **Virtual Disk**: Native WebDAV support allows Nexus to be mounted as a local drive in Dolphin (KDE), Nautilus (GNOME), or Windows Explorer.
-* **Search**: Integrated SQLite FTS5 (Full-Text Search) provides sub-millisecond discovery across thousands of indexed files.
-* **Management**: A direct shortcut to YouTube Studio allows for convenient oversight of the underlying video shards.
-
-## Installation
-
-### Prerequisites
-
-* **Go** (1.21+)
-* **Rust** (Latest stable)
-* **Node.js & npm** (v18+)
-* **FFmpeg** (Required for video assembly)
-
-### Setup
-
-1. Place your Google Cloud `client_secret.json` in `~/.config/nexus-storage/` or the root of `nexus-daemon`.
-2. Build the Core library:
-   ```bash
-   cd nexus-core && cargo build --release
-   ```
-3. Install GUI dependencies:
-   ```bash
-   cd nexus-gui && npm install
-   ```
-
-### Execution
-
-Use the provided runner script for automatic sidecar compilation and application launch:
-
-```bash
-./run-app.sh
+```mermaid
+graph TD
+    A[Nexus GUI - Tauri] -->|Telemetry/RPC| B[Nexus Daemon - Go]
+    B -->|CGO Bindings| C[Nexus Core - Rust]
+    C -->|AES-256 / RaptorQ| D[Binary Shards]
+    D -->|FFmpeg Assembly| E[Video Stream]
+    E -->|Studio API| F[YouTube Cloud]
 ```
 
-## Usage
+### Core Components
+- **[Rust] Nexus Core**: The cryptographic and signal processing engine. Handles **XChaCha20-Poly1305** authenticated encryption and **RaptorQ** fountain code error correction.
+- **[Go] Nexus Daemon**: The orchestration layer. Manages the OAuth2 lifecycle, maintains a local **SQLite FTS5** metadata index, and provides a binary bridge for **Rclone** FUSE mounts.
+- **[Tauri] Nexus GUI**: The high-fidelity desktop dashboard. Features real-time quota monitoring, live sync telemetry, and an optimized startup sequence with **Skeleton Loaders**.
 
-Once the application is running:
+---
 
-1. Complete the Google OAuth2 authentication flow.
-2. Use the **Connect** button in the sidebar to mount the virtual disk.
-3. Manage files directly through your native file manager or the Nexus dashboard.
+## 🛰️ The Nexus Pipeline
 
-## Development
+The transition from a local file to a cloud-stored video shard involves multiple layers of data transformation to ensure zero-loss recovery and maximum security.
 
-The project follows a sidecar architecture. The Go daemon must be compiled with the `fts5` build tag to enable search functionality:
+### 📤 Upload & Compression
+```mermaid
+sequenceDiagram
+    participant User as Local File
+    participant Enc as Encryption (XChaCha20)
+    participant FEC as Forward Error Corr (RaptorQ)
+    participant Pix as Pixel Grid Encoding
+    participant YT as YouTube Studio
+    
+    User->>Enc: Byte Stream Input
+    Enc->>FEC: Encrypted Payload
+    FEC->>Pix: Fault-Tolerant Shards
+    Pix->>YT: Chromatic Video Assembly
+```
 
-```bash
-go build -tags fts5 -o nexus-daemon .
+### 📥 Download & Reconstitution
+```mermaid
+sequenceDiagram
+    participant YT as YouTube CDN
+    participant Pix as Frame Analysis
+    participant FEC as Error Recovery
+    participant Dec as Decryption
+    participant User as Original File
+    
+    YT->>Pix: MP4 Stream
+    Pix->>FEC: Decoded Bitstream
+    FEC->>Dec: Recovered Encrypted Shard
+    Dec->>User: Secure Verification & Output
 ```
 
 ---
 
-*Nexus Storage: Decentralized Persistence through Video Encoding.*
+## 🔒 Technical Specifications
+
+### Security & Privacy
+- **Client-Side Only**: All encryption happens on-machine. Google never sees raw bytes, filenames, or folder structures.
+- **Content-Addressability**: SHA-256 deduplication prevents redundant uploads, saving bandwidth and API quota.
+- **Manifest Resilience**: Periodic metadata snapshots are sharded and mirrored across dedicated playlists for full disaster recovery.
+
+### Universal Integration
+- **Virtual Disk**: Mount Nexus as a native drive (**Dolphin, Nautilus, Explorer**) via the built-in Rclone bridge.
+- **Real-time Search**: Sub-millisecond discovery across millions of shards using SQLite Full-Text Search.
+- **Branding**: Professional startup sequence with a 2-second security gate to ensure session integrity.
+
+---
+
+## 🛠️ Installation & Setup
+
+### Prerequisites
+- **Go** (1.21+), **Rust** (Stable), **Node.js** (v18+)
+- **FFmpeg**: Required for signal-to-video transitions.
+
+### Quick Start
+1. Place your Google `client_secret.json` in `~/.config/nexus-storage/`.
+2. Run the unified launcher:
+   ```bash
+   chmod +x run-app.sh
+   ./run-app.sh
+   ```
+
+---
+
+<div align="center">
+  <p><i>Nexus Storage: Redefining Persistence.</i></p>
+</div>
