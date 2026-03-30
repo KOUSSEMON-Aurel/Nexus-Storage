@@ -16,17 +16,20 @@ import (
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
+	"io"
 )
 
 type YouTubeManager struct {
-	config  *oauth2.Config
-	service *youtube.Service
-	mu      sync.RWMutex
-	authed    bool
-	user      string
-	channelID string
+	config       *oauth2.Config
+	service      *youtube.Service
+	driveService *drive.Service
+	mu           sync.RWMutex
+	authed       bool
+	user         string
+	channelID    string
 }
 
 func getConfigDir() string {
@@ -54,8 +57,12 @@ func NewYouTubeManager() *YouTubeManager {
 		return m // Return unauthenticated manager, never nil
 	}
 
-	// Pro Scope: YoutubeScope + Monitoring for real-time quota
-	config, err := google.ConfigFromJSON(b, youtube.YoutubeScope, "https://www.googleapis.com/auth/monitoring.read")
+	// Pro Scope: YoutubeScope + Monitoring for real-time quota + Drive for manifest
+	config, err := google.ConfigFromJSON(b, 
+		youtube.YoutubeScope, 
+		"https://www.googleapis.com/auth/monitoring.read",
+		drive.DriveFileScope,
+	)
 	if err != nil {
 		log.Printf("⚠️  YouTube: could not parse client_secret.json: %v", err)
 		return m
@@ -99,9 +106,14 @@ func (m *YouTubeManager) TryLoadToken() bool {
 	if err != nil {
 		return false
 	}
+	driveService, err := drive.NewService(context.Background(), option.WithHTTPClient(client))
+	if err != nil {
+		log.Printf("⚠️  Drive: could not create service: %v", err)
+	}
 
 	m.mu.Lock()
 	m.service = service
+	m.driveService = driveService
 	m.authed = true
 	m.mu.Unlock()
 
@@ -114,6 +126,7 @@ func (m *YouTubeManager) TryLoadToken() bool {
 func (m *YouTubeManager) Logout() {
 	m.mu.Lock()
 	m.service = nil
+	m.driveService = nil
 	m.authed = false
 	m.user = ""
 	m.channelID = ""
@@ -233,6 +246,66 @@ func (m *YouTubeManager) GetChannelID() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.channelID
+}
+
+func (m *YouTubeManager) UploadManifestToDrive(filename string, data io.Reader) (string, error) {
+	m.mu.RLock()
+	driveSvc := m.driveService
+	m.mu.RUnlock()
+
+	if driveSvc == nil {
+		return "", fmt.Errorf("drive service not initialized")
+	}
+
+	// 1. Search for existing manifest file to overwrite
+	query := "name = 'nexus.db' and trashed = false"
+	fileList, err := driveSvc.Files.List().Q(query).Fields("files(id)").Do()
+	if err == nil && len(fileList.Files) > 0 {
+		fileID := fileList.Files[0].Id
+		// Overwrite existing
+		_, err = driveSvc.Files.Update(fileID, nil).Media(data).Do()
+		return fileID, err
+	}
+
+	// 2. Create new if not found
+	f := &drive.File{
+		Name:     "nexus.db",
+		MimeType: "application/x-sqlite3",
+	}
+	res, err := driveSvc.Files.Create(f).Media(data).Do()
+	if err != nil {
+		return "", err
+	}
+	return res.Id, nil
+}
+
+func (m *YouTubeManager) DownloadManifestFromDrive() (io.ReadCloser, error) {
+	m.mu.RLock()
+	driveSvc := m.driveService
+	m.mu.RUnlock()
+
+	if driveSvc == nil {
+		return nil, fmt.Errorf("drive service not initialized")
+	}
+
+	query := "name = 'nexus.db' and trashed = false"
+	fileList, err := driveSvc.Files.List().Q(query).Fields("files(id)").Do()
+	if err != nil || len(fileList.Files) == 0 {
+		return nil, fmt.Errorf("manifest not found on drive")
+	}
+
+	fileID := fileList.Files[0].Id
+	resp, err := driveSvc.Files.Get(fileID).Download()
+	if err != nil {
+		return nil, err
+	}
+	return resp.Body, nil
+}
+
+func (m *YouTubeManager) GetDriveService() *drive.Service {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.driveService
 }
 
 func (m *YouTubeManager) GetAuthURL() string {

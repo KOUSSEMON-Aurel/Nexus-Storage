@@ -203,12 +203,38 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 
 	// Quota-Thrifty Deduplication
 	existing, _ := q.db.GetFileByHash(t.SHA256)
-	if existing != nil {
+	if existing != nil && !t.IsManifest {
 		log.Printf("[%s] ♻️  Deduplication: File already exists. Linking locally...", t.ID)
 		t.Status = "Linked (Dedupe)"
 		t.Progress = 100
 		q.updateTaskState(t)
 		return q.db.SaveFile(filepath.Base(t.FilePath), existing.VideoID, totalSize, "dedupe", "dedupe", t.ParentID, t.SHA256, existing.IsArchive)
+	}
+
+	// Nexus 2.0: Manifest belongs on Google Drive, not YouTube
+	if t.IsManifest {
+		t.Status = "Uploading to Drive"
+		q.updateTaskState(t)
+		
+		dbFile, err := os.Open(t.FilePath)
+		if err != nil {
+			return fmt.Errorf("could not open manifest for drive upload: %w", err)
+		}
+		defer dbFile.Close()
+
+		driveID, err := q.ytManager.UploadManifestToDrive("nexus.db", dbFile)
+		if err != nil {
+			return fmt.Errorf("drive upload failed: %w", err)
+		}
+
+		log.Printf("[%s] ✅ Manifest backed up to Google Drive: %s", t.ID, driveID)
+		t.Status = "Completed"
+		t.Progress = 100
+		q.updateTaskState(t)
+		
+		// Optional: Still clean up old YouTube manifests once
+		q.SweepOldManifests(driveID)
+		return nil
 	}
 
 	// Shard size = 1GB (1024 * 1024 * 1024 bytes)
