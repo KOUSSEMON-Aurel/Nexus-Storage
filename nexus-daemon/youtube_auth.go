@@ -248,17 +248,44 @@ func (m *YouTubeManager) GetChannelID() string {
 	return m.channelID
 }
 
-func (m *YouTubeManager) UploadManifestToDrive(filename string, data io.Reader) (string, error) {
-	m.mu.RLock()
-	driveSvc := m.driveService
-	m.mu.RUnlock()
-
+func (m *YouTubeManager) getMetadataFolderID() (string, error) {
+	driveSvc := m.GetDriveService()
 	if driveSvc == nil {
 		return "", fmt.Errorf("drive service not initialized")
 	}
 
-	// 1. Search for existing manifest file to overwrite
+	query := "name = 'Nexus-Storage-Metadata' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+	list, err := driveSvc.Files.List().Q(query).Fields("files(id)").Do()
+	if err == nil && len(list.Files) > 0 {
+		return list.Files[0].Id, nil
+	}
+
+	// Create it if not found
+	f := &drive.File{
+		Name:     "Nexus-Storage-Metadata",
+		MimeType: "application/vnd.google-apps.folder",
+	}
+	res, err := driveSvc.Files.Create(f).Do()
+	if err != nil {
+		return "", err
+	}
+	return res.Id, nil
+}
+
+func (m *YouTubeManager) UploadManifestToDrive(filename string, data io.Reader) (string, error) {
+	driveSvc := m.GetDriveService()
+	if driveSvc == nil {
+		return "", fmt.Errorf("drive service not initialized")
+	}
+
+	folderID, _ := m.getMetadataFolderID()
+
+	// 1. Search for existing manifest file in that folder to overwrite
 	query := "name = 'nexus.db' and trashed = false"
+	if folderID != "" {
+		query = fmt.Sprintf("name = 'nexus.db' and '%s' in parents and trashed = false", folderID)
+	}
+
 	fileList, err := driveSvc.Files.List().Q(query).Fields("files(id)").Do()
 	if err == nil && len(fileList.Files) > 0 {
 		fileID := fileList.Files[0].Id
@@ -272,6 +299,9 @@ func (m *YouTubeManager) UploadManifestToDrive(filename string, data io.Reader) 
 		Name:     "nexus.db",
 		MimeType: "application/x-sqlite3",
 	}
+	if folderID != "" {
+		f.Parents = []string{folderID}
+	}
 	res, err := driveSvc.Files.Create(f).Media(data).Do()
 	if err != nil {
 		return "", err
@@ -280,15 +310,17 @@ func (m *YouTubeManager) UploadManifestToDrive(filename string, data io.Reader) 
 }
 
 func (m *YouTubeManager) DownloadManifestFromDrive() (io.ReadCloser, error) {
-	m.mu.RLock()
-	driveSvc := m.driveService
-	m.mu.RUnlock()
-
+	driveSvc := m.GetDriveService()
 	if driveSvc == nil {
 		return nil, fmt.Errorf("drive service not initialized")
 	}
 
+	folderID, _ := m.getMetadataFolderID()
 	query := "name = 'nexus.db' and trashed = false"
+	if folderID != "" {
+		query = fmt.Sprintf("name = 'nexus.db' and '%s' in parents and trashed = false", folderID)
+	}
+
 	fileList, err := driveSvc.Files.List().Q(query).Fields("files(id)").Do()
 	if err != nil || len(fileList.Files) == 0 {
 		return nil, fmt.Errorf("manifest not found on drive")

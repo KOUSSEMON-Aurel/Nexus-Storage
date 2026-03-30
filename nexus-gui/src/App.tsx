@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Plus, HardDrive, Shield, Clock, Star, Trash2,
   Grid3X3, List, FileText, FileImage, Archive, Lock,
   X, MoreVertical, Moon, Sun, CloudLightning, ChevronRight,
-  Upload, Minus, Square, RefreshCw
+  Upload, Minus, Square, RefreshCw, Check
 } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -292,22 +292,16 @@ export default function App() {
     return () => clearTimeout(delay);
   }, [search]);
 
-  const handleUploadClick = async (mode: string, password?: string, isFolder?: boolean) => {
+  const handleUploadClick = async (path: string, mode: string, password?: string, isFolder?: boolean) => {
     try {
-      const selectedPath = await openDialog({
-        multiple: false,
-        directory: isFolder,
-        title: isFolder ? "Select Folder to Upload" : "Select File to Upload",
-      });
-
-      if (selectedPath) {
+      if (path) {
         setUploadOpen(false);
         showToast(isFolder ? "Archiving & starting upload..." : "Starting upload...", "info");
         const res = await fetch(`${API_BASE}/upload`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
-            path: typeof selectedPath === 'string' ? selectedPath : selectedPath[0], 
+            path, 
             mode, 
             password 
           })
@@ -1288,10 +1282,26 @@ function SecuritySection({ c }: { c: ColorSet }) {
 
 // ─── Upload Modal ─────────────────────────────────────────────────────────────
 
-function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: (mode: string, password?: string, isFolder?: boolean) => void; c: ColorSet }) {
+function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: (path: string, mode: string, password?: string, isFolder?: boolean) => void; c: ColorSet }) {
   const [mode, setMode] = useState<string>("base");
   const [password, setPassword] = useState("");
   const [isFolder, setIsFolder] = useState(false);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+
+  const handleSelect = async () => {
+    try {
+      const res = await openDialog({
+        multiple: false,
+        directory: isFolder,
+        title: isFolder ? "Select Folder to Upload" : "Select File to Upload",
+      });
+      if (res) {
+        setSelectedPath(typeof res === 'string' ? res : res[0]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <div>
@@ -1306,32 +1316,40 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
         {/* Toggle File/Folder */}
         <div style={{ display: "flex", background: c.bgApp, padding: 4, borderRadius: 12, border: `1px solid ${c.border}` }}>
            <button 
-             onClick={() => setIsFolder(false)}
+             onClick={() => { setIsFolder(false); setSelectedPath(null); }}
              style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", background: !isFolder ? c.bgSurface : "transparent", color: !isFolder ? c.textPrimary : c.textSecondary, fontWeight: 600, cursor: "pointer", fontSize: 13 }}
            >
              Single File
            </button>
            <button 
-             onClick={() => setIsFolder(true)}
+             onClick={() => { setIsFolder(true); setSelectedPath(null); }}
              style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", background: isFolder ? c.bgSurface : "transparent", color: isFolder ? c.textPrimary : c.textSecondary, fontWeight: 600, cursor: "pointer", fontSize: 13 }}
            >
              Folder (Archive)
            </button>
         </div>
 
-        {/* Drop zone */}
+        {/* Drop zone / Selector */}
         <div 
-          onClick={() => onUpload(mode, password, isFolder)}
+          onClick={handleSelect}
           style={{
-            border: `2px dashed ${c.border}`, borderRadius: 16,
+            border: `2px dashed ${selectedPath ? "#34A853" : c.border}`, borderRadius: 16,
             padding: "30px 24px", display: "flex", flexDirection: "column",
             alignItems: "center", gap: 12, cursor: "pointer", textAlign: "center",
+            background: selectedPath ? "rgba(52, 168, 83, 0.05)" : "transparent",
+            transition: "all 0.2s",
           }}>
-          <div style={{ width: 56, height: 56, borderRadius: 16, background: "#E8F0FE", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {isFolder ? <Archive size={28} color="#1A73E8" /> : <Upload size={28} color="#1A73E8" />}
+          <div style={{ width: 56, height: 56, borderRadius: 16, background: selectedPath ? "#E6F4EA" : "#E8F0FE", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {selectedPath ? <Check size={28} color="#34A853" /> : (isFolder ? <Archive size={28} color="#1A73E8" /> : <Upload size={28} color="#1A73E8" />)}
           </div>
-          <p style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{isFolder ? "Select Folder to Archive" : "Select File to Upload"}</p>
-          <p style={{ fontSize: 13, color: c.textSecondary }}>Nexus 2.0 Unified Channel Pipeline</p>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>
+              {selectedPath ? (selectedPath.split('/').pop() || selectedPath) : (isFolder ? "Select Folder to Archive" : "Select File to Upload")}
+            </p>
+            <p style={{ fontSize: 13, color: c.textSecondary }}>
+              {selectedPath ? "Path: " + selectedPath : "Nexus 2.0 Unified Channel Pipeline"}
+            </p>
+          </div>
         </div>
 
         {/* Password */}
@@ -1374,8 +1392,16 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
           </div>
         </div>
         <button 
-          onClick={() => onUpload(mode, password, isFolder)}
-          style={{ width: "100%", padding: "13px 20px", borderRadius: 12, background: "#1A73E8", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+          disabled={!selectedPath}
+          onClick={() => selectedPath && onUpload(selectedPath, mode, password, isFolder)}
+          style={{ 
+            width: "100%", padding: "13px 20px", borderRadius: 12, 
+            background: !selectedPath ? c.border : "#1A73E8", 
+            color: "white", border: "none", fontSize: 14, fontWeight: 500, 
+            cursor: !selectedPath ? "not-allowed" : "pointer",
+            opacity: !selectedPath ? 0.7 : 1,
+            transition: "all 0.2s"
+          }}>
           Start {isFolder ? "Archival & Upload" : "Upload"}
         </button>
       </div>

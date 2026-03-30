@@ -203,12 +203,11 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 
 	// Quota-Thrifty Deduplication
 	existing, _ := q.db.GetFileByHash(t.SHA256)
-	if existing != nil && !t.IsManifest {
-		log.Printf("[%s] ♻️  Deduplication: File already exists. Linking locally...", t.ID)
-		t.Status = "Linked (Dedupe)"
-		t.Progress = 100
-		q.updateTaskState(t)
-		return q.db.SaveFile(filepath.Base(t.FilePath), existing.VideoID, totalSize, "dedupe", "dedupe", t.ParentID, t.SHA256, existing.IsArchive)
+	if existing != nil && existing.VideoID != "" && !t.IsManifest {
+		log.Printf("[%s] ♻️  Deduplication: File already exists (VideoID: %s). Linking locally...", t.ID, existing.VideoID)
+		q.db.SaveFile(t.FilePath, existing.VideoID, totalSize, existing.Hash, existing.Key, t.ParentID, t.SHA256, existing.IsArchive)
+		t.Status = "Completed"
+		return nil
 	}
 
 	// Nexus 2.0: Manifest belongs on Google Drive, not YouTube

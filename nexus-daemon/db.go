@@ -224,32 +224,58 @@ func (d *Database) MergeManifest(cloudDbPath string) error {
 	defer d.db.Exec("DETACH DATABASE cloud")
 
 	// 1.5. Forward Compatibility: Apply missing columns to old manifests.
-	// We ignore errors because if the column already exists, it fails safely.
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN parent_id INTEGER`)
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN sha256 TEXT`)
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN file_key TEXT DEFAULT ''`)
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN is_archive BOOLEAN DEFAULT 0`)
 
-	// 2. Merge Files (using path as unique key)
-	// IMPORTANT: never overwrite a local soft-delete with cloud data.
-	// If files.deleted_at is already set, keep it (local deletion wins).
+	// 2. Merge Folders (Recursive Mapping)
+	// We use a simplified level-by-level approach for folder sync.
+	for i := 0; i < 5; i++ { 
+		_, err = d.db.Exec(`
+			INSERT INTO folders (name, parent_id)
+			SELECT cf.name, lf_parent.id
+			FROM cloud.folders cf
+			LEFT JOIN cloud.folders cf_parent ON cf.parent_id = cf_parent.id
+			LEFT JOIN folders lf_parent ON (cf_parent.name = lf_parent.name)
+			WHERE NOT EXISTS (
+				SELECT 1 FROM folders lf 
+				WHERE lf.name = cf.name 
+				AND (
+					(lf.parent_id IS NULL AND cf.parent_id IS NULL) OR 
+					(lf.parent_id = lf_parent.id)
+				)
+			)
+			ON CONFLICT DO NOTHING
+		`)
+	}
+
+	// 3. Merge Files using a CTE to resolve parent_ids correctly
 	_, err = d.db.Exec(`
+		WITH CloudFilesWithLocalParent AS (
+			SELECT 
+				cf.path, cf.video_id, cf.size, cf.hash, cf.key, cf.starred, cf.deleted_at, cf.last_update, cf.sha256, cf.file_key, cf.is_archive,
+				lf.id as local_parent_id
+			FROM cloud.files cf
+			LEFT JOIN cloud.folders cfolder ON cf.parent_id = cfolder.id
+			LEFT JOIN folders lf ON cfolder.name = lf.name
+		)
 		INSERT INTO files (path, video_id, size, hash, key, starred, deleted_at, last_update, parent_id, sha256, file_key, is_archive)
-		SELECT path, video_id, size, hash, key, starred, deleted_at, last_update, parent_id, sha256, file_key, is_archive
-		FROM cloud.files
-		WHERE true
+		SELECT 
+			path, video_id, size, hash, key, starred, deleted_at, last_update, local_parent_id, sha256, file_key, is_archive
+		FROM CloudFilesWithLocalParent
 		ON CONFLICT(path) DO UPDATE SET
-			video_id   = excluded.video_id,
-			size       = excluded.size,
-			hash       = excluded.hash,
-			key        = excluded.key,
-			starred    = excluded.starred,
-			deleted_at = CASE WHEN files.deleted_at IS NOT NULL THEN files.deleted_at ELSE excluded.deleted_at END,
+			video_id    = excluded.video_id,
+			size        = excluded.size,
+			hash        = excluded.hash,
+			key         = excluded.key,
+			starred     = excluded.starred,
+			deleted_at  = CASE WHEN files.deleted_at IS NOT NULL THEN files.deleted_at ELSE excluded.deleted_at END,
 			last_update = excluded.last_update,
-			parent_id  = excluded.parent_id,
-			sha256     = excluded.sha256,
-			file_key   = excluded.file_key,
-			is_archive = excluded.is_archive
+			parent_id   = excluded.parent_id,
+			sha256      = excluded.sha256,
+			file_key    = excluded.file_key,
+			is_archive  = excluded.is_archive
 		WHERE (excluded.last_update > files.last_update OR files.last_update IS NULL)
 		  AND files.deleted_at IS NULL
 	`)
@@ -257,15 +283,13 @@ func (d *Database) MergeManifest(cloudDbPath string) error {
 		return fmt.Errorf("files merge failed: %w", err)
 	}
 
-	// 3. Merge Shards
-	// (Simple insert skip on conflict for shards since they are immutable)
+	// 4. Merge Shards
 	_, err = d.db.Exec(`
 		INSERT INTO shards (file_id, video_id, position)
 		SELECT f.id, cs.video_id, cs.position
 		FROM cloud.shards cs
 		JOIN cloud.files cf ON cs.file_id = cf.id
 		JOIN files f ON f.path = cf.path
-		WHERE true
 		ON CONFLICT DO NOTHING
 	`)
 	
