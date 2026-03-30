@@ -386,23 +386,66 @@ func (m *YouTubeManager) StartLoginServer() error {
 			<!DOCTYPE html>
 			<html>
 			<head>
-				<title>Nexus-Storage - Authenticated</title>
+				<title>Nexus Storage - Authenticated</title>
+				<meta name="viewport" content="width=device-width, initial-scale=1.0">
 				<style>
-					body { background-color: #0f172a; color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-					.card { background-color: #1e293b; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; max-width: 400px; border: 1px solid #334155; }
-					.icon { background-color: #10b981; color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 30px; margin: 0 auto 20px; box-shadow: 0 0 15px rgba(16, 185, 129, 0.5); }
-					h1 { margin: 0 0 10px; font-size: 24px; }
-					p { color: #94a3b8; font-size: 15px; line-height: 1.5; margin-bottom: 20px; }
-					.btn { background-color: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-					.btn:hover { background-color: #2563eb; }
+					:root { --primary: #1A73E8; --bg: #0F172A; }
+					body { 
+						background: radial-gradient(circle at top right, #1E293B, #0F172A);
+						color: #F8FAFC; 
+						font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+						display: flex; justify-content: center; align-items: center; 
+						height: 100vh; margin: 0; overflow: hidden;
+					}
+					.glass {
+						background: rgba(30, 41, 59, 0.7);
+						backdrop-filter: blur(12px);
+						-webkit-backdrop-filter: blur(12px);
+						padding: 48px;
+						border-radius: 32px;
+						border: 1px solid rgba(255, 255, 255, 0.1);
+						box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+						text-align: center;
+						max-width: 420px;
+						animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+					}
+					@keyframes slideUp {
+						from { opacity: 0; transform: translateY(20px) scale(0.98); }
+						to { opacity: 1; transform: translateY(0) scale(1); }
+					}
+					.icon-circle {
+						width: 80px; height: 80px;
+						background: linear-gradient(135deg, #34D399, #10B981);
+						border-radius: 24px;
+						display: flex; justify-content: center; align-items: center;
+						margin: 0 auto 32px;
+						box-shadow: 0 20px 40px rgba(16, 185, 129, 0.3);
+						transform: rotate(-5deg);
+					}
+					.check { font-size: 40px; color: white; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+					h1 { margin: 0 0 12px; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+					p { color: #94A3B8; font-size: 16px; line-height: 1.6; margin-bottom: 32px; font-weight: 400; }
+					.btn { 
+						background: var(--primary);
+						color: white; border: none; 
+						padding: 16px 32px; border-radius: 16px;
+						font-size: 15px; font-weight: 600; cursor: pointer;
+						transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+						box-shadow: 0 8px 16px rgba(26, 115, 232, 0.2);
+						width: 100%;
+					}
+					.btn:hover { background: #2563EB; transform: translateY(-2px); box-shadow: 0 12px 20px rgba(26, 115, 232, 0.3); }
+					.btn:active { transform: translateY(0); }
 				</style>
 			</head>
 			<body>
-				<div class="card">
-					<div class="icon">✓</div>
-					<h1>Authentication Successful</h1>
-					<p>Your Google account has been securely linked to <b>Nexus-Storage</b>. You can now close this window and return to the application.</p>
-					<button class="btn" onclick="window.close()">Close Window</button>
+				<div class="glass">
+					<div class="icon-circle">
+						<span class="check">✓</span>
+					</div>
+					<h1>Nexus Linked</h1>
+					<p>Your YouTube connection is verified. Encryption keys have been synchronized securely.</p>
+					<button class="btn" onclick="window.close()">Back to Nexus</button>
 				</div>
 			</body>
 			</html>

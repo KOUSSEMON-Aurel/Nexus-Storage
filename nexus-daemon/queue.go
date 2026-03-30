@@ -40,6 +40,7 @@ type Task struct {
 
 type TaskQueue struct {
 	tasks         map[string]*Task
+	taskChan      chan *Task
 	mu            sync.Mutex
 	core          *NexusCore
 	db            *Database
@@ -47,7 +48,7 @@ type TaskQueue struct {
 	manifestMu    sync.Mutex
 	manifestTimer *time.Timer
 	pm            *PlaylistManager
-	cache         *CacheManager // V3: LRU disk cache
+	cache         *CacheManager 
 }
 
 func ensureYtDlp() {
@@ -74,12 +75,13 @@ func ensureYtDlp() {
 
 func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManager, pm *PlaylistManager, cache *CacheManager) {
 	q.tasks = make(map[string]*Task)
+	q.taskChan = make(chan *Task, 100) // Buffered queue
 	q.core = core
 	q.db = db
 	q.ytManager = ytManager
 	q.pm = pm
 	q.cache = cache
-	ensureYtDlp() // synchronous - must complete before any tasks
+	ensureYtDlp()
 
 	// Load pending tasks from DB
 	rows, err := db.GetPendingTasks()
@@ -93,25 +95,43 @@ func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManage
 				t.Type = TaskType(tType)
 				q.tasks[t.ID] = t
 				log.Printf("⏳ Resuming pending task %s", t.ID)
-				go q.processTask(t)
+				q.taskChan <- t // Add to sequential worker
 			}
 		}
 	}
+
+	// Start the single sequential worker
+	go q.worker()
 }
 
 func (q *TaskQueue) AddTask(t *Task) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	
+	// Prevent duplicate manifest tasks if one is already pending
+	if t.IsManifest {
+		for _, pending := range q.tasks {
+			if pending.IsManifest && (pending.Status == "Pending" || pending.Status == "Processing") {
+				return 
+			}
+		}
+	}
+
 	q.tasks[t.ID] = t
 	q.db.SaveTask(t.ID, int(t.Type), t.FilePath, t.Mode, t.IsManifest, t.Status, t.Progress, t.CreatedAt, t.ParentID, t.SHA256)
-	go q.processTask(t)
+	q.taskChan <- t
+}
+
+func (q *TaskQueue) worker() {
+	for t := range q.taskChan {
+		q.processTask(t)
+	}
 }
 
 func (q *TaskQueue) updateTaskState(t *Task) {
 	q.db.SaveTask(t.ID, int(t.Type), t.FilePath, t.Mode, t.IsManifest, t.Status, t.Progress, t.CreatedAt, t.ParentID, t.SHA256)
 }
 
-// GetTask returns the in-memory task pointer (or nil if not found).
 func (q *TaskQueue) GetTask(id string) *Task {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -119,9 +139,12 @@ func (q *TaskQueue) GetTask(id string) *Task {
 }
 
 func (q *TaskQueue) processTask(t *Task) {
+	q.mu.Lock()
 	t.Status = "Processing"
 	q.updateTaskState(t)
-	log.Printf("Starting task %s", t.ID)
+	q.mu.Unlock()
+
+	log.Printf("🚀 Starting task %s (%v)", t.ID, t.Type)
 
 	var err error
 	switch t.Type {
@@ -133,15 +156,19 @@ func (q *TaskQueue) processTask(t *Task) {
 		err = q.handleDelete(t)
 	}
 
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
 	if err != nil {
 		t.Status = fmt.Sprintf("Error: %v", err)
 		q.updateTaskState(t)
-		log.Printf("Task %s failed: %v", t.ID, err)
+		log.Printf("❌ Task %s failed: %v", t.ID, err)
 	} else {
 		t.Status = "Completed"
 		t.Progress = 100
-		q.db.DeleteTask(t.ID) // Remove from queue on success
-		log.Printf("Task %s completed successfully", t.ID)
+		q.db.DeleteTask(t.ID) 
+		delete(q.tasks, t.ID) // Remove from in-memory map
+		log.Printf("✅ Task %s completed successfully", t.ID)
 	}
 }
 

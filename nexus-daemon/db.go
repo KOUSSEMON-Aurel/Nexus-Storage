@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -12,6 +13,7 @@ import (
 
 type Database struct {
 	db             *sql.DB
+	mu             sync.Mutex
 	OnConfigChange func()
 }
 
@@ -215,9 +217,12 @@ func (d *Database) LogQuotaUsage(units int) {
 	d.db.Exec(`INSERT INTO quota_log (date, units) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET units = units + ?`, date, units, units)
 }
 
-func (d *Database) MergeManifest(cloudDbPath string) error {
-	// 1. Attach the cloud DB
-	_, err := d.db.Exec(fmt.Sprintf("ATTACH DATABASE '%s' AS cloud", cloudDbPath))
+func (d *Database) MergeManifest(driveManifestPath string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	// 1. Attach the cloud manifest database
+	_, err := d.db.Exec(`ATTACH DATABASE ? AS cloud`, driveManifestPath)
 	if err != nil {
 		return fmt.Errorf("attach failed: %w", err)
 	}
@@ -321,6 +326,8 @@ func (d *Database) Close() {
 }
 
 func (d *Database) SetKV(key, value string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	_, err := d.db.Exec(`INSERT INTO kv_store (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
 	if err == nil && d.OnConfigChange != nil {
 		d.OnConfigChange()
@@ -329,6 +336,8 @@ func (d *Database) SetKV(key, value string) error {
 }
 
 func (d *Database) GetKV(key string) (string, bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	var value string
 	err := d.db.QueryRow(`SELECT value FROM kv_store WHERE key = ?`, key).Scan(&value)
 	if err != nil {
@@ -507,6 +516,9 @@ func (d *Database) GetFileByID(id int64) (*FileRecord, error) {
 }
 
 func (d *Database) ListFiles() ([]FileRecord, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	rows, err := d.db.Query(`
 		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
 		FROM files WHERE deleted_at IS NULL ORDER BY last_update DESC`)
@@ -528,6 +540,9 @@ func (d *Database) ListFiles() ([]FileRecord, error) {
 }
 
 func (d *Database) ListTrash() ([]FileRecord, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	rows, err := d.db.Query(`
 		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
 		FROM files WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC`)
@@ -550,6 +565,8 @@ func (d *Database) ListTrash() ([]FileRecord, error) {
 
 // SoftDelete moves a file to trash.
 func (d *Database) SoftDelete(id int64) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	_, err := d.db.Exec(
 		`UPDATE files SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
 	if err == nil && d.OnConfigChange != nil {
@@ -560,6 +577,8 @@ func (d *Database) SoftDelete(id int64) error {
 
 // Restore moves a file out of trash.
 func (d *Database) Restore(id int64) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	_, err := d.db.Exec(`UPDATE files SET deleted_at = NULL WHERE id = ?`, id)
 	if err == nil && d.OnConfigChange != nil {
 		d.OnConfigChange()
@@ -569,6 +588,8 @@ func (d *Database) Restore(id int64) error {
 
 // PermanentDelete removes the record entirely.
 func (d *Database) PermanentDelete(id int64) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	_, err := d.db.Exec(`DELETE FROM files WHERE id = ?`, id)
 	if err == nil && d.OnConfigChange != nil {
 		d.OnConfigChange()
@@ -578,6 +599,8 @@ func (d *Database) PermanentDelete(id int64) error {
 
 // CleanupTrash removes files that have been in trash longer than 'days'.
 func (d *Database) CleanupTrash(days int) ([]string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	threshold := time.Now().AddDate(0, 0, -days).Format("2006-01-02 15:04:05")
 	
 	// Find VideoIDs to also queue cloud deletion
@@ -606,7 +629,9 @@ func (d *Database) CleanupTrash(days int) ([]string, error) {
 // ToggleStar sets the starred status.
 // CreateFolder ensures a folder exists and returns its ID.
 func (d *Database) CreateFolder(name string, parentID *int64) (int64, error) {
-	res, err := d.db.Exec(`INSERT INTO folders (name, parent_id) VALUES (?, ?) ON CONFLICT(name, parent_id) DO UPDATE SET name=name`, name, parentID)
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	res, err := d.db.Exec(`INSERT OR IGNORE INTO folders (name, parent_id) VALUES (?, ?)`, name, parentID)
 	if err != nil {
 		return 0, err
 	}
@@ -622,6 +647,8 @@ func (d *Database) CreateFolder(name string, parentID *int64) (int64, error) {
 }
 
 func (d *Database) GetFolderByID(id int64) (*FolderRecord, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	var f FolderRecord
 	err := d.db.QueryRow(`SELECT id, name, parent_id, playlist_id FROM folders WHERE id = ?`, id).Scan(&f.ID, &f.Name, &f.ParentID, &f.PlaylistID)
 	if err == sql.ErrNoRows {
@@ -631,6 +658,8 @@ func (d *Database) GetFolderByID(id int64) (*FolderRecord, error) {
 }
 
 func (d *Database) ListSubfolders(parentID *int64) ([]FolderRecord, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	rows, err := d.db.Query(`SELECT id, name, parent_id, playlist_id FROM folders WHERE parent_id IS ?`, parentID)
 	if err != nil {
 		return nil, err
@@ -639,8 +668,9 @@ func (d *Database) ListSubfolders(parentID *int64) ([]FolderRecord, error) {
 	var folders []FolderRecord
 	for rows.Next() {
 		var f FolderRecord
-		rows.Scan(&f.ID, &f.Name, &f.ParentID, &f.PlaylistID)
-		folders = append(folders, f)
+		if err := rows.Scan(&f.ID, &f.Name, &f.ParentID, &f.PlaylistID); err == nil {
+			folders = append(folders, f)
+		}
 	}
 	return folders, nil
 }
@@ -687,6 +717,8 @@ type Stats struct {
 }
 
 func (d *Database) GetStats() (Stats, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	var s Stats
 	// Direct queries for reliability
 	d.db.QueryRow(`SELECT COUNT(*), IFNULL(SUM(size),0) FROM files WHERE deleted_at IS NULL`).Scan(&s.FileCount, &s.TotalSize)

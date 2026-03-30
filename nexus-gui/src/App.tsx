@@ -137,6 +137,8 @@ export default function App() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [isAppReady, setIsAppReady] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const handleLogout = async () => {
     try {
@@ -219,37 +221,90 @@ export default function App() {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
-  // Polling for files, tasks, and stats
+  // ─── INITIALIZATION & GATING ──────────────────────────────────────────────
+  useEffect(() => {
+    let unmount = false;
+    const startTime = Date.now();
+
+    const initialize = async () => {
+      // 1. Core Readiness (API + Auth)
+      try {
+        const fetchOpts: RequestInit = { cache: "no-store", headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" } };
+        
+        // Wait for basic stats (API ready)
+        const statsRes = await fetch(`${API_BASE}/stats`, fetchOpts);
+        if (!statsRes.ok) throw new Error("Backend not available");
+        
+        // CRITICAL: Fetch Auth status BEFORE lifting splash
+        const authRes = await fetch(`${API_BASE}/auth/status?_t=${Date.now()}`, fetchOpts);
+        if (authRes.ok) {
+           const authData = await authRes.json();
+           if (!unmount) setAuth(authData);
+        }
+
+        // Fetch first batch of files for skeletons
+        const filesRes = await fetch(section === "trash" ? `${API_BASE}/trash` : `${API_BASE}/files`, fetchOpts);
+        if (filesRes.ok && !unmount) {
+           const data: BackendFile[] = await filesRes.json();
+           setDbFiles(data.map(mapBackendToFile));
+        }
+
+        // 2. Minimum delay (2s) to show the premium splash screen
+        const elapsed = Date.now() - startTime;
+        const wait = Math.max(0, 2000 - elapsed);
+        
+        setTimeout(() => {
+          if (!unmount) {
+            setIsAppReady(true);
+            // Show skeletons for another 800ms while UI transitions
+            setTimeout(() => { if (!unmount) setIsInitialLoading(false); }, 800);
+          }
+        }, wait);
+
+      } catch (err) {
+        if (!unmount) {
+           console.log("Waiting for backend...", err);
+           // Retry after 1s
+           setTimeout(initialize, 1000);
+        }
+      }
+    };
+
+    initialize();
+    return () => { unmount = true; };
+  }, [section]);
+
+  // ─── BACKGROUND POLLING ───────────────────────────────────────────────────
   useEffect(() => {
     let tick = 0;
     const poll = async () => {
+      if (!isAppReady) return; // Don't poll until initialized
+
       try {
         const fetchFilesUrl = section === "trash" ? `${API_BASE}/trash` : `${API_BASE}/files`;
         const fetchOpts: RequestInit = { cache: "no-store", headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" } };
-        const [filesRes, tasksRes, statsRes] = await Promise.all([
-          fetch(fetchFilesUrl, fetchOpts),
+        const [tasksRes, statsRes, quotaRes, mountRes] = await Promise.all([
           fetch(`${API_BASE}/tasks`, fetchOpts),
-          fetch(`${API_BASE}/stats`, fetchOpts)
+          fetch(`${API_BASE}/stats`, fetchOpts),
+          fetch(`${API_BASE}/quota`, fetchOpts),
+          fetch(`${API_BASE}/mount/status`, fetchOpts)
         ]);
         
-        if (filesRes.ok) {
-          const data: BackendFile[] = await filesRes.json();
-          setDbFiles(data.map(mapBackendToFile));
-        }
-
         if (tasksRes.ok) setTasks(await tasksRes.json());
         if (statsRes.ok) setStats(await statsRes.json());
-
-        // Fetch Quota
-        const quotaRes = await fetch(`${API_BASE}/quota`, fetchOpts);
         if (quotaRes.ok) setQuota(await quotaRes.json());
-
-        // Fetch Mount Status
-        const mountRes = await fetch(`${API_BASE}/mount/status`, fetchOpts);
         if (mountRes.ok) setIsMounted((await mountRes.json()).mounted);
 
-        // Pro Optimization: Only poll auth aggressively if NOT authenticated.
-        // Once authenticated, checking every 60 seconds (30 ticks) is plenty.
+        // Files polling
+        if (tick % 2 === 0) { // Every 4s
+          const filesRes = await fetch(fetchFilesUrl, fetchOpts);
+          if (filesRes.ok) {
+            const data: BackendFile[] = await filesRes.json();
+            setDbFiles(data.map(mapBackendToFile));
+          }
+        }
+
+        // Auth polling (aggressively if not authenticated, else every 60s)
         if (!auth.authenticated || tick % 30 === 0) {
           const authRes = await fetch(`${API_BASE}/auth/status?_t=${Date.now()}`, fetchOpts);
           if (authRes.ok) {
@@ -261,14 +316,14 @@ export default function App() {
         }
         tick++;
       } catch (err) {
-        console.error("API Error:", err);
+        console.error("Polling Error:", err);
       }
     };
 
     poll();
     const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
-  }, [section, auth.authenticated, auth.user]);
+  }, [section, auth.authenticated, auth.user, isAppReady]);
 
   // Quota Alert logic
   useEffect(() => {
@@ -399,9 +454,11 @@ export default function App() {
   };
 
   return (
-    <div 
-      data-tauri-drag-region
-      style={{ background: c.bgApp, color: c.textPrimary, fontFamily: "'Inter', system-ui, sans-serif", height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <>
+      <SplashScreen b={isAppReady} loading={isInitialLoading} c={c} />
+      <div 
+        data-tauri-drag-region
+        style={{ background: c.bgApp, color: c.textPrimary, fontFamily: "'Inter', system-ui, sans-serif", height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       
       {/* ━━━━ HEADER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <header
@@ -684,16 +741,28 @@ export default function App() {
                 <motion.div key={section} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}>
                   {section === "security" ? (
                     <SecuritySection c={c} />
-                  ) : section === "trash" ? (
-                    <EmptyState icon={<Trash2 size={64} />} title="Trash is empty" sub="Items deleted from Nexus are stored here temporarily." c={c} />
                   ) : files.length === 0 ? (
-                    <EmptyState icon={<Search size={64} />} title="No files match your search" sub="Try a different search term." c={c} />
+                    <EmptyState 
+                      icon={section === "trash" ? <Trash2 size={64} color={c.textSecondary} /> : <Search size={64} />} 
+                      title={section === "trash" ? "Trash is empty" : "No files match your search"} 
+                      sub={section === "trash" ? "Items deleted from Nexus are stored here temporarily." : "Try a different search term."} 
+                      c={c} 
+                    />
                   ) : (
                     <>
                       <p style={{ fontSize: 14, fontWeight: 500, color: c.textSecondary, marginBottom: 16 }}>
                         {section === "starred" ? "Starred" : "Suggested"}
                       </p>
-                      {viewMode === "grid" ? (
+                      {isInitialLoading ? (
+                        <>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 16 }}>
+                            <Skeleton width={120} height={18} />
+                          </div>
+                          <div style={{ display: viewMode === "grid" ? "grid" : "block", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 20 }}>
+                            {[1,2,3,4,5,6].map(i => <FileSkeleton key={i} viewMode={viewMode} c={c} />)}
+                          </div>
+                        </>
+                      ) : viewMode === "grid" ? (
                         <FileGrid files={files} onSelect={setSelected} selected={selected!} c={c} dark={dark} />
                       ) : (
                         <FileList files={files} onSelect={setSelected} selected={selected!} c={c} dark={dark} />
@@ -915,8 +984,8 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -1247,6 +1316,7 @@ function SecuritySection({ c }: { c: ColorSet }) {
       .catch(console.error);
   }, []);
 
+  /*
   const handleUpdatePurge = async (days: number) => {
     setPurgeDays(days);
     await fetch(`${API_BASE}/settings/trash`, {
@@ -1255,6 +1325,7 @@ function SecuritySection({ c }: { c: ColorSet }) {
       body: JSON.stringify({ purge_days: days })
     });
   }
+  */
 
   if (protocols.length === 0) return <div style={{ color: c.textSecondary }}>Loading security info...</div>;
 
@@ -1533,3 +1604,81 @@ const DARK: ColorSet = {
   border:        "#3C4043",
   btnShadow:     "0 1px 3px rgba(0,0,0,.5), 0 4px 8px rgba(0,0,0,.3)",
 };
+const shimmer = `
+  @keyframes shimmer {
+    0% { background-position: -468px 0; }
+    100% { background-position: 468px 0; }
+  }
+`;
+
+function Skeleton({ width, height, borderRadius = 8, style = {} }: { width: string | number; height: string | number; borderRadius?: any; style?: any }) {
+  return (
+    <div className="skeleton-shimmer" style={{
+      width, height, borderRadius,
+      background: "#f6f7f8",
+      backgroundImage: "linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%)",
+      backgroundRepeat: "no-repeat",
+      backgroundSize: "800px 104px",
+      animation: "shimmer 1.2s linear infinite forwards",
+      ...style
+    }} />
+  );
+}
+
+function FileSkeleton({ viewMode, c }: { viewMode: ViewMode; c: ColorSet }) {
+  if (viewMode === "list") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 160px 100px 40px", alignItems: "center", height: 52, padding: "0 16px", borderBottom: `1px solid ${c.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Skeleton width={32} height={32} />
+          <Skeleton width={180} height={16} />
+        </div>
+        <Skeleton width={60} height={14} />
+        <Skeleton width={100} height={14} />
+        <Skeleton width={40} height={14} />
+        <div style={{ display: "flex", justifyContent: "center" }}><Skeleton width={20} height={20} borderRadius="50%" /></div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ background: c.bgSurface, borderRadius: 16, border: `1px solid ${c.border}`, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+      <Skeleton width="100%" height={140} borderRadius={12} />
+      <Skeleton width="80%" height={18} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Skeleton width="40%" height={12} />
+        <Skeleton width={20} height={20} borderRadius="50%" />
+      </div>
+    </div>
+  );
+}
+
+function SplashScreen({ b, loading, c }: { b: boolean; loading: boolean; c: ColorSet }) {
+  return (
+    <AnimatePresence>
+      {!b && (
+        <motion.div 
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0, scale: 1.05 }}
+          transition={{ duration: 0.6, ease: "easeInOut" }}
+          style={{ position: "fixed", inset: 0, background: c.bgApp, zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}
+        >
+          <style>{shimmer}</style>
+          <motion.div 
+            animate={{ scale: [1, 1.1, 1], opacity: [0.8, 1, 0.8] }} 
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            style={{ width: 80, height: 80, borderRadius: 24, background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24, boxShadow: "0 20px 40px rgba(26, 115, 232, 0.3)" }}
+          >
+            <CloudLightning size={44} color="white" />
+          </motion.div>
+          <h1 style={{ fontSize: 28, fontWeight: 600, color: c.textPrimary, letterSpacing: -0.5, marginBottom: 8, textAlign: "center" }}>Nexus Storage</h1>
+          <div style={{ width: 40, height: 4, background: "#1A73E840", borderRadius: 2, overflow: "hidden", marginBottom: 16 }}>
+             <motion.div animate={{ x: [-40, 40] }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }} style={{ width: 20, height: "100%", background: "#1A73E8" }} />
+          </div>
+          <p style={{ fontSize: 13, color: c.textSecondary, letterSpacing: 1.5, fontWeight: 600 }}>
+            {loading ? "FETCHING CLOUD SHARDS..." : "SECURE INITIALIZATION"}
+          </p>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
