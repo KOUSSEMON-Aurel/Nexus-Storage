@@ -349,10 +349,14 @@ func (d *Database) SaveFileWithKey(path, videoID string, size int64, hash, key s
 		sha256 = excluded.sha256,
 		file_key = excluded.file_key,
 		is_archive = excluded.is_archive,
-		last_update = CURRENT_TIMESTAMP;
+		last_update = CURRENT_TIMESTAMP,
+		deleted_at = NULL;
 	`
 	if _, err := d.db.Exec(query, path, videoID, size, hash, key, parentID, sha256, fileKey, isArchive); err != nil {
 		return fmt.Errorf("could not save file: %w", err)
+	}
+	if d.OnConfigChange != nil {
+		d.OnConfigChange()
 	}
 	return nil
 }
