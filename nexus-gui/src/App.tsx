@@ -1231,13 +1231,28 @@ function TaskOverlay({ tasks, c }: { tasks: Record<string, BackendTask>; c: Colo
 
 function SecuritySection({ c }: { c: ColorSet }) {
   const [protocols, setProtocols] = useState<{name: string, detail: string, active: boolean}[]>([]);
+  const [purgeDays, setPurgeDays] = useState(30);
 
   useEffect(() => {
     fetch(`${API_BASE}/security`)
       .then(res => res.json())
       .then(data => setProtocols(data))
       .catch(console.error);
+
+    fetch(`${API_BASE}/settings/trash`)
+      .then(res => res.json())
+      .then(data => setPurgeDays(data.purge_days))
+      .catch(console.error);
   }, []);
+
+  const handleUpdatePurge = async (days: number) => {
+    setPurgeDays(days);
+    await fetch(`${API_BASE}/settings/trash`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ purge_days: days })
+    });
+  }
 
   if (protocols.length === 0) return <div style={{ color: c.textSecondary }}>Loading security info...</div>;
 

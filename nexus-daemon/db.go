@@ -562,6 +562,33 @@ func (d *Database) PermanentDelete(id int64) error {
 	return err
 }
 
+// CleanupTrash removes files that have been in trash longer than 'days'.
+func (d *Database) CleanupTrash(days int) ([]string, error) {
+	threshold := time.Now().AddDate(0, 0, -days).Format("2006-01-02 15:04:05")
+	
+	// Find VideoIDs to also queue cloud deletion
+	rows, err := d.db.Query(`SELECT video_id FROM files WHERE deleted_at < ? AND deleted_at IS NOT NULL`, threshold)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var videoIDs []string
+	for rows.Next() {
+		var vid string
+		if err := rows.Scan(&vid); err == nil && vid != "" {
+			videoIDs = append(videoIDs, vid)
+		}
+	}
+
+	_, err = d.db.Exec(`DELETE FROM files WHERE deleted_at < ? AND deleted_at IS NOT NULL`, threshold)
+	if err == nil && d.OnConfigChange != nil {
+		d.OnConfigChange()
+	}
+	
+	return videoIDs, err
+}
+
 // ToggleStar sets the starred status.
 // CreateFolder ensures a folder exists and returns its ID.
 func (d *Database) CreateFolder(name string, parentID *int64) (int64, error) {

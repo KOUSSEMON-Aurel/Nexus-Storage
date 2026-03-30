@@ -78,8 +78,26 @@ func (c *CacheManager) Stats() (totalBytes int64, count int) {
 	return c.db.CacheStats()
 }
 
+// Evict removes all cached shards associated with a file ID.
+func (c *CacheManager) Evict(fileID int64) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// 1. Find all shards for this file
+	videoIDs, err := c.db.GetShardsForFile(fileID)
+	if err != nil {
+		return err
+	}
+
+	for _, vid := range videoIDs {
+		path := filepath.Join(c.CacheDir, vid+".shard")
+		os.Remove(path)
+		c.db.DeleteCacheEntry(vid)
+	}
+	return nil
+}
+
 // evictIfNeeded removes the oldest cache entries until total size is under MaxBytes.
-// Must be called with c.mu held.
 func (c *CacheManager) evictIfNeeded() {
 	totalBytes, _ := c.db.CacheStats()
 	for totalBytes > c.MaxBytes {

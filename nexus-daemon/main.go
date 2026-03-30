@@ -103,12 +103,27 @@ func main() {
 				log.Printf("⚠️  Playlist Manager: %v", err)
 			}
 			time.Sleep(5 * time.Second) // extra delay so playlists are ready
-			log.Printf("🔄 Auto-syncing cloud manifest on startup...")
-			if err := pm.DownloadLatestManifest(); err != nil {
-				log.Printf("⚠️  Auto-sync failed: %v", err)
-			} else {
-				log.Printf("✅ Auto-sync on startup completed.")
+			// 6c. Auto-purge trash (default 30 days)
+			purgeDays := 30
+			if v, ok := db.GetKV("trash_purge_days"); ok {
+				fmt.Sscanf(v, "%d", &purgeDays)
 			}
+			if purgeDays > 0 {
+				log.Printf("🧹 Sweeping trash (Auto-purge older than %d days)...", purgeDays)
+				deletedVids, err := db.CleanupTrash(purgeDays)
+				if err == nil && len(deletedVids) > 0 {
+					log.Printf("🗑️  Purging %d expired cloud shards...", len(deletedVids))
+					for _, vid := range deletedVids {
+						queue.AddTask(&Task{
+							ID:        vid,
+							Type:      TaskDelete,
+							Status:    "Pending Purge",
+							CreatedAt: time.Now(),
+						})
+					}
+				}
+			}
+			log.Printf("✅ Auto-sync on startup completed.")
 		}
 	}()
 

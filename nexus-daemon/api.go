@@ -59,6 +59,7 @@ func (s *APIServer) Start(port int) {
 	// V3: Cache stats and Shared Links
 	mux.HandleFunc("/api/cache/stats", s.handleCacheStats)
 	mux.HandleFunc("/api/download/shared", s.handleSharedDownload)
+	mux.HandleFunc("/api/settings/trash", s.handleTrashSettings)
 
 	handler := corsMiddleware(mux)
 	fmt.Printf("🌐 API Server starting on http://localhost:%d\n", port)
@@ -513,6 +514,30 @@ func (s *APIServer) handleQuotaLimit(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"status": "ok", "limit": req.Limit})
 }
 
+
+func (s *APIServer) handleTrashSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		days := 30
+		if d, ok := s.db.GetKV("trash_purge_days"); ok {
+			fmt.Sscanf(d, "%d", &days)
+		}
+		jsonOK(w, map[string]int{"purge_days": days})
+		return
+	}
+	if r.Method == http.MethodPost {
+		var req struct {
+			Days int `json:"purge_days"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.db.SetKV("trash_purge_days", fmt.Sprintf("%d", req.Days))
+		jsonOK(w, map[string]any{"status": "ok", "purge_days": req.Days})
+		return
+	}
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
 
 func httpError(w http.ResponseWriter, err error, code int) {
 	http.Error(w, err.Error(), code)

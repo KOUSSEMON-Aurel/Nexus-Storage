@@ -242,6 +242,28 @@ func (m *YouTubeManager) GetLiveQuota() (int, bool) {
 	return total, true
 }
 
+func (m *YouTubeManager) VideoExists(videoID string) (bool, error) {
+	driveSvc := m.GetDriveService() // First try a quick check if it's treated as a file (Nexus 2.0)
+	if driveSvc != nil {
+		_, err := driveSvc.Files.Get(videoID).Fields("id").Do()
+		if err == nil {
+			return true, nil
+		}
+	}
+
+	ytService := m.GetService()
+	if ytService == nil {
+		return false, fmt.Errorf("youtube service not initialized")
+	}
+
+	call := ytService.Videos.List([]string{"id"}).Id(videoID)
+	resp, err := call.Do()
+	if err != nil {
+		return false, err
+	}
+	return len(resp.Items) > 0, nil
+}
+
 func (m *YouTubeManager) GetChannelID() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
