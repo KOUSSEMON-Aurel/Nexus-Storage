@@ -10,9 +10,15 @@ use crate::theme::*;
 
 pub fn draw(f: &mut Frame, area: Rect, app: &AppState) {
     let auth_str = if app.auth.authenticated {
-        Span::styled("[✓ Connecté]", Style::default().fg(EMERALD))
+        Span::styled("[✓ YouTube OK]", Style::default().fg(EMERALD))
     } else {
-        Span::styled("[✗ Déconnecté]", Style::default().fg(ROSE))
+        Span::styled("[✗ YouTube Déco]", Style::default().fg(ROSE))
+    };
+
+    let mount_str = if app.is_mounted {
+        Span::styled(" [🔌 FUSE Connecté]", Style::default().fg(CYAN))
+    } else {
+        Span::styled(" [📡 FUSE Débranché]", Style::default().fg(MUTED))
     };
 
     let logo = Span::styled(" NEXUS STORAGE  v0.3.0 ", Style::default().fg(CYAN).add_modifier(Modifier::BOLD));
@@ -31,7 +37,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &AppState) {
         };
         Line::from(vec![Span::styled(format!(" 🔔 {}", notif.message), Style::default().fg(n_color))])
     } else {
-        Line::from(vec![Span::raw(" "), auth_str])
+        Line::from(vec![Span::raw(" "), auth_str, mount_str])
     };
 
     let p = Paragraph::new(vec![top_line, mid_line, bot_line])

@@ -21,13 +21,39 @@ cp "nexus-daemon/client_secret.json" "$NEXUS_CONFIG_DIR/client_secret.json"
 echo "🦀 1. Compilation de Nexus Core (Rust)..."
 cargo build --package nexus-core
 
-# Copier la lib partagée pour que le daemon Go puisse la trouver lors de sa compilation (si nécessaire)
-echo "📂 2. Préparation de la librairie partagée pour le daemon..."
-cp target/debug/libnexus_core.so nexus-daemon/
+echo "📂 2. Préparation de la librairie statique pour le daemon..."
+# On utilise UNIQUEMENT la lib statique (.a) pour garantir un binaire standalone
+cp target/debug/libnexus_core.a nexus-daemon/
+# Suppression des anciennes libs dynamiques pour éviter toute confusion
+rm -f nexus-daemon/libnexus_core.so nexus-gui/src-tauri/bin/libnexus_core.so
 
-echo "🚀 3. Compilation du sidecar (Go daemon)..."
-chmod +x nexus-gui/scripts/build-sidecar.sh
-./nexus-gui/scripts/build-sidecar.sh
+echo "🚀 3. Compilation du daemon (Go - Pure Static Link)..."
+cd nexus-daemon
+go build -tags fts5 -o nexus-daemon .
+cd ..
+
+
+# Préparation du dossier sidecar pour Tauri
+TRIPLE=$(rustc -vV | sed -n 's|host: ||p')
+BIN_DEST="nexus-gui/src-tauri/bin"
+mkdir -p "$BIN_DEST"
+cp nexus-daemon/nexus-daemon "$BIN_DEST/nexus-daemon-$TRIPLE"
+# Plus besoin de copier le .so ici car tout est dans le binaire !
+
+# 3.1 Check system dependencies
+MISSING=""
+command -v ffmpeg >/dev/null 2>&1 || MISSING="ffmpeg $MISSING"
+command -v rclone >/dev/null 2>&1 || MISSING="rclone $MISSING"
+
+if [ -n "$MISSING" ]; then
+    echo "❌ DÉPENDANCES MANQUANTES : $MISSING"
+    echo "💡 Veuillez les installer avec votre gestionnaire de paquets :"
+    echo "   Ubuntu/Debian : sudo apt install $MISSING"
+    echo "   Arch Linux    : sudo pacman -S $MISSING"
+    echo "   Fedora        : sudo dnf install $MISSING"
+    exit 1
+fi
+echo "✅ Dépendances système (ffmpeg, rclone) présentes."
 
 echo "🧹 Nettoyage des anciens processus (ports 1420 & 8081)..."
 fuser -k 1420/tcp 2>/dev/null || true
@@ -36,7 +62,7 @@ pkill -f nexus-daemon 2>/dev/null || true
 
 echo "🖥️  4. Choix de l'interface..."
 echo "1) GUI (Tauri + React/Vite) - Recommandé pour le confort"
-echo "2) TUI (Terminal Pro) - Recommandé pour le monitoring & SSH"
+echo "2) TUI (Terminal ) - Recommandé pour le monitoring & SSH"
 read -p "Choisissez (1/2) : " choice
 
 if [ "$choice" == "2" ]; then

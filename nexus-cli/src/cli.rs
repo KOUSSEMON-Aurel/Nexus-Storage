@@ -35,6 +35,10 @@ pub enum Commands {
     /// Direct shortcut to upload a file (same as `nexus file upload`)
     Upload {
         path: String,
+        #[arg(long, default_value = "base", help = "Encoding mode (base or high)")]
+        mode: String,
+        #[arg(long, help = "Optional encryption password")]
+        password: Option<String>,
         #[arg(long, help = "Disable progress bar")]
         no_progress: bool,
     },
@@ -61,6 +65,12 @@ pub enum Commands {
     Daemon {
         #[command(subcommand)]
         cmd: DaemonCommands,
+    },
+    /// Download a file shared by someone else via a token
+    DownloadShared {
+        token: String,
+        #[arg(short, long, help = "Local output path")]
+        out: Option<String>,
     },
 }
 
@@ -92,6 +102,10 @@ pub enum FileCommands {
         id: String,
         #[arg(long, help = "Skip deletion confirmation prompt")]
         force: bool,
+    },
+    /// Generate a per-file shareable encryption link (V3)
+    Share {
+        id: String,
     },
 }
 

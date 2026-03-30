@@ -19,12 +19,13 @@ async fn main() {
         Commands::Auth { cmd } => handle_auth(&client, cmd, cli.json).await,
         Commands::Quota { warn_at } => handle_quota(&client, *warn_at, cli.json).await,
         Commands::File { cmd } => handle_file(&client, cmd, cli.json).await,
-        Commands::Upload { path, no_progress } => handle_upload(&client, path, *no_progress, cli.json).await,
+        Commands::Upload { path, mode, password, no_progress } => handle_upload(&client, path, mode, password.as_deref(), *no_progress, cli.json).await,
         Commands::Mount { path } => handle_mount(&client, path, cli.json).await,
         Commands::Umount => handle_umount(&client, cli.json).await,
         Commands::Studio => handle_studio(&client, cli.json).await,
         Commands::Task { cmd } => handle_task(&client, cmd, cli.json).await,
         Commands::Daemon { cmd } => handle_daemon(&client, cmd, cli.json).await,
+        Commands::DownloadShared { token, out } => handle_download_shared(&client, token, out, cli.json).await,
     };
 
     if let Err(e) = res {
@@ -110,15 +111,26 @@ async fn handle_file(client: &NexusClient, cmd: &FileCommands, json: bool) -> Re
             client.delete_file(id_i64).await?;
             if !json { println!("{} Fichier supprimé avec succès.", style("✓").green()); }
         }
+        FileCommands::Share { id } => {
+            let id_i64 = id.parse::<i64>().map_err(|_| NexusError::ApiError("L'ID doit être un nombre".into()))?;
+            let link = client.share_file(id_i64).await?;
+            if json {
+                output::print_json(&serde_json::json!({ "link": link }));
+            } else {
+                println!("{} Lien de partage généré :", style("🔗").bold());
+                println!("{}", style(link).cyan().underlined());
+                println!("\n{} Note : La personne recevant ce lien pourra déchiffrer ce fichier uniquement.", style("ℹ").blue());
+            }
+        }
         _ => eprintln!("Commande non implémentée."),
     }
     Ok(())
 }
 
-async fn handle_upload(client: &NexusClient, path: &str, no_progress: bool, json: bool) -> Result<(), NexusError> {
+async fn handle_upload(client: &NexusClient, path: &str, mode: &str, password: Option<&str>, no_progress: bool, json: bool) -> Result<(), NexusError> {
     if !json { println!("{} Préparation de l'upload : {}", style("🚀").bold(), style(path).cyan()); }
     
-    let task = client.upload(path).await?;
+    let task = client.upload(path, mode, password).await?;
     let task_id = task.id.clone();
     
     if json {
@@ -231,6 +243,19 @@ async fn handle_daemon(_client: &NexusClient, cmd: &DaemonCommands, json: bool) 
             let _ = Command::new("pkill").arg("-f").arg("nexus-daemon").output();
             if !json { println!("{} Daemon arrêté.", style("✓").green()); }
         }
+    }
+    Ok(())
+}
+async fn handle_download_shared(client: &NexusClient, token: &str, out: &Option<String>, json: bool) -> Result<(), NexusError> {
+    if !json { println!("{} Démarrage du téléchargement partagé...", style("📥").bold()); }
+    
+    client.download_shared(token, out.as_deref()).await?;
+    
+    if !json { 
+        println!("{} Requête de téléchargement acceptée par le daemon.", style("✓").green());
+        println!("Suivez la progression avec : {} nexus task list", style("$").dim());
+    } else {
+        println!(r#"{{"status": "queued"}}"#);
     }
     Ok(())
 }

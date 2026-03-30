@@ -125,9 +125,7 @@ pub unsafe extern "C" fn nexus_compress(
     }
     let data = unsafe { slice::from_raw_parts(in_ptr, in_len) };
     let algo = match level {
-        1 => Some(CompressionLevel::Lz4),
         2 => Some(CompressionLevel::Zstd),
-        3 => Some(CompressionLevel::Lzma),
         4 => Some(CompressionLevel::Store),
         _ => None, // auto
     };
@@ -205,9 +203,8 @@ pub unsafe extern "C" fn nexus_encode_to_frames(
     };
     let path = Path::new(path_str);
     let encoding_mode = match mode {
-        0 => EncodingMode::Tank,
-        1 => EncodingMode::Density,
-        _ => EncodingMode::Tank,
+        1 => EncodingMode::High,
+        _ => EncodingMode::Base,
     };
 
     match encoder::encode_to_frames(data, path, encoding_mode) {
@@ -235,9 +232,8 @@ pub unsafe extern "C" fn nexus_decode_from_frames(
     };
     let path = Path::new(path_str);
     let encoding_mode = match mode {
-        0 => EncodingMode::Tank,
-        1 => EncodingMode::Density,
-        _ => EncodingMode::Tank,
+        1 => EncodingMode::High,
+        _ => EncodingMode::Base,
     };
 
     match crate::decoder::decode_from_frames(path, encoding_mode) {
@@ -246,3 +242,68 @@ pub unsafe extern "C" fn nexus_decode_from_frames(
     }
 }
 
+// --------------------------
+//  Per-File Raw-Key Functions
+// --------------------------
+
+/// Generate a cryptographically random 32-byte file key.
+/// Caller must free the returned bytes with nexus_free_bytes.
+#[no_mangle]
+pub unsafe extern "C" fn nexus_generate_file_key(
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if out_ptr.is_null() || out_len.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let key = crate::crypto::generate_file_key();
+    unsafe { alloc_bytes(key.to_vec(), out_ptr, out_len) }
+}
+
+/// Encrypt `in_len` bytes using a raw 32-byte file key (no password derivation).
+#[no_mangle]
+pub unsafe extern "C" fn nexus_encrypt_with_key(
+    in_ptr: *const c_uchar,
+    in_len: usize,
+    key_ptr: *const c_uchar,
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if in_ptr.is_null() || key_ptr.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let data = unsafe { std::slice::from_raw_parts(in_ptr, in_len) };
+    let key_slice = unsafe { std::slice::from_raw_parts(key_ptr, 32) };
+    let key_array: &[u8; 32] = match key_slice.try_into() {
+        Ok(k) => k,
+        Err(_) => return NEXUS_ERR_CRYPTO,
+    };
+    match crate::crypto::encrypt_with_key(data, key_array) {
+        Ok(blob) => unsafe { alloc_bytes(blob, out_ptr, out_len) },
+        Err(_) => NEXUS_ERR_CRYPTO,
+    }
+}
+
+/// Decrypt a blob produced by nexus_encrypt_with_key.
+#[no_mangle]
+pub unsafe extern "C" fn nexus_decrypt_with_key(
+    in_ptr: *const c_uchar,
+    in_len: usize,
+    key_ptr: *const c_uchar,
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if in_ptr.is_null() || key_ptr.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let data = unsafe { std::slice::from_raw_parts(in_ptr, in_len) };
+    let key_slice = unsafe { std::slice::from_raw_parts(key_ptr, 32) };
+    let key_array: &[u8; 32] = match key_slice.try_into() {
+        Ok(k) => k,
+        Err(_) => return NEXUS_ERR_CRYPTO,
+    };
+    match crate::crypto::decrypt_with_key(data, key_array) {
+        Ok(blob) => unsafe { alloc_bytes(blob, out_ptr, out_len) },
+        Err(_) => NEXUS_ERR_CRYPTO,
+    }
+}

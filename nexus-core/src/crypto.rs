@@ -77,6 +77,55 @@ pub fn decrypt(blob: &[u8], password: &str) -> NexusResult<Vec<u8>> {
         .map_err(|_| NexusError::Crypto("decryption failed — wrong password or corrupted data".into()))
 }
 
+// ─── Per-File Raw-Key Variants ────────────────────────────────────────────────
+// These functions use a caller-supplied 32-byte raw key instead of a password.
+// Layout: nonce(24) || ciphertext+tag
+// There is no Argon2id salt because the key is already a strong random secret.
+
+/// Encrypt `plaintext` using a raw 32-byte key.
+/// Returns `nonce || ciphertext` (no salt — key is already strong).
+pub fn encrypt_with_key(plaintext: &[u8], key_bytes: &[u8; KEY_LEN]) -> NexusResult<Vec<u8>> {
+    let mut nonce_bytes = [0u8; NONCE_LEN];
+    rand::thread_rng().fill_bytes(&mut nonce_bytes);
+
+    let cipher = XChaCha20Poly1305::new_from_slice(key_bytes)
+        .map_err(|e| NexusError::Crypto(e.to_string()))?;
+    let nonce = XNonce::from_slice(&nonce_bytes);
+
+    let ciphertext = cipher
+        .encrypt(nonce, plaintext)
+        .map_err(|e| NexusError::Crypto(e.to_string()))?;
+
+    let mut output = Vec::with_capacity(NONCE_LEN + ciphertext.len());
+    output.extend_from_slice(&nonce_bytes);
+    output.extend_from_slice(&ciphertext);
+    Ok(output)
+}
+
+/// Decrypt a blob produced by `encrypt_with_key()`.
+pub fn decrypt_with_key(blob: &[u8], key_bytes: &[u8; KEY_LEN]) -> NexusResult<Vec<u8>> {
+    if blob.len() < NONCE_LEN {
+        return Err(NexusError::Crypto("blob too short".into()));
+    }
+    let nonce_bytes = &blob[..NONCE_LEN];
+    let ciphertext = &blob[NONCE_LEN..];
+
+    let cipher = XChaCha20Poly1305::new_from_slice(key_bytes)
+        .map_err(|e| NexusError::Crypto(e.to_string()))?;
+    let nonce = XNonce::from_slice(nonce_bytes);
+
+    cipher
+        .decrypt(nonce, ciphertext)
+        .map_err(|_| NexusError::Crypto("decryption failed — wrong key or corrupted data".into()))
+}
+
+/// Generate a cryptographically random 32-byte file key.
+pub fn generate_file_key() -> [u8; KEY_LEN] {
+    let mut key = [0u8; KEY_LEN];
+    rand::thread_rng().fill_bytes(&mut key);
+    key
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

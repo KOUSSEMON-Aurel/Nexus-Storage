@@ -39,6 +39,10 @@ async fn main() -> Result<()> {
     let c_quota = client.clone();
     tokio::spawn(async move { daemon::poll_quota(c_quota, tx_quota).await; });
 
+    let tx_mount = tx.clone();
+    let c_mount = client.clone();
+    tokio::spawn(async move { daemon::poll_mount_status(c_mount, tx_mount).await; });
+
     let tx_files = tx.clone();
     let c_files = client.clone();
     tokio::spawn(async move { daemon::poll_files(c_files, tx_files).await; });

@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -53,8 +54,8 @@ func NewYouTubeManager() *YouTubeManager {
 		return m // Return unauthenticated manager, never nil
 	}
 
-	// Pro Scope: YoutubeScope allows Search and Deletion of ANY video (needed for cleanup)
-	config, err := google.ConfigFromJSON(b, youtube.YoutubeScope)
+	// Pro Scope: YoutubeScope + Monitoring for real-time quota
+	config, err := google.ConfigFromJSON(b, youtube.YoutubeScope, "https://www.googleapis.com/auth/monitoring.read")
 	if err != nil {
 		log.Printf("⚠️  YouTube: could not parse client_secret.json: %v", err)
 		return m
@@ -110,6 +111,16 @@ func (m *YouTubeManager) TryLoadToken() bool {
 	return true
 }
 
+func (m *YouTubeManager) Logout() {
+	m.mu.Lock()
+	m.service = nil
+	m.authed = false
+	m.user = ""
+	m.channelID = ""
+	m.mu.Unlock()
+	os.Remove(filepath.Join(getConfigDir(), "token.json"))
+}
+
 func (m *YouTubeManager) IsAuthenticated() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -149,6 +160,73 @@ func (m *YouTubeManager) FetchChannelID() {
 		m.mu.Unlock()
 		log.Printf("👤 YouTube Authenticated: %s (%s)", m.user, m.channelID)
 	}
+}
+
+func (m *YouTubeManager) GetLiveQuota() (int, bool) {
+	m.mu.RLock()
+	authed := m.authed
+	config := m.config
+	m.mu.RUnlock()
+
+	if !authed || config == nil {
+		return 0, false
+	}
+
+	tokFile := filepath.Join(getConfigDir(), "token.json")
+	tok, err := tokenFromFile(tokFile)
+	if err != nil {
+		return 0, false
+	}
+
+	client := config.Client(context.Background(), tok)
+	
+	// Extract project_id from client_secret
+	b, _ := os.ReadFile(filepath.Join(getConfigDir(), "client_secret.json"))
+	if len(b) == 0 { b, _ = os.ReadFile("client_secret.json") }
+	var secret struct {
+		Installed struct { ProjectID string `json:"project_id"` } `json:"installed"`
+	}
+	json.Unmarshal(b, &secret)
+	projectID := secret.Installed.ProjectID
+	if projectID == "" { return 0, false }
+
+	// Prepare time interval (today)
+	now := time.Now().UTC()
+	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
+	end := now.Format(time.RFC3339)
+
+	filter := `metric.type="serviceruntime.googleapis.com/quota/rate/net_usage" AND resource.labels.service="youtube.googleapis.com"`
+	url := fmt.Sprintf("https://monitoring.googleapis.com/v3/projects/%s/timeSeries?filter=%s&interval.startTime=%s&interval.endTime=%s", 
+		projectID, strings.ReplaceAll(filter, " ", "%20"), start, end)
+
+	resp, err := client.Get(url)
+	if err != nil || resp.StatusCode != 200 {
+		return 0, false
+	}
+	defer resp.Body.Close()
+
+	var monitorResp struct {
+		TimeSeries []struct {
+			Points []struct {
+				Value struct { Int64Value string `json:"int64Value"` } `json:"value"`
+			} `json:"points"`
+		} `json:"timeSeries"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&monitorResp); err != nil {
+		return 0, false
+	}
+
+	total := 0
+	for _, ts := range monitorResp.TimeSeries {
+		for _, p := range ts.Points {
+			var val int
+			fmt.Sscanf(p.Value.Int64Value, "%d", &val)
+			total += val
+		}
+	}
+
+	return total, true
 }
 
 func (m *YouTubeManager) GetChannelID() string {

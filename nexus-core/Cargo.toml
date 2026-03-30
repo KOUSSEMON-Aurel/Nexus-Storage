@@ -7,7 +7,7 @@ license.workspace = true
 description = "NexusStorage core engine: pixel encoding, fountain codes, encryption, compression."
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
 # Image generation (pixel frames)

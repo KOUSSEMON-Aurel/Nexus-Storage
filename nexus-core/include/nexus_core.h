@@ -105,6 +105,43 @@ int32_t nexus_decode_from_frames(
     size_t* out_len
 );
 
+/**
+ * Per-file raw-key encryption functions (no password derivation).
+ * These enable per-file shareable encryption keys.
+ */
+
+/**
+ * Generate a cryptographically random 32-byte file key.
+ * out_ptr will point to a buffer that must be freed with nexus_free_bytes.
+ */
+int32_t nexus_generate_file_key(uint8_t** out_ptr, size_t* out_len);
+
+/**
+ * Encrypt bytes using a raw 32-byte file key (bypasses PBKDF2).
+ * key_ptr must point to exactly 32 bytes.
+ * out_ptr will point to a buffer that must be freed with nexus_free_bytes.
+ */
+int32_t nexus_encrypt_with_key(
+    const uint8_t* in_ptr,
+    size_t in_len,
+    const uint8_t* key_ptr,
+    uint8_t** out_ptr,
+    size_t* out_len
+);
+
+/**
+ * Decrypt a blob produced by nexus_encrypt_with_key.
+ * key_ptr must point to exactly 32 bytes.
+ * out_ptr will point to a buffer that must be freed with nexus_free_bytes.
+ */
+int32_t nexus_decrypt_with_key(
+    const uint8_t* in_ptr,
+    size_t in_len,
+    const uint8_t* key_ptr,
+    uint8_t** out_ptr,
+    size_t* out_len
+);
+
 #ifdef __cplusplus
 }
 #endif

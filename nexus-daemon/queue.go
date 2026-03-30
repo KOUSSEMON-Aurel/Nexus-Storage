@@ -35,6 +35,7 @@ type Task struct {
 	CreatedAt  time.Time `json:"createdAt"`
 	ParentID   *int64    `json:"parentId"`
 	SHA256     string    `json:"sha256,omitempty"`
+	Password   string    `json:"password,omitempty"`
 }
 
 type TaskQueue struct {
@@ -46,6 +47,7 @@ type TaskQueue struct {
 	manifestMu    sync.Mutex
 	manifestTimer *time.Timer
 	pm            *PlaylistManager
+	cache         *CacheManager // V3: LRU disk cache
 }
 
 func ensureYtDlp() {
@@ -70,12 +72,13 @@ func ensureYtDlp() {
 	log.Println("yt-dlp successfully downloaded.")
 }
 
-func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManager, pm *PlaylistManager) {
+func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManager, pm *PlaylistManager, cache *CacheManager) {
 	q.tasks = make(map[string]*Task)
 	q.core = core
 	q.db = db
 	q.ytManager = ytManager
 	q.pm = pm
+	q.cache = cache
 	ensureYtDlp() // synchronous - must complete before any tasks
 
 	// Load pending tasks from DB
@@ -106,6 +109,13 @@ func (q *TaskQueue) AddTask(t *Task) {
 
 func (q *TaskQueue) updateTaskState(t *Task) {
 	q.db.SaveTask(t.ID, int(t.Type), t.FilePath, t.Mode, t.IsManifest, t.Status, t.Progress, t.CreatedAt, t.ParentID, t.SHA256)
+}
+
+// GetTask returns the in-memory task pointer (or nil if not found).
+func (q *TaskQueue) GetTask(id string) *Task {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.tasks[id]
 }
 
 func (q *TaskQueue) processTask(t *Task) {
@@ -139,22 +149,56 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	t.Status = "Checking Deduplication"
 	q.updateTaskState(t)
 
-	file, err := os.Open(t.FilePath)
-	if err != nil {
-		return fmt.Errorf("could not open file: %w", err)
-	}
-	defer file.Close()
+	var totalSize int64
+	var file io.ReadSeekCloser
 
-	stat, err := file.Stat()
+	stat, err := os.Stat(t.FilePath)
 	if err != nil {
 		return err
 	}
-	totalSize := stat.Size()
 
 	h := sha256.New()
-	if _, err := io.Copy(h, file); err != nil {
-		return err
+
+	if stat.IsDir() {
+		t.Status = "Archiving Folder"
+		q.updateTaskState(t)
+
+		tarData, err := ArchiveFolder(t.FilePath)
+		if err != nil {
+			return fmt.Errorf("failed to archive folder: %w", err)
+		}
+
+		// Write tar to a temp file so we can chunk it
+		tempTar, err := os.CreateTemp("", "nexus-archive-*.tar")
+		if err != nil {
+			return err
+		}
+		defer func() {
+			tempTar.Close()
+			os.Remove(tempTar.Name())
+		}()
+
+		if _, err := tempTar.Write(tarData); err != nil {
+			return err
+		}
+		
+		totalSize = int64(len(tarData))
+		h.Write(tarData)
+		file = tempTar
+	} else {
+		f, err := os.Open(t.FilePath)
+		if err != nil {
+			return fmt.Errorf("could not open file: %w", err)
+		}
+		defer f.Close()
+		
+		totalSize = stat.Size()
+		if _, err := io.Copy(h, f); err != nil {
+			return err
+		}
+		file = f
 	}
+
 	t.SHA256 = hex.EncodeToString(h.Sum(nil))
 
 	// Quota-Thrifty Deduplication
@@ -164,7 +208,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		t.Status = "Linked (Dedupe)"
 		t.Progress = 100
 		q.updateTaskState(t)
-		return q.db.SaveFile(filepath.Base(t.FilePath), existing.VideoID, totalSize, "dedupe", "dedupe", t.ParentID, t.SHA256)
+		return q.db.SaveFile(filepath.Base(t.FilePath), existing.VideoID, totalSize, "dedupe", "dedupe", t.ParentID, t.SHA256, existing.IsArchive)
 	}
 
 	// Shard size = 1GB (1024 * 1024 * 1024 bytes)
@@ -186,6 +230,18 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 
 	var manifestVideoID string
 
+	// V3: Generate a unique random encryption key for this file
+	rawFileKey, _ := q.core.GenerateFileKey()
+	
+	// Nexus 2.0: Use user password if provided, otherwise fallback to masterSecret
+	encryptionSecret := "default-secret"
+	if t.Password != "" {
+		encryptionSecret = t.Password
+	}
+	
+	encryptedFileKeyBytes, _ := q.core.Encrypt(rawFileKey, encryptionSecret)
+	storedFileKeyHex := hex.EncodeToString(encryptedFileKeyBytes)
+
 	for i := 0; i < numShards; i++ {
 		t.Status = fmt.Sprintf("Processing Shard %d/%d", i+1, numShards)
 		t.Progress = float64(i) / float64(numShards) * 100
@@ -200,15 +256,20 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 
 		t.Status = fmt.Sprintf("Encrypting Shard %d/%d", i+1, numShards)
 		compressed, _ := q.core.Compress(data, 0)
-		encrypted, err := q.core.Encrypt(compressed, "default-secret")
+		var encrypted []byte
+		if t.IsManifest {
+			encrypted, err = q.core.Encrypt(compressed, "default-secret")
+		} else {
+			encrypted, err = q.core.EncryptWithKey(compressed, rawFileKey)
+		}
 		if err != nil {
 			return err
 		}
 
 		t.Status = fmt.Sprintf("Encoding Shard %d/%d", i+1, numShards)
-		apiMode := 0
-		if t.Mode == "density" {
-			apiMode = 1
+		apiMode := 0 // Base
+		if t.Mode == "high" {
+			apiMode = 1 // High
 		}
 		tempDir, _ := os.MkdirTemp("", fmt.Sprintf("nexus-upload-%s-shard-%d", t.ID, i))
 		frameCount, err := q.core.EncodeToFrames(encrypted, tempDir, apiMode)
@@ -230,7 +291,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		outputVideo := filepath.Join(tempDir, "upload.mp4")
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		cmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-framerate", "30", "-i", filepath.Join(tempDir, "frame_%06d.png"),
-			"-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", outputVideo)
+			"-c:v", "libx264", "-pix_fmt", "gray", "-crf", "18", "-g", "1", "-x264-params", "scm=1", outputVideo)
 		if _, err := cmd.CombinedOutput(); err != nil {
 			cancel()
 			os.RemoveAll(tempDir)
@@ -289,7 +350,11 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		if !t.IsManifest {
 			// Save the file first if it's the very first part, so the shards have a foreign key
 			if i == 0 {
-				q.db.SaveFile(filepath.Base(t.FilePath), response.Id, totalSize, t.SHA256[:16], "default-key", t.ParentID, t.SHA256)
+				isArchive := false
+				if stat, err := os.Stat(t.FilePath); err == nil && stat.IsDir() {
+					isArchive = true
+				}
+				q.db.SaveFileWithKey(filepath.Base(t.FilePath), response.Id, totalSize, t.SHA256[:16], "default-key", t.ParentID, t.SHA256, storedFileKeyHex, isArchive)
 			}
 			fileRecord, _ := q.db.GetFileByHash(t.SHA256)
 			if fileRecord != nil {
@@ -330,6 +395,13 @@ func (q *TaskQueue) QueueManifestBackup() {
 	if q.ytManager == nil || !q.ytManager.IsAuthenticated() {
 		return
 	}
+
+	// CRITICAL: Force SQLite to flush all WAL changes to the main nexus.db file
+	// before we upload it, otherwise the uploaded DB might be empty!
+	if q.db != nil && q.db.db != nil {
+		q.db.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+	}
+
 	dbPath := filepath.Join(getConfigDir(), "nexus.db")
 	t := &Task{
 		ID:         fmt.Sprintf("manifest-%d", time.Now().UnixNano()),
@@ -394,13 +466,30 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 		return fmt.Errorf("mock local video cannot be downloaded without real youtube video")
 	}
 
-	fileRecord, _ := q.db.GetFileByHash(t.SHA256) 
+	// Nexus 2.0: Use user password if provided, otherwise fallback to masterSecret
+	encryptionSecret := "default-secret"
+	if t.Password != "" {
+		encryptionSecret = t.Password
+	}
+
+	var rawFileKey []byte
+	fileRecord, _ := q.db.GetFileByHash(t.SHA256)
 	var shardIDs []string
 	if fileRecord != nil {
 		shardIDs, _ = q.db.GetShardsForFile(fileRecord.ID)
+		// V3: Try to recover the per-file key
+		if fileRecord.FileKey != "" {
+			encryptedKey, err := hex.DecodeString(fileRecord.FileKey)
+			if err == nil {
+				key, err := q.core.Decrypt(encryptedKey, encryptionSecret)
+				if err == nil {
+					rawFileKey = key
+				}
+			}
+		}
 	}
+
 	if len(shardIDs) == 0 {
-		// Fallback: no shards found, just download the provided ID
 		shardIDs = []string{t.ID}
 	}
 
@@ -412,13 +501,13 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 
 	outDir := filepath.Join(os.Getenv("HOME"), "Downloads", "Nexus")
 	os.MkdirAll(outDir, 0755)
-	
+
 	filename := filepath.Base(t.FilePath)
 	if filename == "." || filename == "/" {
 		filename = "recovered_file_" + t.ID
 	}
 	outPath := filepath.Join(outDir, filename)
-	
+
 	outFile, err := os.Create(outPath)
 	if err != nil {
 		return err
@@ -426,52 +515,102 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 	defer outFile.Close()
 
 	for i, vID := range shardIDs {
-		t.Status = fmt.Sprintf("Downloading Shard %d/%d", i+1, len(shardIDs))
+		t.Status = fmt.Sprintf("Shard %d/%d (Checking Cache)", i+1, len(shardIDs))
 		t.Progress = float64(i) / float64(len(shardIDs)) * 100
 		q.updateTaskState(t)
 
-		videoFile := filepath.Join(tempDir, fmt.Sprintf("download_%d.mp4", i))
-		framesDir := filepath.Join(tempDir, fmt.Sprintf("frames_%d", i))
-		os.MkdirAll(framesDir, 0755)
-
-		ytURL := "https://www.youtube.com/watch?v=" + vID
-		dlCmd := exec.Command("yt-dlp", "-f", "bestvideo[ext=mp4]", "-o", videoFile, ytURL)
-		if err := dlCmd.Run(); err != nil {
-			return fmt.Errorf("yt-dlp download failed: %w", err)
+		var rawData []byte
+		cachedPath, found := "", false
+		if q.cache != nil {
+			cachedPath, found = q.cache.Get(vID)
 		}
 
-		t.Status = fmt.Sprintf("Extracting Shard %d/%d", i+1, len(shardIDs))
-		q.updateTaskState(t)
-		ffCmd := exec.Command("ffmpeg", "-i", videoFile, filepath.Join(framesDir, "frame_%06d.png"))
-		if err := ffCmd.Run(); err != nil {
-			return fmt.Errorf("ffmpeg frame extraction failed: %w", err)
-		}
+		if found {
+			t.Status = fmt.Sprintf("Shard %d/%d (Cache Hit)", i+1, len(shardIDs))
+			q.updateTaskState(t)
+			rawData, err = os.ReadFile(cachedPath)
+		} else {
+			t.Status = fmt.Sprintf("Downloading Shard %d/%d", i+1, len(shardIDs))
+			q.updateTaskState(t)
 
-		t.Status = fmt.Sprintf("Decoding Shard %d/%d", i+1, len(shardIDs))
-		apiMode := 0
-		if t.Mode == "density" {
-			apiMode = 1
-		}
-		rawData, err := q.core.DecodeFromFrames(framesDir, apiMode)
-		if err != nil {
-			return fmt.Errorf("frame decoding failed: %w", err)
+			videoFile := filepath.Join(tempDir, fmt.Sprintf("download_%d.mp4", i))
+			framesDir := filepath.Join(tempDir, fmt.Sprintf("frames_%d", i))
+			os.MkdirAll(framesDir, 0755)
+
+			ytURL := "https://www.youtube.com/watch?v=" + vID
+			dlCmd := exec.Command("yt-dlp", "-f", "bestvideo[ext=mp4]", "-o", videoFile, ytURL)
+			if out, err := dlCmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("yt-dlp failed: %v\nOutput: %s", err, string(out))
+			}
+
+			t.Status = fmt.Sprintf("Extracting Shard %d/%d", i+1, len(shardIDs))
+			q.updateTaskState(t)
+			// Ensure we extract as grayscale for Luma-only decoder
+			ffCmd := exec.Command("ffmpeg", "-y", "-i", videoFile, "-pix_fmt", "gray", filepath.Join(framesDir, "frame_%06d.png"))
+			if err := ffCmd.Run(); err != nil {
+				return fmt.Errorf("ffmpeg extraction failed: %w", err)
+			}
+
+			t.Status = fmt.Sprintf("Decoding Shard %d/%d", i+1, len(shardIDs))
+			q.updateTaskState(t)
+			apiMode := 0 // Base
+			if t.Mode == "high" {
+				apiMode = 1 // High
+			}
+			rawData, err = q.core.DecodeFromFrames(framesDir, apiMode)
+			if err != nil {
+				return fmt.Errorf("decoding failed: %w", err)
+			}
+
+			if q.cache != nil {
+				q.cache.Put(vID, rawData)
+			}
 		}
 
 		t.Status = fmt.Sprintf("Decrypting Shard %d/%d", i+1, len(shardIDs))
-		decrypted, err := q.core.Decrypt(rawData, "default-secret")
+		q.updateTaskState(t)
+
+		var decrypted []byte
+		if rawFileKey != nil {
+			decrypted, err = q.core.DecryptWithKey(rawData, rawFileKey)
+		} else {
+			decrypted, err = q.core.Decrypt(rawData, encryptionSecret)
+		}
+
 		if err != nil {
 			return fmt.Errorf("decryption failed: %w", err)
 		}
 
 		t.Status = fmt.Sprintf("Decompressing Shard %d/%d", i+1, len(shardIDs))
+		q.updateTaskState(t)
 		decompressed, err := q.core.Decompress(decrypted)
 		if err != nil {
 			return fmt.Errorf("decompression failed: %w", err)
 		}
 
-		// Append to final file
+		// Simple heuristic: if the original path didn't have an extension but it's a tarball, extract it.
+		// Alternatively, we can check if it's the first shard and the first bytes are a tar header.
+		// But for now, we just write it. We will handle extraction after all shards are combined.
 		if _, err := outFile.Write(decompressed); err != nil {
-			return fmt.Errorf("failed to write output: %w", err)
+			return err
+		}
+	}
+
+	// Post-processing: check if the downloaded file is a tar archive
+	outFile.Close()
+	
+	downloadedData, err := os.ReadFile(outPath)
+	if err == nil && len(downloadedData) > 512 {
+		// Tar headers have specific magic bytes at offset 257 ("ustar")
+		if string(downloadedData[257:262]) == "ustar" {
+			log.Printf("📦 Detected Archive. Extracting to %s...", outPath+"_extracted")
+			extDir := outPath + "_extracted"
+			if err := ExtractArchive(downloadedData, extDir); err == nil {
+				os.Remove(outPath) // Remove the raw tarball
+				outPath = extDir
+			} else {
+				log.Printf("⚠️ Extraction failed: %v", err)
+			}
 		}
 	}
 

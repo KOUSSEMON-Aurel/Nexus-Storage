@@ -38,6 +38,7 @@ pub struct AppState {
     pub auth: AuthStatus,
     #[allow(dead_code)]
     pub user_channel: String,
+    pub is_mounted: bool,
 
     pub files: Vec<FileEntry>,
     pub filtered_files: Vec<FileEntry>,
@@ -67,6 +68,7 @@ impl AppState {
         AppState {
             auth: AuthStatus { authenticated: false, channel_title: String::new() },
             user_channel: String::new(),
+            is_mounted: false,
             files: vec![],
             filtered_files: vec![],
             selected_idx: 0,
@@ -95,6 +97,9 @@ impl AppState {
             }
             crate::daemon::DaemonEvent::QuotaUpdated(quota) => {
                 self.quota = quota;
+            }
+            crate::daemon::DaemonEvent::MountStatus(mounted) => {
+                self.is_mounted = mounted;
             }
             crate::daemon::DaemonEvent::FilesUpdated(files) => {
                 self.files = files.clone();
@@ -161,7 +166,13 @@ impl AppState {
                     let cmd = self.command_input.clone();
                     self.command_history.push(cmd.clone());
                     self.mode = AppMode::Normal;
-                    // TODO: trigger command async
+                    
+                    if cmd.starts_with("/upload ") {
+                        let path = &cmd[8..];
+                        // Trigger upload via internal channel or daemon client
+                    } else if cmd.starts_with("/password ") {
+                        // Set global session password
+                    }
                 }
                 _ => {}
             },

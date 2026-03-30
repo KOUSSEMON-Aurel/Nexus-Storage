@@ -104,9 +104,14 @@ impl NexusClient {
         }
     }
 
-    pub async fn upload(&self, path: &str) -> Result<TaskEntry, NexusError> {
+    pub async fn upload(&self, path: &str, mode: &str, password: Option<&str>) -> Result<TaskEntry, NexusError> {
         let mut payload = HashMap::new();
         payload.insert("path", path.to_string());
+        payload.insert("mode", mode.to_string());
+        if let Some(p) = password {
+            payload.insert("password", p.to_string());
+        }
+        
         let res = self.client.post(format!("{}/api/upload", self.base_url))
             .json(&payload).send().await
             .map_err(|e| if e.is_connect() { NexusError::DaemonUnreachable { url: self.base_url.clone() } } else { NexusError::Http(e) })?;
@@ -155,6 +160,37 @@ impl NexusClient {
                  Ok(format!("Search completed"))
             }
             _ => Err(NexusError::ApiError(format!("Unknown command: {}", cmd)))
+        }
+    }
+
+    pub async fn share_file(&self, id: i64) -> Result<String, NexusError> {
+        let res = self.client.post(format!("{}/api/files/{}/share", self.base_url, id))
+            .send().await
+            .map_err(|e| if e.is_connect() { NexusError::DaemonUnreachable { url: self.base_url.clone() } } else { NexusError::Http(e) })?;
+
+        if res.status().is_success() {
+            let body: serde_json::Value = res.json().await?;
+            Ok(body["link"].as_str().unwrap_or_default().to_string())
+        } else {
+            Err(NexusError::ApiError(res.text().await.unwrap_or_default()))
+        }
+    }
+
+    pub async fn download_shared(&self, token: &str, out: Option<&str>) -> Result<(), NexusError> {
+        let mut payload = HashMap::new();
+        payload.insert("token", token.to_string());
+        if let Some(o) = out {
+            payload.insert("output_path", o.to_string());
+        }
+
+        let res = self.client.post(format!("{}/api/download/shared", self.base_url))
+            .json(&payload).send().await
+            .map_err(|e| if e.is_connect() { NexusError::DaemonUnreachable { url: self.base_url.clone() } } else { NexusError::Http(e) })?;
+
+        if res.status().is_success() {
+            Ok(())
+        } else {
+            Err(NexusError::ApiError(res.text().await.unwrap_or_default()))
         }
     }
 }

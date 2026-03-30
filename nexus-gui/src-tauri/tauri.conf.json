@@ -32,7 +32,9 @@
     "active": true,
     "targets": "all",
     "externalBin": [
-      "bin/nexus-daemon"
+      "bin/nexus-daemon",
+      "bin/ffmpeg",
+      "bin/rclone"
     ],
     "icon": [
       "icons/32x32.png",

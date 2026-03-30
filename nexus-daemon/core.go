@@ -1,7 +1,7 @@
 package main
 
 /*
-#cgo LDFLAGS: -L${SRCDIR}/../target/debug -lnexus_core
+#cgo LDFLAGS: ${SRCDIR}/libnexus_core.a -lm -ldl -lpthread
 #cgo CFLAGS: -I${SRCDIR}/../nexus-core/include
 #include <stdlib.h>
 #include "nexus_core.h"
@@ -181,4 +181,65 @@ func (nc *NexusCore) DecodeFromFrames(outputDir string, mode int) ([]byte, error
 	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
 }
 
+// ─── Per-File Raw-Key Wrappers ────────────────────────────────────────────────
+
+// GenerateFileKey creates a cryptographically random 32-byte key for a file.
+func (nc *NexusCore) GenerateFileKey() ([]byte, error) {
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+	res := C.nexus_generate_file_key(&outPtr, &outLen)
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("key generation error (code %d)", res)
+	}
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+}
+
+// EncryptWithKey encrypts `data` using a raw 32-byte key (no PBKDF2 step).
+func (nc *NexusCore) EncryptWithKey(data, key []byte) ([]byte, error) {
+	if len(data) == 0 {
+		return nil, errors.New("empty data")
+	}
+	if len(key) != 32 {
+		return nil, fmt.Errorf("key must be 32 bytes, got %d", len(key))
+	}
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+	res := C.nexus_encrypt_with_key(
+		(*C.uint8_t)(unsafe.Pointer(&data[0])),
+		C.size_t(len(data)),
+		(*C.uint8_t)(unsafe.Pointer(&key[0])),
+		&outPtr,
+		&outLen,
+	)
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("encrypt_with_key error (code %d)", res)
+	}
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+}
+
+// DecryptWithKey decrypts a blob produced by EncryptWithKey.
+func (nc *NexusCore) DecryptWithKey(data, key []byte) ([]byte, error) {
+	if len(data) == 0 {
+		return nil, errors.New("empty data")
+	}
+	if len(key) != 32 {
+		return nil, fmt.Errorf("key must be 32 bytes, got %d", len(key))
+	}
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+	res := C.nexus_decrypt_with_key(
+		(*C.uint8_t)(unsafe.Pointer(&data[0])),
+		C.size_t(len(data)),
+		(*C.uint8_t)(unsafe.Pointer(&key[0])),
+		&outPtr,
+		&outLen,
+	)
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("decrypt_with_key error (code %d)", res)
+	}
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+}
 

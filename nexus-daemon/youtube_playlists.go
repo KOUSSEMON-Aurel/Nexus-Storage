@@ -3,17 +3,22 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"time"
 
 	"google.golang.org/api/youtube/v3"
 )
 
 type PlaylistManager struct {
-	yt *YouTubeManager
-	db *Database
+	yt   *YouTubeManager
+	db   *Database
+	core *NexusCore
 }
 
-func NewPlaylistManager(yt *YouTubeManager, db *Database) *PlaylistManager {
-	return &PlaylistManager{yt: yt, db: db}
+func NewPlaylistManager(yt *YouTubeManager, db *Database, core *NexusCore) *PlaylistManager {
+	return &PlaylistManager{yt: yt, db: db, core: core}
 }
 
 // EnsureBasePlaylists creates NEXUS_ROOT and NEXUS_MANIFEST if they don't exist.
@@ -34,9 +39,10 @@ func (pm *PlaylistManager) EnsureBasePlaylists() error {
 	foundManifest := ""
 
 	for _, p := range resp.Items {
-		if p.Snippet.Title == "NEXUS_ROOT" {
+		switch p.Snippet.Title {
+		case "NEXUS_ROOT":
 			foundRoot = p.Id
-		} else if p.Snippet.Title == "NEXUS_MANIFEST" {
+		case "NEXUS_MANIFEST":
 			foundManifest = p.Id
 		}
 	}
@@ -136,4 +142,101 @@ func (pm *PlaylistManager) AddVideoToPlaylist(playlistID, videoID string) error 
 		log.Printf("📎 Added Video %s to Playlist %s", videoID, playlistID)
 	}
 	return err
+}
+
+func (pm *PlaylistManager) DownloadLatestManifest() error {
+	svc := pm.yt.GetService()
+	if svc == nil {
+		return fmt.Errorf("YouTube not authenticated")
+	}
+
+	manifestID, ok := pm.db.GetKV("playlist_manifest_id")
+	if !ok || manifestID == "" {
+		return fmt.Errorf("NEXUS_MANIFEST playlist not found")
+	}
+
+	// 1. List items in Manifest playlist
+	resp, err := svc.PlaylistItems.List([]string{"snippet", "contentDetails"}).PlaylistId(manifestID).MaxResults(10).Do()
+	if err != nil {
+		return err
+	}
+
+	if len(resp.Items) == 0 {
+		return fmt.Errorf("No manifest found in playlist")
+	}
+
+	// 2. We use the latest valid item (skip deleted videos still cached in playlist)
+	var latest *youtube.PlaylistItem
+	for i := len(resp.Items) - 1; i >= 0; i-- {
+		title := resp.Items[i].Snippet.Title
+		if title != "Deleted video" && title != "Private video" {
+			latest = resp.Items[i]
+			break
+		}
+	}
+
+	if latest == nil {
+		return fmt.Errorf("No valid manifest found in playlist (all seem deleted)")
+	}
+
+	videoID := latest.Snippet.ResourceId.VideoId
+	log.Printf("📥 Found cloud manifest video: %s", videoID)
+
+	// 3. Download and Process
+	tempDir, _ := os.MkdirTemp("", "nexus-sync-*")
+	defer os.RemoveAll(tempDir)
+
+	videoFile := filepath.Join(tempDir, "manifest.mp4")
+	ytURL := "https://www.youtube.com/watch?v=" + videoID
+	
+	// Use yt-dlp to download (same logic as queue.go)
+	log.Printf("📥 Downloading manifest video...")
+	dlCmd := exec.Command("yt-dlp", "-f", "bestvideo[ext=mp4]", "-o", videoFile, ytURL)
+	if out, err := dlCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("yt-dlp manifest failed: %v\nOutput: %s", err, string(out))
+	}
+
+	// Frame extraction
+	framesDir := filepath.Join(tempDir, "frames")
+	os.MkdirAll(framesDir, 0755)
+	log.Printf("🖼️  Extracting frames from manifest...")
+	ffCmd := exec.Command("ffmpeg", "-y", "-i", videoFile, filepath.Join(framesDir, "frame_%06d.png"))
+	if err := ffCmd.Run(); err != nil {
+		return fmt.Errorf("ffmpeg manifest extraction failed: %w", err)
+	}
+
+	// Decode
+	log.Printf("🔐 Decoding manifest data...")
+	rawData, err := pm.core.DecodeFromFrames(framesDir, 0) // Manifests always use tank/0 mode
+	if err != nil {
+		return fmt.Errorf("decoding manifest failed: %w", err)
+	}
+
+	// Decrypt (using master secret for manifest)
+	const masterSecret = "default-secret"
+	decrypted, err := pm.core.Decrypt(rawData, masterSecret)
+	if err != nil {
+		return fmt.Errorf("decrypting manifest failed: %w", err)
+	}
+
+	// Decompress
+	decompressed, err := pm.core.Decompress(decrypted)
+	if err != nil {
+		return fmt.Errorf("decompressing manifest failed: %w", err)
+	}
+
+	// 4. Merge into DB
+	cloudDbPath := filepath.Join(tempDir, "cloud_manifest.db")
+	if err := os.WriteFile(cloudDbPath, decompressed, 0644); err != nil {
+		return fmt.Errorf("saving cloud db failed: %w", err)
+	}
+
+	log.Printf("🔄 Merging cloud records into local database...")
+	if err := pm.db.MergeManifest(cloudDbPath); err != nil {
+		return fmt.Errorf("DB merge failed: %w", err)
+	}
+
+	pm.db.SetKV("last_cloud_sync", time.Now().Format(time.RFC3339))
+	log.Printf("✅ Cloud Manifest Sync completed successfully.")
+	return nil
 }

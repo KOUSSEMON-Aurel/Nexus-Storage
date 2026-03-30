@@ -5,20 +5,27 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 type APIServer struct {
-	db        *Database
-	queue     *TaskQueue
-	ytManager *YouTubeManager
+	db             *Database
+	queue          *TaskQueue
+	ytManager      *YouTubeManager
+	pm             *PlaylistManager
+	cache          *CacheManager
+	syncMu         sync.Mutex
+	syncInProgress bool
 }
 
 func (s *APIServer) Start(port int) {
 	mux := http.NewServeMux()
-	mux.Handle("/webdav/", NewWebDAVHandler(s.db, s.queue))
+	mux.Handle("/vfs/", NewVFSHandler(s.db, s.queue))
 
 	// File collection
 	mux.HandleFunc("/api/files", s.handleFiles)
@@ -40,9 +47,18 @@ func (s *APIServer) Start(port int) {
 	// Auth & Quota
 	mux.HandleFunc("/api/auth/status", s.handleAuthStatus)
 	mux.HandleFunc("/api/auth/login", s.handleAuthLogin)
+	mux.HandleFunc("/api/auth/logout", s.handleAuthLogout)
 	mux.HandleFunc("/api/quota", s.handleQuota)
+	mux.HandleFunc("/api/quota/limit", s.handleQuotaLimit)
+	mux.HandleFunc("/api/cloud/sync", s.handleCloudSync)
 	mux.HandleFunc("/api/mount", s.handleMount)
+	mux.HandleFunc("/api/unmount", s.handleUnmount)
+	mux.HandleFunc("/api/mount/status", s.handleMountStatus)
 	mux.HandleFunc("/api/studio", s.handleStudio)
+
+	// V3: Cache stats and Shared Links
+	mux.HandleFunc("/api/cache/stats", s.handleCacheStats)
+	mux.HandleFunc("/api/download/shared", s.handleSharedDownload)
 
 	handler := corsMiddleware(mux)
 	fmt.Printf("🌐 API Server starting on http://localhost:%d\n", port)
@@ -95,6 +111,24 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		jsonOK(w, map[string]string{"status": "deleted"})
+		
+	// POST /api/files/{id}/evict -> "Free up space" (clear from local cache but keep in DB)
+	case action == "evict" && r.Method == http.MethodPost:
+		f, _ := s.db.GetFileByID(id)
+		if f != nil {
+			path := filepath.Base(f.Path)
+			currParent := f.ParentID
+			for currParent != nil {
+				folder, _ := s.db.GetFolderByID(*currParent)
+				if folder == nil { break }
+				path = filepath.Join(folder.Name, path)
+				currParent = folder.ParentID
+			}
+			home, _ := os.UserHomeDir()
+			cachePath := filepath.Join(home, ".nexus", "cache", path)
+			os.Remove(cachePath)
+		}
+		jsonOK(w, map[string]string{"status": "evicted"})
 
 	// POST /api/files/{id}/star
 	case action == "star" && r.Method == http.MethodPost:
@@ -134,7 +168,9 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 		jsonOK(w, map[string]string{"status": "permanently_deleted"})
 
 	default:
-		http.Error(w, "not found", http.StatusNotFound)
+		if !s.dispatchFileAction(w, r, action, idStr) {
+			http.Error(w, "not found", http.StatusNotFound)
+		}
 	}
 }
 
@@ -165,15 +201,25 @@ func (s *APIServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Path string `json:"path"`
-		Mode string `json:"mode"` // "tank" | "density"
+		Path     string `json:"path"`
+		Mode     string `json:"mode"` // "tank" | "density"
+		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if req.Mode == "" {
-		req.Mode = "tank"
+	if req.Mode == "" || req.Mode == "tank" {
+		req.Mode = "base"
+	}
+	if req.Mode == "density" {
+		req.Mode = "high"
+	}
+
+	// Basic validation
+	if _, err := os.Stat(req.Path); os.IsNotExist(err) {
+		http.Error(w, "file or folder does not exist", http.StatusBadRequest)
+		return
 	}
 
 	task := &Task{
@@ -181,6 +227,7 @@ func (s *APIServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 		Type:      TaskUpload,
 		FilePath:  req.Path,
 		Mode:      req.Mode,
+		Password:  req.Password,
 		Status:    "Pending",
 		CreatedAt: time.Now(),
 	}
@@ -198,8 +245,9 @@ func (s *APIServer) handleDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		VideoID string `json:"video_id"`
-		Path    string `json:"path"`
+		VideoID  string `json:"video_id"`
+		Path     string `json:"path"`
+		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -210,6 +258,7 @@ func (s *APIServer) handleDownload(w http.ResponseWriter, r *http.Request) {
 		ID:        req.VideoID,
 		Type:      TaskDownload,
 		FilePath:  req.Path,
+		Password:  req.Password,
 		Status:    "Pending",
 		CreatedAt: time.Now(),
 	}
@@ -323,9 +372,9 @@ func corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Depth, If-Modified-Since, User-Agent, X-Expected-Entity-Length, Pragma, Cache-Control")
 		
 		if r.Method == "OPTIONS" {
-			// Do not intercept OPTIONS for webdav so the net/webdav
+			// Do not intercept OPTIONS for vfs so the net/vfs
 			// handler can inject DAV: 1, 2 and Allow capabilities.
-			if !strings.HasPrefix(r.URL.Path, "/webdav/") && !strings.HasPrefix(r.URL.Path, "/webdav") {
+			if !strings.HasPrefix(r.URL.Path, "/vfs/") && !strings.HasPrefix(r.URL.Path, "/vfs") {
 				w.WriteHeader(http.StatusOK)
 				return
 			}
@@ -345,6 +394,16 @@ func jsonOK(w http.ResponseWriter, v any) {
 func (s *APIServer) handleMount(w http.ResponseWriter, r *http.Request) {
 	go autoMountVirtualDisk()
 	jsonOK(w, map[string]string{"status": "mount-requested"})
+}
+
+func (s *APIServer) handleUnmount(w http.ResponseWriter, r *http.Request) {
+	unmountVirtualDisk()
+	jsonOK(w, map[string]string{"status": "unmount-requested"})
+}
+
+func (s *APIServer) handleMountStatus(w http.ResponseWriter, r *http.Request) {
+	mounted := isVirtualDiskMounted()
+	jsonOK(w, map[string]bool{"mounted": mounted})
 }
 
 func (s *APIServer) handleStudio(w http.ResponseWriter, r *http.Request) {
@@ -374,13 +433,86 @@ func (s *APIServer) handleSearch(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, files)
 }
 
+func (s *APIServer) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.ytManager.Logout()
+	jsonOK(w, map[string]any{"status": "logged_out"})
+}
+
 func (s *APIServer) handleQuota(w http.ResponseWriter, r *http.Request) {
 	used := s.db.GetDailyQuota()
+	limitStr, ok := s.db.GetKV("quota_limit")
+	limit := 10000
+	if ok {
+		if l, err := strconv.Atoi(limitStr); err == nil {
+			limit = l
+		}
+	}
+
+	// Try real-time monitoring if authenticated
+	liveUsed, hasLive := s.ytManager.GetLiveQuota()
+	source := "local"
+	if hasLive {
+		used = liveUsed
+		source = "monitoring"
+	}
+
 	jsonOK(w, map[string]any{
-		"used":  used,
-		"limit": 10000,
+		"used":   used,
+		"limit":  limit,
+		"source": source,
 	})
 }
+
+func (s *APIServer) handleCloudSync(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.syncMu.Lock()
+	if s.syncInProgress {
+		s.syncMu.Unlock()
+		http.Error(w, "Sync already in progress", http.StatusConflict)
+		return
+	}
+	s.syncInProgress = true
+	s.syncMu.Unlock()
+
+	defer func() {
+		s.syncMu.Lock()
+		s.syncInProgress = false
+		s.syncMu.Unlock()
+	}()
+
+	log.Printf("🔄 Manual cloud sync requested via API...")
+	if err := s.pm.DownloadLatestManifest(); err != nil {
+		log.Printf("❌ Cloud sync failed: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("✅ Manual cloud sync completed.")
+	jsonOK(w, map[string]any{"status": "ok", "message": "Manifest sync completed"})
+}
+
+func (s *APIServer) handleQuotaLimit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Limit int `json:"limit"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.db.SetKV("quota_limit", fmt.Sprintf("%d", req.Limit))
+	jsonOK(w, map[string]any{"status": "ok", "limit": req.Limit})
+}
+
 
 func httpError(w http.ResponseWriter, err error, code int) {
 	http.Error(w, err.Error(), code)

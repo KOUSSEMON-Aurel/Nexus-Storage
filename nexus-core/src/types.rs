@@ -4,24 +4,21 @@
 use thiserror::Error;
 
 /// Encoding mode: trade-off between resilience and density.
+/// All modes use 4×4 Luma blocks for DCT alignment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncodingMode {
-    /// 4×4 black/white blocks — indestructible under *any* YouTube compression.
-    Tank,
-    /// 2×2 colored blocks — maximum data density, requires 4K download to decode.
-    Density,
+    /// 2 levels (B&W) — maximum resilience (survives 360p).
+    Base,
+    /// 8 levels (Grayscale) — high density (requires 1080p+).
+    High,
 }
 
 /// Compression algorithm used before pixel encoding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompressionLevel {
-    /// Use zstd — best for text/source code.
+    /// Use zstd (default for V2).
     Zstd,
-    /// Use lz4 — best for binary data (fast default).
-    Lz4,
-    /// Use lzma — maximum compression ratio (slow).
-    Lzma,
-    /// No compression — best for already-compressed files (.zip, .mp4, .jpg…).
+    /// No compression.
     Store,
 }
 

@@ -21,6 +21,23 @@ pub async fn poll_auth(client: Client, tx: Sender<DaemonEvent>) {
     }
 }
 
+use serde::Deserialize;
+#[derive(Deserialize)]
+struct MountResponse {
+    mounted: bool,
+}
+
+pub async fn poll_mount_status(client: Client, tx: Sender<DaemonEvent>) {
+    loop {
+        if let Ok(res) = client.get(format!("{}/mount/status", BASE_URL)).send().await {
+            if let Ok(resp) = res.json::<MountResponse>().await {
+                let _ = tx.send(DaemonEvent::MountStatus(resp.mounted)).await;
+            }
+        }
+        sleep(Duration::from_secs(3)).await;
+    }
+}
+
 pub async fn poll_quota(client: Client, tx: Sender<DaemonEvent>) {
     loop {
         if let Ok(res) = client.get(format!("{}/quota", BASE_URL)).send().await {

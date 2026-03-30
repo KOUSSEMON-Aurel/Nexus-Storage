@@ -12,6 +12,7 @@ pub enum DaemonEvent {
     QuotaUpdated(QuotaInfo),
     FilesUpdated(Vec<FileEntry>),
     TasksUpdated(Vec<TaskEntry>),
+    MountStatus(bool),
     TelemetryPoint(f64),
     CommandResult(String),
     Error(String),
