@@ -27,6 +27,7 @@ interface NFile {
   rawDate: number;
   sha256: string;
   parentId?: number;
+  videoID: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -86,6 +87,7 @@ function mapBackendToFile(bf: BackendFile): NFile {
     type: type,
     modified: bf.LastUpdate ? new Date(bf.LastUpdate).toLocaleDateString() : "-",
     shardId: (bf.VideoID || "").substring(0, 8),
+    videoID: bf.VideoID || "",
     starred: bf.Starred ?? false,
     encrypted: true,
     owner: "me",
@@ -325,7 +327,7 @@ export default function App() {
         const res = await fetch(`${API_BASE}/download`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ video_id: file.shardId, path: file.name })
+          body: JSON.stringify({ video_id: file.videoID, path: file.name })
         });
         if (res.ok) showToast("Download started", "success");
         else showToast("Download failed", "error");

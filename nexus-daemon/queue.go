@@ -417,8 +417,8 @@ func (q *TaskQueue) RequestManifestBackup() {
 		q.manifestTimer.Stop()
 	}
 
-	// Debounce for 30 seconds
-	q.manifestTimer = time.AfterFunc(30*time.Second, func() {
+	// Debounce for 5 seconds
+	q.manifestTimer = time.AfterFunc(5*time.Second, func() {
 		log.Println("🔄 Debounced Manifest Backup triggered after DB changes.")
 		q.QueueManifestBackup()
 	})
