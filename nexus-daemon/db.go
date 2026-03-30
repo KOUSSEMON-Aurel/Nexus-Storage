@@ -223,17 +223,16 @@ func (d *Database) MergeManifest(cloudDbPath string) error {
 	}
 	defer d.db.Exec("DETACH DATABASE cloud")
 
-	// 1.5. Forward Compatibility: Apply missing columns to old manifests.
+	// 1.5. Forward Compatibility
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN parent_id INTEGER`)
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN sha256 TEXT`)
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN file_key TEXT DEFAULT ''`)
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN is_archive BOOLEAN DEFAULT 0`)
 
-	// 2. Merge Folders (Recursive Mapping)
-	// We use a simplified level-by-level approach for folder sync.
+	// 2. Merge Folders (Simplified level-by-level)
 	for i := 0; i < 5; i++ { 
 		_, err = d.db.Exec(`
-			INSERT INTO folders (name, parent_id)
+			INSERT OR IGNORE INTO folders (name, parent_id)
 			SELECT cf.name, lf_parent.id
 			FROM cloud.folders cf
 			LEFT JOIN cloud.folders cf_parent ON cf.parent_id = cf_parent.id
@@ -246,51 +245,62 @@ func (d *Database) MergeManifest(cloudDbPath string) error {
 					(lf.parent_id = lf_parent.id)
 				)
 			)
-			ON CONFLICT DO NOTHING
 		`)
 	}
 
-	// 3. Merge Files using a CTE to resolve parent_ids correctly
+	// 3. Create a temporary table for file mapping (Compatibility Fix)
+	d.db.Exec(`DROP TABLE IF EXISTS cloud_merge`)
 	_, err = d.db.Exec(`
-		WITH CloudFilesWithLocalParent AS (
-			SELECT 
-				cf.path, cf.video_id, cf.size, cf.hash, cf.key, cf.starred, cf.deleted_at, cf.last_update, cf.sha256, cf.file_key, cf.is_archive,
-				lf.id as local_parent_id
-			FROM cloud.files cf
-			LEFT JOIN cloud.folders cfolder ON cf.parent_id = cfolder.id
-			LEFT JOIN folders lf ON cfolder.name = lf.name
-		)
-		INSERT INTO files (path, video_id, size, hash, key, starred, deleted_at, last_update, parent_id, sha256, file_key, is_archive)
+		CREATE TEMP TABLE cloud_merge AS 
 		SELECT 
-			path, video_id, size, hash, key, starred, deleted_at, last_update, local_parent_id, sha256, file_key, is_archive
-		FROM CloudFilesWithLocalParent
-		ON CONFLICT(path) DO UPDATE SET
-			video_id    = excluded.video_id,
-			size        = excluded.size,
-			hash        = excluded.hash,
-			key         = excluded.key,
-			starred     = excluded.starred,
-			deleted_at  = CASE WHEN files.deleted_at IS NOT NULL THEN files.deleted_at ELSE excluded.deleted_at END,
-			last_update = excluded.last_update,
-			parent_id   = excluded.parent_id,
-			sha256      = excluded.sha256,
-			file_key    = excluded.file_key,
-			is_archive  = excluded.is_archive
-		WHERE (excluded.last_update > files.last_update OR files.last_update IS NULL)
+			cf.path, cf.video_id, cf.size, cf.hash, cf.key, cf.starred, cf.deleted_at, cf.last_update, cf.sha256, cf.file_key, cf.is_archive,
+			lf.id as local_parent_id
+		FROM cloud.files cf
+		LEFT JOIN cloud.folders cfolder ON cf.parent_id = cfolder.id
+		LEFT JOIN folders lf ON cfolder.name = lf.name
+	`)
+	if err != nil {
+		return fmt.Errorf("temp table creation failed: %w", err)
+	}
+
+	// 4. Update existing files
+	_, err = d.db.Exec(`
+		UPDATE files SET
+			video_id    = (SELECT video_id FROM cloud_merge WHERE cloud_merge.path = files.path),
+			size        = (SELECT size FROM cloud_merge WHERE cloud_merge.path = files.path),
+			hash        = (SELECT hash FROM cloud_merge WHERE cloud_merge.path = files.path),
+			key         = (SELECT key FROM cloud_merge WHERE cloud_merge.path = files.path),
+			starred     = (SELECT starred FROM cloud_merge WHERE cloud_merge.path = files.path),
+			deleted_at  = (SELECT CASE WHEN files.deleted_at IS NOT NULL THEN files.deleted_at ELSE cloud_merge.deleted_at END FROM cloud_merge WHERE cloud_merge.path = files.path),
+			last_update = (SELECT last_update FROM cloud_merge WHERE cloud_merge.path = files.path),
+			parent_id   = (SELECT local_parent_id FROM cloud_merge WHERE cloud_merge.path = files.path),
+			sha256      = (SELECT sha256 FROM cloud_merge WHERE cloud_merge.path = files.path),
+			file_key    = (SELECT file_key FROM cloud_merge WHERE cloud_merge.path = files.path),
+			is_archive  = (SELECT is_archive FROM cloud_merge WHERE cloud_merge.path = files.path)
+		WHERE path IN (SELECT path FROM cloud_merge)
+		  AND (SELECT last_update FROM cloud_merge WHERE cloud_merge.path = files.path) > files.last_update
 		  AND files.deleted_at IS NULL
 	`)
+	
+	// 5. Insert new files
+	_, err = d.db.Exec(`
+		INSERT INTO files (path, video_id, size, hash, key, starred, deleted_at, last_update, parent_id, sha256, file_key, is_archive)
+		SELECT path, video_id, size, hash, key, starred, deleted_at, last_update, local_parent_id, sha256, file_key, is_archive
+		FROM cloud_merge
+		WHERE path NOT IN (SELECT path FROM files)
+	`)
+
 	if err != nil {
 		return fmt.Errorf("files merge failed: %w", err)
 	}
 
-	// 4. Merge Shards
+	// 6. Merge Shards
 	_, err = d.db.Exec(`
-		INSERT INTO shards (file_id, video_id, position)
+		INSERT OR IGNORE INTO shards (file_id, video_id, position)
 		SELECT f.id, cs.video_id, cs.position
 		FROM cloud.shards cs
 		JOIN cloud.files cf ON cs.file_id = cf.id
 		JOIN files f ON f.path = cf.path
-		ON CONFLICT DO NOTHING
 	`)
 	
 	return err
