@@ -69,8 +69,10 @@ func (s *APIServer) Start(port int) {
 	handler := corsMiddleware(mux)
 	fmt.Printf("🌐 API Server starting on http://localhost:%d\n", port)
 	
-	// Pre-warm quota cache
+	// Pre-warm quota cache after a delay to ensure YouTube auth is ready
 	go func() {
+		// Wait 3 seconds for auth to complete and scope validation
+		time.Sleep(3 * time.Second)
 		if liveUsed, hasLive := s.ytManager.GetLiveQuota(); hasLive {
 			s.quotaCacheMu.Lock()
 			s.quotaCache = liveUsed
@@ -78,7 +80,7 @@ func (s *APIServer) Start(port int) {
 			s.quotaCacheMu.Unlock()
 			log.Printf("✅ Quota cache pre-warmed with %d units from live monitoring", liveUsed)
 		} else {
-			log.Printf("⚠️  Quota cache pre-warm failed - live monitoring not available")
+			log.Printf("⚠️  Quota cache pre-warm: live monitoring not available")
 		}
 	}()
 	

@@ -216,7 +216,7 @@ func (m *YouTubeManager) GetLiveQuota() (int, bool) {
 	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, pt).UTC()
 	end := now.UTC()
 
-	filter := `metric.type="serviceruntime.googleapis.com/quota/allocation/usage" AND resource.labels.service="youtube.googleapis.com"`
+	filter := `metric.type="serviceruntime.googleapis.com/quota/rate/net_usage" AND resource.labels.service="youtube.googleapis.com"`
 	url := fmt.Sprintf("https://monitoring.googleapis.com/v3/projects/%s/timeSeries?filter=%s&interval.startTime=%s&interval.endTime=%s", 
 		projectID, strings.ReplaceAll(filter, " ", "%20"), start.Format(time.RFC3339), end.Format(time.RFC3339))
 
