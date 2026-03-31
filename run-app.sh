@@ -69,9 +69,9 @@ read -p "Choisissez (1/2) : " choice
 
 if [ "$choice" == "2" ]; then
     echo "✨ Lancement du TUI Nexus..."
-    # On lance d'abord le daemon en arrière-plan
-    echo "📡 Démarrage du daemon en arrière-plan..."
-    ./nexus-gui/src-tauri/bin/nexus-daemon-x86_64-unknown-linux-gnu &
+    # On lance d'abord le daemon en arrière-plan en redirigeant sa sortie
+    echo "📡 Démarrage du daemon (logs: $NEXUS_CONFIG_DIR/daemon.log)..."
+    ./nexus-gui/src-tauri/bin/nexus-daemon-x86_64-unknown-linux-gnu > "$NEXUS_CONFIG_DIR/daemon.log" 2>&1 &
     DAEMON_PID=$!
     
     # Nettoyage automatique à la fermeture du script
