@@ -125,7 +125,7 @@ export default function App() {
   const [selected, setSelected] = useState<NFile | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [downloadPasswordOpen, setDownloadPasswordOpen] = useState(false);
-  const [pendingDownloadFile, setPendingDownloadFile] = useState<NFile | null>(null);
+  const [pendingDownloadFile] = useState<NFile | null>(null);
   const [downloadPassword, setDownloadPassword] = useState("");
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "info" } | null>(null);
   
@@ -1302,7 +1302,7 @@ function TaskOverlay({ tasks, c }: { tasks: Record<string, BackendTask>; c: Colo
 
 function SecuritySection({ c }: { c: ColorSet }) {
   const [protocols, setProtocols] = useState<{name: string, detail: string, active: boolean}[]>([]);
-  const [purgeDays, setPurgeDays] = useState(30);
+  const [, setPurgeDays] = useState(30);
 
   useEffect(() => {
     fetch(`${API_BASE}/security`)

@@ -173,7 +173,7 @@ impl AppState {
                     self.mode = AppMode::Normal;
                     
                     if cmd.starts_with("/upload ") {
-                        let path = &cmd[8..];
+                        let _path = &cmd[8..];
                         // Trigger upload via internal channel or daemon client
                     } else if cmd.starts_with("/password ") {
                         // Set global session password

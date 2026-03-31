@@ -15,6 +15,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &AppState) {
         AppMode::SearchFilter => "  [Esc] annuler  [↑↓] nav  ",
         AppMode::Confirm(_) => "  [y] confirmer  [n] annuler  ",
         AppMode::Help => "  [Esc] fermer  ",
+        AppMode::Loading => "  Initialisation sécurisée...  ",
     };
 
     let p = Paragraph::new(Span::styled(mode_str, Style::default().fg(SURFACE).bg(MUTED)))

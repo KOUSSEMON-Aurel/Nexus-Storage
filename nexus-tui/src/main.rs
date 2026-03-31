@@ -6,7 +6,7 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use reqwest::Client;
-use std::{io, sync::{Arc, Mutex}, time::Duration};
+use std::{io, sync::{Arc, Mutex}, time::{Duration, Instant}};
 use tokio::sync::mpsc;
 
 mod app;
