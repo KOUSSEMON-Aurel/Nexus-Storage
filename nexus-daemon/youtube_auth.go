@@ -201,19 +201,32 @@ func (m *YouTubeManager) GetLiveQuota() (int, bool) {
 	}
 	json.Unmarshal(b, &secret)
 	projectID := secret.Installed.ProjectID
-	if projectID == "" { return 0, false }
+	if projectID == "" { 
+		log.Printf("⚠️  GetLiveQuota: project_id not found in client_secret.json")
+		return 0, false 
+	}
 
-	// Prepare time interval (today)
-	now := time.Now().UTC()
-	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
-	end := now.Format(time.RFC3339)
+	// Prepare time interval (current PT day)
+	pt, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		log.Printf("⚠️  GetLiveQuota: could not load PT timezone: %v", err)
+		return 0, false
+	}
+	now := time.Now().In(pt)
+	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, pt).UTC()
+	end := now.UTC()
 
-	filter := `metric.type="serviceruntime.googleapis.com/quota/rate/net_usage" AND resource.labels.service="youtube.googleapis.com"`
+	filter := `metric.type="serviceruntime.googleapis.com/quota/allocation/usage" AND resource.labels.service="youtube.googleapis.com"`
 	url := fmt.Sprintf("https://monitoring.googleapis.com/v3/projects/%s/timeSeries?filter=%s&interval.startTime=%s&interval.endTime=%s", 
-		projectID, strings.ReplaceAll(filter, " ", "%20"), start, end)
+		projectID, strings.ReplaceAll(filter, " ", "%20"), start.Format(time.RFC3339), end.Format(time.RFC3339))
 
 	resp, err := client.Get(url)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil {
+		log.Printf("⚠️  GetLiveQuota: HTTP error: %v", err)
+		return 0, false
+	}
+	if resp.StatusCode != 200 {
+		log.Printf("⚠️  GetLiveQuota: HTTP status %d", resp.StatusCode)
 		return 0, false
 	}
 	defer resp.Body.Close()
@@ -239,6 +252,7 @@ func (m *YouTubeManager) GetLiveQuota() (int, bool) {
 		}
 	}
 
+	log.Printf("✅ GetLiveQuota: Retrieved %d units from monitoring API", total)
 	return total, true
 }
 

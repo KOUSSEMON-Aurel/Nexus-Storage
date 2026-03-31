@@ -213,7 +213,8 @@ func (d *Database) SearchFiles(query string) ([]FileRecord, error) {
 }
 
 func (d *Database) LogQuotaUsage(units int) {
-	date := time.Now().Format("2006-01-02")
+	pt, _ := time.LoadLocation("America/Los_Angeles")
+	date := time.Now().In(pt).Format("2006-01-02")
 	d.db.Exec(`INSERT INTO quota_log (date, units) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET units = units + ?`, date, units, units)
 }
 
@@ -313,7 +314,8 @@ func (d *Database) MergeManifest(driveManifestPath string) error {
 
 
 func (d *Database) GetDailyQuota() int {
-	date := time.Now().Format("2006-01-02")
+	pt, _ := time.LoadLocation("America/Los_Angeles")
+	date := time.Now().In(pt).Format("2006-01-02")
 	var units int
 	d.db.QueryRow(`SELECT units FROM quota_log WHERE date = ?`, date).Scan(&units)
 	return units

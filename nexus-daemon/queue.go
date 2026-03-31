@@ -234,6 +234,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		log.Printf("[%s] 🔬 Verifying cloud record for deduplication (ID: %s)...", t.ID, existing.VideoID)
 		exists, err := q.ytManager.VideoExists(existing.VideoID)
 		if err == nil && exists {
+			q.db.LogQuotaUsage(1)
 			log.Printf("[%s] ♻️  Deduplication: File verified on cloud. Linking locally...", t.ID)
 			q.db.SaveFile(t.FilePath, existing.VideoID, totalSize, existing.Hash, existing.Key, t.ParentID, t.SHA256, existing.IsArchive)
 			t.Status = "Completed"
@@ -489,13 +490,20 @@ func (q *TaskQueue) SweepOldManifests(newId string) {
 	// Search for standard OR stealth manifests
 	call1 := ytService.Search.List([]string{"id", "snippet"}).Q("NEXUS_MANIFEST").Type("video").ForMine(true).MaxResults(50)
 	resp1, err1 := call1.Do()
+	if err1 == nil {
+		q.db.LogQuotaUsage(100)
+	}
 	call2 := ytService.Search.List([]string{"id", "snippet"}).Q("DATA_STATE_MANIFEST").Type("video").ForMine(true).MaxResults(50)
 	resp2, err2 := call2.Do()
+	if err2 == nil {
+		q.db.LogQuotaUsage(100)
+	}
 
 	if err1 != nil && err2 != nil {
 		log.Printf("⚠️  Manifest Sweep: search failed")
 		if oldId, ok := q.db.GetKV("manifest_video_id"); ok && oldId != "" && oldId != newId {
 			ytService.Videos.Delete(oldId).Do()
+			q.db.LogQuotaUsage(50)
 		}
 		return
 	}
@@ -510,6 +518,8 @@ func (q *TaskQueue) SweepOldManifests(newId string) {
 			log.Printf("🗑️  Manifest Sweep: Deleting orphan manifest %s (%s)", id, item.Snippet.Title)
 			if err := ytService.Videos.Delete(id).Do(); err != nil {
 				log.Printf("⚠️  Manifest Sweep: could not delete %s: %v", id, err)
+			} else {
+				q.db.LogQuotaUsage(50)
 			}
 		}
 	}
@@ -691,6 +701,8 @@ func (q *TaskQueue) handleDelete(t *Task) error {
 	err := ytService.Videos.Delete(t.ID).Do()
 	if err != nil {
 		log.Printf("Warning: Could not delete YouTube video %s: %v", t.ID, err)
+	} else {
+		q.db.LogQuotaUsage(50)
 	}
 	t.Progress = 90
 	return nil
