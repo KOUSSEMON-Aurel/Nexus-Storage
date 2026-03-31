@@ -132,6 +132,7 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 			httpError(w, err, http.StatusInternalServerError)
 			return
 		}
+		s.queue.RequestManifestBackup()
 		jsonOK(w, map[string]string{"status": "deleted"})
 		
 	// POST /api/files/{id}/evict -> "Free up space" (clear from local cache but keep in DB)
@@ -162,6 +163,7 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 			httpError(w, err, http.StatusInternalServerError)
 			return
 		}
+		s.queue.RequestManifestBackup()
 		jsonOK(w, map[string]bool{"starred": body.Starred})
 
 	// POST /api/files/{id}/restore
@@ -170,6 +172,7 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 			httpError(w, err, http.StatusInternalServerError)
 			return
 		}
+		s.queue.RequestManifestBackup()
 		jsonOK(w, map[string]string{"status": "restored"})
 
 	// DELETE /api/files/{id}/permanent
@@ -179,6 +182,7 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 			httpError(w, err, http.StatusInternalServerError)
 			return
 		}
+		s.queue.RequestManifestBackup()
 		if fileRec != nil && fileRec.VideoID != "" {
 			s.queue.AddTask(&Task{
 				ID:        fileRec.VideoID,
