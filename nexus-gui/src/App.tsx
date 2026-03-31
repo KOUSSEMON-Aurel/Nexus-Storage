@@ -200,9 +200,9 @@ export default function App() {
   const handleCalibrateQuota = async () => {
     try {
       showToast("🔄 Refreshing metrics...", "info");
-      // Just re-fetch everything immediately
+      // Force live quota refresh
       const fetchQuota = async () => {
-        const res = await fetch(`${API_BASE}/quota`);
+        const res = await fetch(`${API_BASE}/quota?force=true`);
         if (res.ok) setQuota(await res.json());
       };
       await fetchQuota();

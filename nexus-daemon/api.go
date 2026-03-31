@@ -76,7 +76,9 @@ func (s *APIServer) Start(port int) {
 			s.quotaCache = liveUsed
 			s.quotaCacheTime = time.Now()
 			s.quotaCacheMu.Unlock()
-			log.Printf("✅ Quota cache pre-warmed with %d units", liveUsed)
+			log.Printf("✅ Quota cache pre-warmed with %d units from live monitoring", liveUsed)
+		} else {
+			log.Printf("⚠️  Quota cache pre-warm failed - live monitoring not available")
 		}
 	}()
 	
@@ -461,6 +463,9 @@ func (s *APIServer) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *APIServer) handleQuota(w http.ResponseWriter, r *http.Request) {
+	// Check for force parameter
+	forceLive := r.URL.Query().Get("force") == "true"
+	
 	used := s.db.GetDailyQuota()
 	limitStr, ok := s.db.GetKV("quota_limit")
 	limit := 10000
@@ -480,7 +485,7 @@ func (s *APIServer) handleQuota(w http.ResponseWriter, r *http.Request) {
 	
 	// Check cache - only call live quota if cache is older than 5 minutes and enabled
 	s.quotaCacheMu.Lock()
-	cacheValid := enableLiveQuota && time.Since(s.quotaCacheTime) < 5*time.Minute && s.quotaCacheTime.After(time.Now().Add(-24*time.Hour))
+	cacheValid := enableLiveQuota && !forceLive && time.Since(s.quotaCacheTime) < 5*time.Minute && s.quotaCacheTime.After(time.Now().Add(-24*time.Hour)) && s.quotaCacheTime.After(time.Time{})
 	if cacheValid {
 		used = s.quotaCache
 		source = "cached"
