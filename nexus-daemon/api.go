@@ -53,6 +53,7 @@ func (s *APIServer) Start(port int) {
 	mux.HandleFunc("/api/auth/login", s.handleAuthLogin)
 	mux.HandleFunc("/api/auth/logout", s.handleAuthLogout)
 	mux.HandleFunc("/api/quota", s.handleQuota)
+	mux.HandleFunc("/api/quota/live", s.handleQuotaLiveToggle)
 	mux.HandleFunc("/api/quota/limit", s.handleQuotaLimit)
 	mux.HandleFunc("/api/cloud/sync", s.handleCloudSync)
 	mux.HandleFunc("/api/mount", s.handleMount)
@@ -469,19 +470,25 @@ func (s *APIServer) handleQuota(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Check if live monitoring is enabled (default: true, can be disabled to save API calls)
+	enableLiveQuota := true
+	if val, ok := s.db.GetKV("enable_live_quota"); ok && val == "false" {
+		enableLiveQuota = false
+	}
+	
 	source := "local"
 	
-	// Check cache - only call live quota if cache is older than 10 seconds
+	// Check cache - only call live quota if cache is older than 5 minutes and enabled
 	s.quotaCacheMu.Lock()
-	cacheValid := time.Since(s.quotaCacheTime) < 10*time.Second && s.quotaCache > 0
+	cacheValid := enableLiveQuota && time.Since(s.quotaCacheTime) < 5*time.Minute && s.quotaCacheTime.After(time.Now().Add(-24*time.Hour))
 	if cacheValid {
 		used = s.quotaCache
 		source = "cached"
 	}
 	s.quotaCacheMu.Unlock()
 	
-	// Try real-time monitoring if not using valid cache
-	if !cacheValid {
+	// Try real-time monitoring if not using valid cache and enabled
+	if !cacheValid && enableLiveQuota {
 		liveUsed, hasLive := s.ytManager.GetLiveQuota()
 		if hasLive {
 			used = liveUsed
@@ -499,6 +506,49 @@ func (s *APIServer) handleQuota(w http.ResponseWriter, r *http.Request) {
 		"limit":  limit,
 		"source": source,
 	})
+}
+
+func (s *APIServer) handleQuotaLiveToggle(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		// Get current status
+		enabled := true
+		if val, ok := s.db.GetKV("enable_live_quota"); ok && val == "false" {
+			enabled = false
+		}
+		jsonOK(w, map[string]any{"enabled": enabled})
+		return
+	}
+	
+	if r.Method == http.MethodPost {
+		// Toggle status
+		current := "true"
+		if val, ok := s.db.GetKV("enable_live_quota"); ok && val == "false" {
+			current = "false"
+		}
+		
+		newValue := "false"
+		if current == "false" {
+			newValue = "true"
+		}
+		
+		if err := s.db.SetKV("enable_live_quota", newValue); err != nil {
+			httpError(w, err, http.StatusInternalServerError)
+			return
+		}
+		
+		// Clear cache when disabling
+		if newValue == "false" {
+			s.quotaCacheMu.Lock()
+			s.quotaCache = 0
+			s.quotaCacheTime = time.Time{}
+			s.quotaCacheMu.Unlock()
+		}
+		
+		jsonOK(w, map[string]any{"enabled": newValue == "true"})
+		return
+	}
+	
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
 func (s *APIServer) handleCloudSync(w http.ResponseWriter, r *http.Request) {
