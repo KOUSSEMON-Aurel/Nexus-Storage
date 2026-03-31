@@ -21,6 +21,10 @@ type APIServer struct {
 	cache          *CacheManager
 	syncMu         sync.Mutex
 	syncInProgress bool
+	// Quota cache to avoid spamming Google Cloud Monitoring API
+	quotaCache     int
+	quotaCacheTime time.Time
+	quotaCacheMu   sync.Mutex
 }
 
 func (s *APIServer) Start(port int) {
@@ -63,6 +67,18 @@ func (s *APIServer) Start(port int) {
 
 	handler := corsMiddleware(mux)
 	fmt.Printf("🌐 API Server starting on http://localhost:%d\n", port)
+	
+	// Pre-warm quota cache
+	go func() {
+		if liveUsed, hasLive := s.ytManager.GetLiveQuota(); hasLive {
+			s.quotaCacheMu.Lock()
+			s.quotaCache = liveUsed
+			s.quotaCacheTime = time.Now()
+			s.quotaCacheMu.Unlock()
+			log.Printf("✅ Quota cache pre-warmed with %d units", liveUsed)
+		}
+	}()
+	
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), handler))
 }
 
@@ -453,12 +469,29 @@ func (s *APIServer) handleQuota(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Try real-time monitoring if authenticated
-	liveUsed, hasLive := s.ytManager.GetLiveQuota()
 	source := "local"
-	if hasLive {
-		used = liveUsed
-		source = "monitoring"
+	
+	// Check cache - only call live quota if cache is older than 10 seconds
+	s.quotaCacheMu.Lock()
+	cacheValid := time.Since(s.quotaCacheTime) < 10*time.Second && s.quotaCache > 0
+	if cacheValid {
+		used = s.quotaCache
+		source = "cached"
+	}
+	s.quotaCacheMu.Unlock()
+	
+	// Try real-time monitoring if not using valid cache
+	if !cacheValid {
+		liveUsed, hasLive := s.ytManager.GetLiveQuota()
+		if hasLive {
+			used = liveUsed
+			source = "monitoring"
+			// Update cache
+			s.quotaCacheMu.Lock()
+			s.quotaCache = liveUsed
+			s.quotaCacheTime = time.Now()
+			s.quotaCacheMu.Unlock()
+		}
 	}
 
 	jsonOK(w, map[string]any{
