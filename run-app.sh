@@ -13,6 +13,13 @@ if [ ! -f "nexus-daemon/client_secret.json" ]; then
     exit 1
 fi
 
+echo "🧹 Nettoyage des anciens processus (ports 1420 & 8081)..."
+fuser -k 1420/tcp 2>/dev/null || true
+fuser -k 8081/tcp 2>/dev/null || true
+# Explicitly kill all daemon variants to unlock binaries
+pkill -f nexus-daemon 2>/dev/null || true
+sleep 1 # Allow OS to unlock file handles
+
 # Auto-copy credentials to stable config directory so the daemon can always find them
 NEXUS_CONFIG_DIR="$HOME/.config/nexus-storage"
 mkdir -p "$NEXUS_CONFIG_DIR"
@@ -54,11 +61,6 @@ if [ -n "$MISSING" ]; then
     exit 1
 fi
 echo "✅ Dépendances système (ffmpeg, rclone) présentes."
-
-echo "🧹 Nettoyage des anciens processus (ports 1420 & 8081)..."
-fuser -k 1420/tcp 2>/dev/null || true
-fuser -k 8081/tcp 2>/dev/null || true
-pkill -f nexus-daemon 2>/dev/null || true
 
 echo "🖥️  4. Choix de l'interface..."
 echo "1) GUI (Tauri + React/Vite) - Recommandé pour le confort"
