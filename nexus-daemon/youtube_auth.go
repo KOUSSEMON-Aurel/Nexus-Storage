@@ -71,12 +71,13 @@ func NewYouTubeManager() *YouTubeManager {
 	m.config = config
 	m.TryLoadToken()
 
-	// VALIDATION: If authenticated, check if we have the 'Search' scope by doing a tiny test call
+	// VALIDATION: If authenticated, check if we have the 'Search' scope by doing a minimal validation call
 	if m.authed {
 		go func() {
 			svc := m.GetService()
 			if svc == nil { return }
-			_, err := svc.Search.List([]string{"id"}).MaxResults(1).ForMine(true).Do()
+			// Use Videos.List (1 unit) instead of Search.List (100 units) for scope validation
+			_, err := svc.Videos.List([]string{"id"}).MaxResults(1).Do()
 			if err != nil && strings.Contains(err.Error(), "insufficientPermissions") {
 				log.Printf("⚠️  OAuth Scope mismatch detected (Old Token). Forcing Re-Auth...")
 				m.mu.Lock()
