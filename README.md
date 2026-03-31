@@ -1,109 +1,96 @@
 <div align="center">
-  <img src="https://img.shields.io/badge/Nexus--Storage-2.1-1A73E8?style=for-the-badge&logoColor=white" alt="Nexus Version" />
-  <img src="https://img.shields.io/badge/Security-XChaCha20--Poly1305-10B981?style=for-the-badge" alt="Security" />
-  <img src="https://img.shields.io/badge/Backend-YouTube--Refinery-FF0000?style=for-the-badge&logo=youtube" alt="Backend" />
+  <img src="https://raw.githubusercontent.com/KOUSSEMON-Aurel/Nexus-Storage/main/assets/nexus-logo.png" alt="Nexus Logo" width="120" />
+  <h1>Nexus Storage v2.2</h1>
+  <p><strong>Universal Decentralized Persistence | YouTube Refinery Architecture</strong></p>
+  
+  <div style="display: flex; justify-content: center; gap: 10px;">
+    <img src="https://img.shields.io/badge/Security-XChaCha20--Poly1305-10B981?style=for-the-badge" alt="Security" />
+    <img src="https://img.shields.io/badge/Resilience-RaptorQ--Fountain-3B82F6?style=for-the-badge" alt="Resilience" />
+    <img src="https://img.shields.io/badge/GUI-Tauri--React-FF4400?style=for-the-badge" alt="GUI" />
+  </div>
 </div>
 
 <br />
 
-<div align="center">
-  <h1>Nexus Storage</h1>
-  <p><strong>Universal Decentralized Persistence through High-Density Video Archival</strong></p>
-  <p><i>A professional-grade, encrypted cloud storage system utilizing YouTube's global infrastructure as a high-resilience block storage backend.</i></p>
-</div>
+> [!IMPORTANT]
+> **Nexus Storage is not a standard cloud drive.** It is a high-density archival system that abstracts the YouTube Content Delivery Network (CDN) into a raw block storage device. It provides virtually unlimited, multi-regional storage for encrypted data.
 
 ---
 
-## Overview
+## 🏗️ Architectural Philosophy
 
-Nexus Storage transforms binary data into high-entropy video streams, achieving virtually unlimited capacity with multi-regional redundancy. By abstracting the "video" layer into a raw block storage device, Nexus allows for traditional file management workflows while benefiting from the most robust content delivery network on the planet.
+Nexus is designed on the principle of **Infrastructural Parasitism**. By transforming binary data into "video" signals, we leverage the most robust, high-availability storage infrastructure on the planet without sacrificing security or privacy.
 
-## 🏗️ System Architecture
-
-Nexus follows a decoupled, three-tier architecture designed for maximum performance and native operating system integration.
-
-```mermaid
-graph TD
-    A[Nexus GUI - Tauri] -->|Telemetry/RPC| B[Nexus Daemon - Go]
-    B -->|CGO Bindings| C[Nexus Core - Rust]
-    C -->|AES-256 / RaptorQ| D[Binary Shards]
-    D -->|FFmpeg Assembly| E[Video Stream]
-    E -->|Studio API| F[YouTube Cloud]
-```
-
-### Core Components
-- **[Rust] Nexus Core**: The cryptographic and signal processing engine. Handles **XChaCha20-Poly1305** authenticated encryption and **RaptorQ** fountain code error correction.
-- **[Go] Nexus Daemon**: The orchestration layer. Manages the OAuth2 lifecycle, maintains a local **SQLite FTS5** metadata index, and provides a binary bridge for **Rclone** FUSE mounts.
-- **[Tauri] Nexus GUI**: The high-fidelity desktop dashboard. Features real-time quota monitoring, live sync telemetry, and an optimized startup sequence with **Skeleton Loaders**.
+### The Micro-Service Stack
+- **🛡️ Nexus Core (Rust)**: Native signal processing. Handles massive-scale encryption and Forward Error Correction (FEC) with memory-safe efficiency.
+- **📡 Nexus Daemon (Go)**: The orchestration kernel. Manages the API bridge, SQLite index, and the FUSE/WebDAV virtual disk.
+- **💎 Nexus GUI (Tauri)**: A premium desktop experience. Features **Floating Glassmorphism**, 18px rounded aesthetics, and real-time telemetry.
 
 ---
 
-## 🛰️ The Nexus Pipeline
+## 🛠️ The Nexus Pipeline: How it Works
 
-The transition from a local file to a cloud-stored video shard involves multiple layers of data transformation to ensure zero-loss recovery and maximum security.
+Nexus doesn't just "upload" files; it refines them into a resilient, chromatic signal.
 
-### 📤 Upload & Compression
+### 1. Data Refinement (Encryption & FEC)
+Before a single byte leaves your machine, the file is sharded and wrapped in **XChaCha20-Poly1305** authenticated encryption. We then apply **RaptorQ (Fountain Codes)**: if the YouTube CDN drops frames during compression, Nexus can still reconstruct 100% of the data using the remaining fragments.
+
+### 2. Chromatic Encoding
+Data shards are mapped to high-entropy pixel grids (**YUV420p**). This "optical storage" approach ensures that even under aggressive YouTube re-encoding, the bit-density remains sufficient for bit-perfect recovery.
+
 ```mermaid
-sequenceDiagram
-    participant User as Local File
-    participant Enc as Encryption (XChaCha20)
-    participant FEC as Forward Error Corr (RaptorQ)
-    participant Pix as Pixel Grid Encoding
-    participant YT as YouTube Studio
-    
-    User->>Enc: Byte Stream Input
-    Enc->>FEC: Encrypted Payload
-    FEC->>Pix: Fault-Tolerant Shards
-    Pix->>YT: Chromatic Video Assembly
-```
-
-### 📥 Download & Reconstitution
-```mermaid
-sequenceDiagram
-    participant YT as YouTube CDN
-    participant Pix as Frame Analysis
-    participant FEC as Error Recovery
-    participant Dec as Decryption
-    participant User as Original File
-    
-    YT->>Pix: MP4 Stream
-    Pix->>FEC: Decoded Bitstream
-    FEC->>Dec: Recovered Encrypted Shard
-    Dec->>User: Secure Verification & Output
+graph LR
+    A[Raw File] --> B{Nexus Core}
+    B -->|Encrypt| C[XChaCha20 Payload]
+    C -->|Fountain| D[RaptorQ Shards]
+    D -->|Encode| E[Video Frame]
+    E -->|Studio| F[YouTube Cloud]
+    style B fill:#1A73E8,color:#fff
+    style F fill:#FF0000,color:#fff
 ```
 
 ---
 
-## 🔒 Technical Specifications
+## 🔒 Security Model: Absolute Privacy
 
-### Security & Privacy
-- **Client-Side Only**: All encryption happens on-machine. Google never sees raw bytes, filenames, or folder structures.
-- **Content-Addressability**: SHA-256 deduplication prevents redundant uploads, saving bandwidth and API quota.
-- **Manifest Resilience**: Periodic metadata snapshots are sharded and mirrored across dedicated playlists for full disaster recovery.
-
-### Universal Integration
-- **Virtual Disk**: Mount Nexus as a native drive (**Dolphin, Nautilus, Explorer**) via the built-in Rclone bridge.
-- **Real-time Search**: Sub-millisecond discovery across millions of shards using SQLite Full-Text Search.
-- **Branding**: Professional startup sequence with a 2-second security gate to ensure session integrity.
+Our security model assumes the backend is **hostile**. 
+- **Zero-Knowledge**: The Nexus Daemon maintains an offline Index. Filenames, folder structures, and metadata are **never** uploaded to Google.
+- **Per-Shard Entropy**: Each video shard is visually indistinguishable from random chromatic noise, preventing content-analysis or automated flagging.
+- **Manifest Miracles**: The global file index is sharded and mirrored in hidden playlists, allowing you to restore your entire drive from a fresh install using only your Google identity.
 
 ---
 
-## 🛠️ Installation & Setup
+## 🚀 Performance & Scaling
 
-### Prerequisites
-- **Go** (1.21+), **Rust** (Stable), **Node.js** (v18+)
-- **FFmpeg**: Required for signal-to-video transitions.
+| Feature | Specification | User Benefit |
+|:--- |:--- |:--- |
+| **Indexing** | SQLite FTS5 | Sub-millisecond search across TBs of data |
+| **Mounting** | Rclone FUSE | Mount as a local drive (D:, Z:, /mnt/nexus) |
+| **Sync** | Async Worker | Native background uploads without GUI lag |
+| **Safety** | Global Mutex | CGO-level thread safety for data integrity |
 
-### Quick Start
-1. Place your Google `client_secret.json` in `~/.config/nexus-storage/`.
-2. Run the unified launcher:
-   ```bash
-   chmod +x run-app.sh
-   ./run-app.sh
-   ```
+---
+
+## ⚙️ Quick Start
+
+### Build & Execution
+Nexus is cross-platform but optimized for high-performance Linux desktops.
+
+```bash
+# Clone and Initialize
+git clone https://github.com/KOUSSEMON-Aurel/Nexus-Storage.git
+cd Nexus-Storage
+
+# Launch the Unified Pipeline
+./run-app.sh
+```
+
+> [!TIP]
+> Ensure **FFmpeg** is installed in your path. It is the critical engine for video assembly.
 
 ---
 
 <div align="center">
-  <p><i>Nexus Storage: Redefining Persistence.</i></p>
+  <p><i>Developed for Absolute Persistence. Built for the Decentralized Era.</i></p>
+  <img src="https://img.shields.io/badge/Maintained%20by-Antigravity-blue?style=flat-square" alt="Antigravity" />
 </div>
