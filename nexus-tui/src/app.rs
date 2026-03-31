@@ -6,6 +6,7 @@ use crate::daemon::{AuthStatus, FileEntry, QuotaInfo, TaskEntry};
 #[derive(Debug, PartialEq)]
 pub enum AppMode {
     Normal,
+    Loading,
     CommandInput,
     SearchFilter,
     #[allow(dead_code)]
@@ -81,13 +82,17 @@ impl AppState {
             },
             current_kbps: 0.0,
             tasks: vec![],
-            mode: AppMode::Normal,
+            mode: AppMode::Loading,
             command_input: String::new(),
             command_history: vec![],
             cmd_history_idx: None,
             notification: None,
             should_quit: false,
         }
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.mode != AppMode::Loading
     }
 
     pub fn apply_event(&mut self, event: crate::daemon::DaemonEvent) {

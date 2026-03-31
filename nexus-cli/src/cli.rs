@@ -72,6 +72,13 @@ pub enum Commands {
         #[arg(short, long, help = "Local output path")]
         out: Option<String>,
     },
+    /// Explicitly synchronize local index with YouTube metadata
+    Sync,
+    /// Manage deleted files and trash retention
+    Trash {
+        #[command(subcommand)]
+        cmd: TrashCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -130,4 +137,19 @@ pub enum DaemonCommands {
     Start,
     /// Terminate daemon safely
     Stop,
+}
+
+#[derive(Subcommand)]
+pub enum TrashCommands {
+    /// Lists all files in the trash
+    List,
+    /// Permanently purge items from the trash
+    Purge {
+        #[arg(long, help = "Skip confirmation")]
+        force: bool,
+    },
+    /// Restore a file from trash back to My Drive
+    Restore {
+        id: String,
+    },
 }

@@ -59,6 +59,19 @@ impl NexusClient {
         }
     }
 
+    pub async fn get_trash_files(&self) -> Result<Vec<FileEntry>, NexusError> {
+        let res = self.client.get(format!("{}/api/trash", self.base_url))
+            .send().await
+            .map_err(|e| if e.is_connect() { NexusError::DaemonUnreachable { url: self.base_url.clone() } } else { NexusError::Http(e) })?;
+
+        if res.status() == StatusCode::OK {
+            let files = res.json::<Vec<FileEntry>>().await?;
+            Ok(files)
+        } else {
+            Err(NexusError::ApiError(res.text().await.unwrap_or_default()))
+        }
+    }
+
     pub async fn get_tasks(&self) -> Result<Vec<TaskEntry>, NexusError> {
         let res = self.client.get(format!("{}/api/tasks", self.base_url))
             .send().await
@@ -154,12 +167,29 @@ impl NexusClient {
                     Err(NexusError::ApiError(res.text().await.unwrap_or_default()))
                 }
             }
-            "/search" => {
-                 let q = args.join(" ");
-                 let _ = self.search(&q).await?;
-                 Ok(format!("Search completed"))
+            "/cloud/sync" => {
+                let res = self.client.post(format!("{}/api/cloud/sync", self.base_url)).send().await?;
+                if res.status().is_success() { Ok("Cloud Sync triggered".into()) }
+                else { Err(NexusError::ApiError(res.text().await.unwrap_or_default())) }
+            }
+            "/trash/purge" => {
+                let res = self.client.post(format!("{}/api/trash/purge", self.base_url)).send().await?;
+                if res.status().is_success() { Ok("Trash purged".into()) }
+                else { Err(NexusError::ApiError(res.text().await.unwrap_or_default())) }
             }
             _ => Err(NexusError::ApiError(format!("Unknown command: {}", cmd)))
+        }
+    }
+
+    pub async fn restore_file(&self, id: i64) -> Result<(), NexusError> {
+        let res = self.client.post(format!("{}/api/files/{}/restore", self.base_url, id))
+            .send().await
+            .map_err(|e| if e.is_connect() { NexusError::DaemonUnreachable { url: self.base_url.clone() } } else { NexusError::Http(e) })?;
+
+        if res.status().is_success() {
+            Ok(())
+        } else {
+            Err(NexusError::ApiError(res.text().await.unwrap_or_default()))
         }
     }
 

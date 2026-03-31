@@ -54,11 +54,23 @@ async fn main() -> Result<()> {
     let tx_telem = tx.clone();
     tokio::spawn(async move { daemon::telemetry_loop(tx_telem).await; });
 
+    let start_time = Instant::now();
+    let mut initialized = false;
+
     loop {
         // Drain incoming daemon events
         while let Ok(event) = rx.try_recv() {
             let mut state = app.lock().unwrap();
             state.apply_event(event);
+            initialized = true; // We've received at least one event from daemon
+        }
+
+        // Handle Mode Transition (Loading -> Normal)
+        {
+            let mut state = app.lock().unwrap();
+            if state.mode == AppMode::Loading && initialized && start_time.elapsed() > Duration::from_secs(2) {
+                state.mode = AppMode::Normal;
+            }
         }
 
         // Draw UI

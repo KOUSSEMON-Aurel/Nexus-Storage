@@ -6,7 +6,7 @@ use nexus_daemon_client::error::NexusError;
 mod cli;
 mod output;
 
-use cli::{Cli, Commands, AuthCommands, FileCommands, TaskCommands, DaemonCommands};
+use cli::{Cli, Commands, AuthCommands, FileCommands, TaskCommands, DaemonCommands, TrashCommands};
 
 #[tokio::main]
 async fn main() {
@@ -22,6 +22,8 @@ async fn main() {
         Commands::Upload { path, mode, password, no_progress } => handle_upload(&client, path, mode, password.as_deref(), *no_progress, cli.json).await,
         Commands::Mount { path } => handle_mount(&client, path, cli.json).await,
         Commands::Umount => handle_umount(&client, cli.json).await,
+        Commands::Sync => handle_sync(&client, cli.json).await,
+        Commands::Trash { cmd } => handle_trash(&client, cmd, cli.json).await,
         Commands::Studio => handle_studio(&client, cli.json).await,
         Commands::Task { cmd } => handle_task(&client, cmd, cli.json).await,
         Commands::Daemon { cmd } => handle_daemon(&client, cmd, cli.json).await,
@@ -246,6 +248,47 @@ async fn handle_daemon(_client: &NexusClient, cmd: &DaemonCommands, json: bool) 
     }
     Ok(())
 }
+async fn handle_sync(client: &NexusClient, json: bool) -> Result<(), NexusError> {
+    if !json { println!("{} Synchronisation du manifeste Cloud...", style("🔄").bold()); }
+    client.execute_command("/cloud/sync", &[]).await?;
+    if !json { println!("{} Index synchronisé avec succès.", style("✓").green()); }
+    else { println!(r#"{{"status": "ok"}}"#); }
+    Ok(())
+}
+
+async fn handle_trash(client: &NexusClient, cmd: &TrashCommands, json: bool) -> Result<(), NexusError> {
+    match cmd {
+        TrashCommands::List => {
+            let files = client.get_trash_files().await?;
+            if json {
+                output::print_json(&files);
+            } else {
+                println!("{} Fichiers dans la Corbeille :", style("🗑️").bold());
+                output::print_files(&files);
+            }
+        }
+        TrashCommands::Purge { force } => {
+            if !force && !json {
+                println!("{} Êtes-vous sûr de vouloir vider la corbeille ? [y/N]", style("⚠️").yellow());
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input).unwrap();
+                if input.trim().to_lowercase() != "y" {
+                    println!("Annulé.");
+                    return Ok(());
+                }
+            }
+            client.execute_command("/trash/purge", &[]).await?;
+            if !json { println!("{} Corbeille vidée.", style("✓").green()); }
+        }
+        TrashCommands::Restore { id } => {
+            let id_i64 = id.parse::<i64>().map_err(|_| NexusError::ApiError("L'ID doit être un nombre".into()))?;
+            client.restore_file(id_i64).await?;
+            if !json { println!("{} Fichier restauré.", style("✓").green()); }
+        }
+    }
+    Ok(())
+}
+
 async fn handle_download_shared(client: &NexusClient, token: &str, out: &Option<String>, json: bool) -> Result<(), NexusError> {
     if !json { println!("{} Démarrage du téléchargement partagé...", style("📥").bold()); }
     
