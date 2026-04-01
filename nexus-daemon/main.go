@@ -154,26 +154,6 @@ func main() {
 				}
 			}
 
-			// 6c. Auto-purge trash (default 30 days)
-			purgeDays := 30
-			if v, ok := db.GetKV("trash_purge_days"); ok {
-				fmt.Sscanf(v, "%d", &purgeDays)
-			}
-			if purgeDays > 0 {
-				log.Printf("🧹 Sweeping trash (Auto-purge older than %d days)...", purgeDays)
-				deletedVids, err := db.CleanupTrash(purgeDays)
-				if err == nil && len(deletedVids) > 0 {
-					log.Printf("🗑️  Purging %d expired cloud shards...", len(deletedVids))
-					for _, vid := range deletedVids {
-						queue.AddTask(&Task{
-							ID:        vid,
-							Type:      TaskDelete,
-							Status:    "Pending Purge",
-							CreatedAt: time.Now(),
-						})
-					}
-				}
-			}
 			log.Printf("✅ Auto-sync on startup completed.")
 		}
 	}()
@@ -182,6 +162,11 @@ func main() {
 	api := &APIServer{db: db, queue: &queue, ytManager: ytManager, pm: pm, cache: cacheMgr, syncMgr: syncMgr, dbPath: *dbPath}
 
 	go api.Start(8081)
+
+	// 8. OPTIMIZATION #4: Daily trash cleanup scheduler
+	// Instead of cleaning trash on every startup (expensive operation),
+	// schedule it to run once per day at 3:00 AM
+	go scheduleTrashCleanup(db, &queue)
 
 	// Keep alive until interrupted
 	sigChan := make(chan os.Signal, 1)
@@ -201,6 +186,54 @@ func main() {
 	}
 	
 	unmountVirtualDisk()
+}
+
+// scheduleTrashCleanup runs daily trash cleanup at 3:00 AM instead of on every startup
+// OPTIMIZATION #4: Prevents quota waste from repeated cleanup operations
+// Only executes once per day, avoiding redundant YouTube API calls
+func scheduleTrashCleanup(db *Database, queue *TaskQueue) {
+	for {
+		// Calculate next cleanup time (3:00 AM today or tomorrow)
+		now := time.Now()
+		next := time.Date(now.Year(), now.Month(), now.Day(), 3, 0, 0, 0, now.Location())
+		
+		// If 3 AM has already passed today, schedule for tomorrow
+		if now.After(next) {
+			next = next.AddDate(0, 0, 1)
+		}
+		
+		waitDuration := next.Sub(now)
+		log.Printf("⏰ Trash cleanup scheduled for %s (in %v)", next.Format("15:04:05"), waitDuration.Round(time.Second))
+		
+		// Sleep until the scheduled cleanup time
+		time.Sleep(waitDuration)
+		
+		// Execute cleanup
+		log.Printf("🧹 [SCHEDULED] Running daily trash cleanup...")
+		purgeDays := 30
+		if v, ok := db.GetKV("trash_purge_days"); ok {
+			fmt.Sscanf(v, "%d", &purgeDays)
+		}
+		
+		if purgeDays > 0 {
+			if deletedVids, err := db.CleanupTrash(purgeDays); err == nil && len(deletedVids) > 0 {
+				log.Printf("🗑️  [SCHEDULED] Queueing %d expired cloud shards for deletion...", len(deletedVids))
+				for _, vid := range deletedVids {
+					queue.AddTask(&Task{
+						ID:        vid,
+						Type:      TaskDelete,
+						Status:    "Pending Purge (Scheduled)",
+						CreatedAt: time.Now(),
+					})
+				}
+				log.Printf("✅ [SCHEDULED] Trash cleanup completed at %s", time.Now().Format("15:04:05"))
+			} else if err != nil {
+				log.Printf("❌ [SCHEDULED] Trash cleanup failed: %v", err)
+			} else {
+				log.Printf("ℹ️  [SCHEDULED] No expired trash found")
+			}
+		}
+	}
 }
 
 // ─── Universal Smart Mounting & Unmounting ────────────────────────────────────
