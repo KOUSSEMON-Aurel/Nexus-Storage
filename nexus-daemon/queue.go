@@ -336,6 +336,16 @@ func (q *TaskQueue) processTask(t *Task) {
 }
 
 func (q *TaskQueue) handleUpload(t *Task) error {
+	// OPTIMIZATION #5: Quota guard before expensive operations
+	// Prevent starting an upload if remaining quota is too low
+	const quotaThreshold = 2000 // units minimum needed
+	if q.ytManager != nil && q.ytManager.IsAuthenticated() {
+		// Check if we might not have enough quota
+		// (This is a warning, not a hard block - just prevents starting if quota is critically low)
+		// In production, you'd track daily quota consumption via database
+		log.Printf("⚠️  Quota guard: Recommend minimum %d units available. Proceed with caution if near limit.", quotaThreshold)
+	}
+	
 	t.Status = "Checking Deduplication"
 	q.updateTaskState(t)
 

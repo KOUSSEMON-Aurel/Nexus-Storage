@@ -22,12 +22,24 @@ func NewPlaylistManager(yt *YouTubeManager, db *Database, core *NexusCore) *Play
 }
 
 // EnsureBasePlaylists creates NEXUS_ROOT and NEXUS_MANIFEST if they don't exist.
+// OPTIMIZATION: Check DB cache first (0 units), only API call if IDs missing (1 unit fallback).
 func (pm *PlaylistManager) EnsureBasePlaylists() error {
 	svc := pm.yt.GetService()
 	if svc == nil {
 		return fmt.Errorf("YouTube service not available")
 	}
 
+	// Step 1: Check if cached in DB (fast, 0 units)
+	cachedRoot, hasRoot := pm.db.GetKV("playlist_root_id")
+	cachedManifest, hasManifest := pm.db.GetKV("playlist_manifest_id")
+	
+	if hasRoot && hasManifest && cachedRoot != "" && cachedManifest != "" {
+		log.Printf("✅ Playlists loaded from cache (0 units)")
+		return nil
+	}
+	
+	// Step 2: Cache miss - query API only if needed (1 unit cost)
+	log.Printf("📡 Cache miss, querying API for playlists...")
 	call := svc.Playlists.List([]string{"snippet", "id"}).Mine(true).MaxResults(50)
 	resp, err := call.Do()
 	if err != nil {
@@ -35,8 +47,8 @@ func (pm *PlaylistManager) EnsureBasePlaylists() error {
 	}
 	pm.db.LogQuotaUsage(1)
 
-	foundRoot := ""
-	foundManifest := ""
+	foundRoot := cachedRoot
+	foundManifest := cachedManifest
 
 	for _, p := range resp.Items {
 		switch p.Snippet.Title {
