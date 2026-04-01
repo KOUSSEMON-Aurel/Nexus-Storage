@@ -224,6 +224,18 @@ func (d *Database) GetFileByHash(sha256 string) (*FileRecord, error) {
 	return &f, err
 }
 
+// GetFileByVideoID retrieves a file record by its primary video ID (first shard)
+func (d *Database) GetFileByVideoID(videoID string) (*FileRecord, error) {
+	var f FileRecord
+	err := d.db.QueryRow(`
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
+		FROM files WHERE video_id = ? LIMIT 1`, videoID).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return &f, err
+}
+
 func (d *Database) SearchFiles(query string) ([]FileRecord, error) {
 	// Try FTS5 first (fast, requires -tags fts5 at build time)
 	rows, err := d.db.Query(`
@@ -751,9 +763,16 @@ func (d *Database) IntegrityCheck() error {
 }
 
 func (d *Database) Checkpoint() error {
-	// wal_checkpoint(TRUNCATE) ensures nexus.db-wal is emptied and truncated to zero bytes
-	_, err := d.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
-	return err
+	// wal_checkpoint(RESTART) = flush to disk + reset WAL log
+	// Then wal_checkpoint(TRUNCATE) = truncate WAL file to zero
+	// This is more reliable than single TRUNCATE
+	if _, err := d.db.Exec("PRAGMA wal_checkpoint(RESTART)"); err != nil {
+		return fmt.Errorf("checkpoint restart failed: %w", err)
+	}
+	if _, err := d.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+		return fmt.Errorf("checkpoint truncate failed: %w", err)
+	}
+	return nil
 }
 
 func (d *Database) GetLocalLSN() (int64, error) {

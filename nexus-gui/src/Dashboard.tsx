@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Plus, HardDrive, Shield, Clock, Star, Trash2,
   Grid3X3, List, FileText, FileImage, Archive, Lock,
   X, MoreVertical, Moon, Sun, CloudLightning, ChevronRight,
-  Upload, Minus, Square, RefreshCw, Check, Settings
+  Upload, Minus, Square, RefreshCw, Check, Settings,
+  Eye, EyeOff
 } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -1443,6 +1444,7 @@ function SecuritySection({ c }: { c: ColorSet }) {
 function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: (path: string, mode: string, password?: string, isFolder?: boolean) => void; c: ColorSet }) {
   const [mode, setMode] = useState<string>("base");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isFolder, setIsFolder] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
 
@@ -1470,7 +1472,7 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
         </button>
       </div>
       <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
-        
+
         {/* Toggle File/Folder */}
         <div style={{ display: "flex", background: c.bgApp, padding: 4, borderRadius: 12, border: `1px solid ${c.border}` }}>
            <button 
@@ -1515,15 +1517,33 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
            <p style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Custom Encryption Password (Optional)</p>
            <div style={{ position: "relative" }}>
              <Lock size={16} color={c.textSecondary} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-             <input 
-               type="password" 
+             <input
+               type={showPassword ? "text" : "password"}
                placeholder="Leave empty for automatic encryption (recommended)"
                value={password}
                onChange={(e) => setPassword(e.target.value)}
-               style={{ width: "100%", padding: "12px 12px 12px 40px", borderRadius: 10, background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
+               style={{ width: "100%", padding: "12px 40px 12px 40px", borderRadius: 10, background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
              />
-           </div>
-           
+             <button
+               type="button"
+               onClick={() => setShowPassword(!showPassword)}
+               style={{
+                 position: "absolute",
+                 right: 12,
+                 top: "50%",
+                 transform: "translateY(-50%)",
+                 background: "none",
+                 border: "none",
+                 cursor: "pointer",
+                 color: c.textSecondary,
+                 display: "flex",
+                 alignItems: "center",
+                 padding: 4
+               }}
+             >
+               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+             </button>
+           </div>           
            {/* Info text */}
            <div style={{ marginTop: 8, fontSize: 11, color: c.textSecondary }}>
              ℹ️ Encryption is automatic via your Google account. Add a custom password here only if you want extra protection for this specific file.

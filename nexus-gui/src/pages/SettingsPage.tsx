@@ -4,7 +4,10 @@ import {
   ArrowLeft, 
   Info,
   ChevronRight,
-  RefreshCw
+  RefreshCw,
+  Lock,
+  Shield,
+  Key
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -50,7 +53,7 @@ interface SettingsPageProps {
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'about'>('about');
+  const [activeTab, setActiveTab] = useState<'encryption' | 'about'>('encryption');
   const [dark, setDark] = useState(document.documentElement.classList.contains('dark'));
 
   // Listen for dark mode changes
@@ -65,6 +68,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
   const c = dark ? DARK : LIGHT;
 
   const navItems = [
+    { id: 'encryption', label: 'Encryption & Security', icon: Shield },
     { id: 'about', label: 'About Nexus', icon: Info },
   ];
 
@@ -161,6 +165,97 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
           position: "relative"
         }}>
           <AnimatePresence mode="wait">
+            {activeTab === 'encryption' && (
+              <motion.div 
+                key="encryption"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                style={{ maxWidth: 640 }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 12, background: "#34A85315", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Lock size={24} color="#34A853" />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: 20, fontWeight: 600, color: c.textPrimary, margin: 0 }}>Encryption & Security</h2>
+                    <p style={{ fontSize: 14, color: c.textSecondary, margin: "4px 0 0 0" }}>Your files protected by zero-knowledge encryption</p>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                  {/* Auto-Encryption Section */}
+                  <section style={{ background: c.bgApp, padding: 20, borderRadius: 16, border: `1px solid ${c.border}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                      <Key size={20} color="#34A853" />
+                      <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, margin: 0 }}>Auto-Encryption (Google-Based)</h3>
+                      <span style={{ fontSize: 11, background: "#34A85320", color: "#34A853", padding: "2px 8px", borderRadius: 6, fontWeight: 600, marginLeft: "auto" }}>ALWAYS ON</span>
+                    </div>
+                    <p style={{ fontSize: 14, color: c.textSecondary, lineHeight: 1.6, margin: "0 0 12px 0" }}>
+                      Your files are automatically encrypted using your permanent Google identity. No passwords to remember, no secrets to manage.
+                    </p>
+                    <div style={{ background: c.bgSurface, padding: 12, borderRadius: 10, border: `1px solid ${c.border}`, fontSize: 13, color: c.textSecondary }}>
+                      <p style={{ margin: "0 0 6px 0" }}>✅ <strong>Deterministic:</strong> Same encryption key across all devices</p>
+                      <p style={{ margin: "0 0 6px 0" }}>✅ <strong>Zero-Knowledge:</strong> No passwords stored anywhere</p>
+                      <p style={{ margin: 0 }}>✅ <strong>Instant:</strong> Works the moment you authenticate</p>
+                    </div>
+                  </section>
+
+                  {/* Custom Override Section */}
+                  <section style={{ background: c.bgApp, padding: 20, borderRadius: 16, border: `1px solid ${c.border}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                      <Shield size={20} color="#1A73E8" />
+                      <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, margin: 0 }}>Custom Password (Optional)</h3>
+                      <span style={{ fontSize: 11, background: "#1A73E820", color: "#1A73E8", padding: "2px 8px", borderRadius: 6, fontWeight: 600, marginLeft: "auto" }}>OPTIONAL</span>
+                    </div>
+                    <p style={{ fontSize: 14, color: c.textSecondary, lineHeight: 1.6, margin: "0 0 12px 0" }}>
+                      Add an extra layer of protection to individual files during upload. Works alongside automatic encryption for maximum security.
+                    </p>
+                    <div style={{ background: c.bgSurface, padding: 12, borderRadius: 10, border: `1px solid ${c.border}`, fontSize: 13, color: c.textSecondary }}>
+                      <p style={{ margin: "0 0 6px 0" }}>🔒 <strong>Per-File:</strong> Set different passwords for different files</p>
+                      <p style={{ margin: "0 0 6px 0" }}>🔓 <strong>Backward Compatible:</strong> Works with old uploads too</p>
+                      <p style={{ margin: 0 }}>⚡ <strong>Recommended:</strong> Leave empty for simplicity</p>
+                    </div>
+                  </section>
+
+                  {/* Technical Details */}
+                  <section>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, marginBottom: 12 }}>How It Works</h3>
+                    <div style={{ background: c.bgApp, padding: 16, borderRadius: 12, border: `1px solid ${c.border}`, fontSize: 13, color: c.textSecondary, lineHeight: 1.7 }}>
+                      <p style={{ margin: "0 0 12px 0" }}>
+                        <strong style={{ color: c.textPrimary }}>Your Google Account</strong> contains a permanent, unique ID called "sub". Nexus uses this ID with cryptographic key derivation (PBKDF2-SHA256) to generate your encryption key.
+                      </p>
+                      <p style={{ margin: "0 0 12px 0" }}>
+                        This means: <strong>same user = same key everywhere</strong>. You can restore your files on any device just by logging in. No recovery codes needed.
+                      </p>
+                      <p style={{ margin: 0 }}>
+                        <strong style={{ color: c.textPrimary }}>Security:</strong> Different users get different keys automatically. Your encryption is only valid for your Google account.
+                      </p>
+                    </div>
+                  </section>
+
+                  {/* FAQ */}
+                  <section>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, marginBottom: 12 }}>Frequently Asked</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {[
+                        { q: "What if I lose my Google account?", a: "Your encrypted files remain secure on YouTube, but will be inaccessible without your account." },
+                        { q: "Can someone else decrypt my files?", a: "No. Your encryption key is unique to your Google account and never shared." },
+                        { q: "Do I need to set a password?", a: "No. Auto-encryption is completely automatic. Passwords are optional for paranoid users." },
+                        { q: "Can I change my encryption key?", a: "Your key is tied to your Google account. You can't change it, but you can download and re-upload files with a custom password if needed." },
+                      ].map((item, i) => (
+                        <div key={i} style={{ padding: 12, background: c.bgSurface, borderRadius: 10, border: `1px solid ${c.border}` }}>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary, margin: "0 0 6px 0" }}>{item.q}</p>
+                          <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{item.a}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              </motion.div>
+            )}
+
             {activeTab === 'about' && (
               <motion.div 
                 key="about"

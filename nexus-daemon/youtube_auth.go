@@ -73,33 +73,6 @@ func NewYouTubeManager() *YouTubeManager {
 	config.RedirectURL = "http://localhost:8080"
 	m.config = config
 	m.TryLoadToken()
-
-	// VALIDATION: If authenticated, check scope compatibility
-	if m.authed {
-		go func() {
-			// Check 1: Verify API scope (existing check)
-			svc := m.GetService()
-			if svc == nil { return }
-			_, err := svc.Videos.List([]string{"id"}).MaxResults(1).Do()
-			if err != nil && strings.Contains(err.Error(), "insufficientPermissions") {
-				log.Printf("⚠️  OAuth Scope mismatch detected (Old Token). Forcing Re-Auth...")
-				m.mu.Lock()
-				m.authed = false
-				m.mu.Unlock()
-				os.Remove(filepath.Join(getConfigDir(), "token.json"))
-				return
-			}
-			
-			// Check 2: Verify OpenID scope (needed for auto-encryption via Google sub)
-			if m.GetGoogleSub() == "" {
-				log.Printf("⚠️  'openid' scope missing from token - auto-encryption disabled. Re-auth required.")
-				m.mu.Lock()
-				m.authed = false
-				m.mu.Unlock()
-				os.Remove(filepath.Join(getConfigDir(), "token.json"))
-			}
-		}()
-	}
 	return m
 }
 
@@ -124,12 +97,22 @@ func (m *YouTubeManager) TryLoadToken() bool {
 		log.Printf("⚠️  Drive: could not create service: %v", err)
 	}
 
-	// Extract Google sub from ID token
-	googleSub := extractGoogleSubFromToken(tok)
+	// Load Google sub from separate file (where we saved it from UserInfo API)
+	subFile := filepath.Join(getConfigDir(), "google-sub.txt")
+	subBytes, err := os.ReadFile(subFile)
+	googleSub := ""
+	if err == nil {
+		googleSub = string(subBytes)
+	}
+	
 	if googleSub != "" {
-		log.Printf("✅ Google sub extracted: %s (auto-encryption enabled)", googleSub[:8]+"...")
+		log.Printf("✅ Google sub loaded: %s (auto-encryption enabled)", googleSub[:8]+"...")
 	} else {
-		log.Printf("⚠️  Google sub not found in token. ID token may not be available (check 'openid' scope). Auto-encryption will not work.")
+		log.Printf("❌ CRITICAL ERROR: Google sub file not found!")
+		log.Printf("   Old token is incompatible. Removing token and forcing re-authentication...")
+		os.Remove(filepath.Join(getConfigDir(), "token.json"))
+		os.Remove(filepath.Join(getConfigDir(), "google-sub.txt"))
+		return false  // Token is invalid - do NOT mark as authenticated
 	}
 
 	m.mu.Lock()
@@ -422,74 +405,160 @@ func (m *YouTubeManager) StartLoginServer() error {
 				fmt.Fprintf(w, "Auth exchange failed: %v", err)
 				return
 			}
+			
+			// CRITICAL: Fetch user info with access_token to get Google 'sub' directly
+			// (oauth2-go doesn't automatically return id_token even with openid scope)
+			var googleSub string
+			resp, err := (&http.Client{}).Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + tok.AccessToken)
+			if err != nil {
+				log.Printf("❌ Failed to fetch Google userinfo: %v", err)
+			} else {
+				defer resp.Body.Close()
+				var userInfo map[string]interface{}
+				json.NewDecoder(resp.Body).Decode(&userInfo)
+				if id, ok := userInfo["id"].(string); ok {
+					googleSub = id
+					log.Printf("✅ Google sub fetched via UserInfo API: %s", id[:8]+"...")
+				}
+			}
+			
 			saveToken(filepath.Join(getConfigDir(), "token.json"), tok)
+			
+			// Save Google sub separately (oauth2-go can't serialize id_token properly)
+			if googleSub != "" {
+				os.WriteFile(filepath.Join(getConfigDir(), "google-sub.txt"), []byte(googleSub), 0600)
+			}
+			
 			m.TryLoadToken()
 
 			html := `
 			<!DOCTYPE html>
-			<html>
+			<html lang="en">
 			<head>
+				<meta charset="UTF-8">
 				<title>Nexus Storage - Authenticated</title>
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
+				<link rel="preconnect" href="https://fonts.googleapis.com">
+				<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+				<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 				<style>
-					:root { --primary: #1A73E8; --bg: #0F172A; }
+					:root { 
+						--primary: #6366f1; 
+						--success: #10b981;
+						--bg: #030712; 
+						--card: #111827;
+						--text: #f9fafb;
+						--text-muted: #9ca3af;
+					}
+					* { box-sizing: border-box; }
 					body { 
-						background: radial-gradient(circle at top right, #1E293B, #0F172A);
-						color: #F8FAFC; 
-						font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+						background: var(--bg);
+						background-image: 
+							radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+							radial-gradient(at 50% 0%, hsla(225,39%,30%,0.15) 0, transparent 50%),
+							radial-gradient(at 100% 0%, hsla(339,49%,30%,0.15) 0, transparent 50%);
+						color: var(--text); 
+						font-family: 'Inter', -apple-system, sans-serif;
 						display: flex; justify-content: center; align-items: center; 
 						height: 100vh; margin: 0; overflow: hidden;
 					}
-					.glass {
-						background: rgba(30, 41, 59, 0.7);
-						backdrop-filter: blur(12px);
-						-webkit-backdrop-filter: blur(12px);
-						padding: 48px;
-						border-radius: 32px;
-						border: 1px solid rgba(255, 255, 255, 0.1);
+					.card {
+						background: var(--card);
+						padding: 64px 48px;
+						border-radius: 40px;
+						border: 1px solid rgba(255, 255, 255, 0.05);
 						box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 						text-align: center;
-						max-width: 420px;
-						animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+						max-width: 480px;
+						width: 90%;
+						position: relative;
+						animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 					}
-					@keyframes slideUp {
-						from { opacity: 0; transform: translateY(20px) scale(0.98); }
+					@keyframes fadeIn {
+						from { opacity: 0; transform: translateY(30px) scale(0.95); }
 						to { opacity: 1; transform: translateY(0) scale(1); }
 					}
-					.icon-circle {
-						width: 80px; height: 80px;
-						background: linear-gradient(135deg, #34D399, #10B981);
-						border-radius: 24px;
+					.icon-container {
+						width: 100px; height: 100px;
+						background: rgba(16, 185, 129, 0.1);
+						border-radius: 30px;
 						display: flex; justify-content: center; align-items: center;
-						margin: 0 auto 32px;
-						box-shadow: 0 20px 40px rgba(16, 185, 129, 0.3);
-						transform: rotate(-5deg);
+						margin: 0 auto 40px;
+						position: relative;
 					}
-					.check { font-size: 40px; color: white; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
-					h1 { margin: 0 0 12px; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-					p { color: #94A3B8; font-size: 16px; line-height: 1.6; margin-bottom: 32px; font-weight: 400; }
-					.btn { 
-						background: var(--primary);
-						color: white; border: none; 
-						padding: 16px 32px; border-radius: 16px;
-						font-size: 15px; font-weight: 600; cursor: pointer;
-						transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-						box-shadow: 0 8px 16px rgba(26, 115, 232, 0.2);
-						width: 100%;
+					.icon-container::after {
+						content: '';
+						position: absolute;
+						inset: -10px;
+						border: 2px solid rgba(16, 185, 129, 0.2);
+						border-radius: 40px;
+						animation: pulse 2s infinite;
 					}
-					.btn:hover { background: #2563EB; transform: translateY(-2px); box-shadow: 0 12px 20px rgba(26, 115, 232, 0.3); }
-					.btn:active { transform: translateY(0); }
+					@keyframes pulse {
+						0% { transform: scale(1); opacity: 0.5; }
+						50% { transform: scale(1.05); opacity: 0.2; }
+						100% { transform: scale(1); opacity: 0.5; }
+					}
+					svg { width: 48px; height: 48px; color: var(--success); }
+					h1 { 
+						margin: 0 0 16px; 
+						font-size: 32px; 
+						font-weight: 800; 
+						letter-spacing: -0.025em;
+						background: linear-gradient(to bottom right, #fff, #9ca3af);
+						-webkit-background-clip: text;
+						-webkit-text-fill-color: transparent;
+					}
+					p { 
+						color: var(--text-muted); 
+						font-size: 17px; 
+						line-height: 1.6; 
+						margin-bottom: 0; 
+						font-weight: 400; 
+					}
+					.footer {
+						margin-top: 48px;
+						padding-top: 32px;
+						border-top: 1px solid rgba(255, 255, 255, 0.05);
+						font-size: 14px;
+						color: #4b5563;
+						display: flex;
+						flex-direction: column;
+						gap: 8px;
+					}
+					.loader {
+						width: 16px; height: 16px;
+						border: 2px solid rgba(255, 255, 255, 0.1);
+						border-top-color: var(--primary);
+						border-radius: 50%;
+						animation: spin 1s linear infinite;
+						display: inline-block;
+						vertical-align: middle;
+						margin-right: 8px;
+					}
+					@keyframes spin { to { transform: rotate(360deg); } }
 				</style>
 			</head>
 			<body>
-				<div class="glass">
-					<div class="icon-circle">
-						<span class="check">✓</span>
+				<div class="card">
+					<div class="icon-container">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+							<polyline points="20 6 9 17 4 12"></polyline>
+						</svg>
 					</div>
 					<h1>Nexus Linked</h1>
-					<p>Your YouTube connection is verified. Encryption keys have been synchronized securely.</p>
-					<button class="btn" onclick="window.close()">Back to Nexus</button>
+					<p>Your YouTube connection is verified. Encryption keys have been synchronized securely with your local node.</p>
+					
+					<div class="footer">
+						<span>You can safely close this window now.</span>
+						<span style="font-size: 12px; opacity: 0.7;">Redirecting to Nexus App...</span>
+					</div>
 				</div>
+				<script>
+					setTimeout(() => {
+						window.close();
+					}, 3000);
+				</script>
 			</body>
 			</html>
 			`

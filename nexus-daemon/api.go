@@ -285,10 +285,21 @@ func (s *APIServer) handleDownload(w http.ResponseWriter, r *http.Request) {
 		VideoID  string `json:"video_id"`
 		Path     string `json:"path"`
 		Password string `json:"password"`
+		SHA256   string `json:"sha256"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	// If SHA256 not provided, try to lookup from VideoID
+	sha256 := req.SHA256
+	if sha256 == "" && req.VideoID != "" {
+		fileRecord, _ := s.queue.db.GetFileByVideoID(req.VideoID)
+		if fileRecord != nil {
+			sha256 = fileRecord.SHA256
+			log.Printf("📝 Lookup SHA256 from VideoID: %s → %s", req.VideoID[:8], sha256[:8])
+		}
 	}
 
 	task := &Task{
@@ -296,6 +307,7 @@ func (s *APIServer) handleDownload(w http.ResponseWriter, r *http.Request) {
 		Type:      TaskDownload,
 		FilePath:  req.Path,
 		Password:  req.Password,
+		SHA256:    sha256,
 		Status:    "Pending",
 		CreatedAt: time.Now(),
 	}

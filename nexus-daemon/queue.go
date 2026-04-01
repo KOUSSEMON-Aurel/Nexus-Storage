@@ -758,13 +758,23 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 		shardIDs, _ = q.db.GetShardsForFile(fileRecord.ID)
 		// V3: Try to recover the per-file key
 		if fileRecord.FileKey != "" {
+			log.Printf("[%s] 🔍 Attempting to decrypt file_key (%d bytes hex)...", t.ID, len(fileRecord.FileKey))
 			encryptedKey, err := hex.DecodeString(fileRecord.FileKey)
 			if err == nil {
+				log.Printf("[%s] ✅ file_key hex decoded successfully (%d bytes)", t.ID, len(encryptedKey))
 				key, err := q.core.Decrypt(encryptedKey, encryptionSecret)
 				if err == nil {
 					rawFileKey = key
+					log.Printf("[%s] ✅ file_key decrypted successfully (%d bytes)", t.ID, len(rawFileKey))
+				} else {
+					log.Printf("[%s] ⚠️  file_key decryption FAILED: %v", t.ID, err)
+					log.Printf("[%s]    encryptionSecret first 16 chars: %s", t.ID, encryptionSecret[:16])
 				}
+			} else {
+				log.Printf("[%s] ❌ file_key hex decode failed: %v", t.ID, err)
 			}
+		} else {
+			log.Printf("[%s] ℹ️  No file_key stored in DB, will use fallback (encryptionSecret only)", t.ID)
 		}
 	}
 
@@ -851,8 +861,10 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 
 		var decrypted []byte
 		if rawFileKey != nil {
+			log.Printf("[%s] 🔐 Shard %d: Decrypting with per-file key (%d bytes)", t.ID, i+1, len(rawFileKey))
 			decrypted, err = q.core.DecryptWithKey(rawData, rawFileKey)
 		} else {
+			log.Printf("[%s] 🔐 Shard %d: Decrypting with encryptionSecret (fallback)", t.ID, i+1)
 			decrypted, err = q.core.Decrypt(rawData, encryptionSecret)
 		}
 
