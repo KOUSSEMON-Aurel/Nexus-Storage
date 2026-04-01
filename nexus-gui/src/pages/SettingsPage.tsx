@@ -8,8 +8,6 @@ import {
   Lock,
   Shield,
   Key,
-  Eye,
-  EyeOff,
   Trash2,
   Clock
 } from 'lucide-react';
@@ -57,10 +55,8 @@ interface SettingsPageProps {
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'encryption' | 'password' | 'trash' | 'about'>('encryption');
+  const [activeTab, setActiveTab] = useState<'encryption' | 'trash' | 'about'>('encryption');
   const [dark, setDark] = useState(document.documentElement.classList.contains('dark'));
-  const [showPassword, setShowPassword] = useState(false);
-  const [customPassword, setCustomPassword] = useState('');
   const [trashRetentionDays, setTrashRetentionDays] = useState(30);
 
   // Listen for dark mode changes
@@ -76,7 +72,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
 
   const navItems = [
     { id: 'encryption', label: 'Encryption & Security', icon: Shield },
-    { id: 'password', label: 'Custom Password', icon: Lock },
     { id: 'trash', label: 'Trash & Storage', icon: Trash2 },
     { id: 'about', label: 'About Nexus', icon: Info },
   ];
@@ -259,69 +254,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                           <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{item.a}</p>
                         </div>
                       ))}
-                    </div>
-                  </section>
-                </div>
-              </motion.div>
-            )}
-
-            {activeTab === 'password' && (
-              <motion.div 
-                key="password"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                style={{ maxWidth: 640 }}
-              >
-                <div style={{ padding: "20px 0" }}>
-                  <section style={{ marginBottom: 32 }}>
-                    <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
-                      <Lock size={20} /> Custom Password (Optional)
-                    </h2>
-                    <p style={{ fontSize: 14, color: c.textSecondary, marginBottom: 16 }}>
-                      By default, your files are encrypted using your Google account. You can optionally set a custom password to override this for specific files.
-                    </p>
-                    <div style={{ background: c.bgSurface, padding: 16, borderRadius: 12, border: `1px solid ${c.border}` }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase" }}>Password (if set)</label>
-                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <input 
-                          type={showPassword ? "text" : "password"}
-                          value={customPassword}
-                          onChange={(e) => setCustomPassword(e.target.value)}
-                          style={{
-                            flex: 1,
-                            padding: "10px 12px",
-                            borderRadius: 8,
-                            border: `1px solid ${c.border}`,
-                            background: c.bgApp,
-                            color: c.textPrimary,
-                            fontSize: 14,
-                            outline: "none",
-                          }}
-                          placeholder="Enter optional password..."
-                        />
-                        <button
-                          onClick={() => setShowPassword(!showPassword)}
-                          style={{
-                            padding: "8px 12px",
-                            borderRadius: 8,
-                            border: `1px solid ${c.border}`,
-                            background: "transparent",
-                            color: c.textSecondary,
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                          title={showPassword ? "Hide password" : "Show password"}
-                        >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                      <p style={{ fontSize: 12, color: c.textSecondary, marginTop: 10 }}>
-                        💡 Leave empty to use automatic encryption via your Google account (recommended).
-                      </p>
                     </div>
                   </section>
                 </div>
