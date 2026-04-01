@@ -1,6 +1,6 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/KOUSSEMON-Aurel/Nexus-Storage/main/assets/nexus-logo.png" alt="Nexus Logo" width="120" />
-  <h1>Nexus Storage v2.2</h1>
+  <h1>Nexus Storage</h1>
   <p><strong>Universal Decentralized Persistence | YouTube Refinery Architecture</strong></p>
   
   <div style="display: flex; justify-content: center; gap: 10px;">
