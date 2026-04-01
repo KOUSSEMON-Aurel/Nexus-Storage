@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Plus, HardDrive, Shield, Clock, Star, Trash2,
   Grid3X3, List, FileText, FileImage, Archive, Lock,
   X, MoreVertical, Moon, Sun, CloudLightning, ChevronRight,
-  Upload, Minus, Square, RefreshCw, Check
+  Upload, Minus, Square, RefreshCw, Check, Settings
 } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useNavigate } from "react-router-dom";
+import PasswordModal from "./components/PasswordModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +35,9 @@ interface NFile {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const API_BASE = "http://127.0.0.1:8081/api";
+
+// Persistent session state to avoid re-showing splash screen when returning from Settings
+let hasInitializedSession = false;
 
 interface BackendFile {
   ID: number;
@@ -132,13 +137,20 @@ export default function Dashboard() {
   const [dbFiles, setDbFiles] = useState<NFile[]>([]);
   const [tasks, setTasks] = useState<Record<string, BackendTask>>({});
   const [stats, setStats] = useState<Stats>({ file_count: 0, total_size: 0 });
+  const navigate = useNavigate();
   const [auth, setAuth] = useState<AuthStatus>({ authenticated: false, user: "" });
   const [quota, setQuota] = useState({ used: 0, limit: 10000, source: "local" });
   const [accountOpen, setAccountOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [isAppReady, setIsAppReady] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isAppReady, setIsAppReady] = useState(hasInitializedSession);
+  const [isInitialLoading, setIsInitialLoading] = useState(!hasInitializedSession);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [pendingPasswordOperation, setPendingPasswordOperation] = useState<{
+    title: string;
+    description: string;
+    callback: (password: string) => Promise<void>;
+  } | null>(null);
 
   const handleLogout = async () => {
     try {
@@ -249,13 +261,23 @@ export default function Dashboard() {
            setDbFiles(data.map(mapBackendToFile));
         }
 
-        // 2. Minimum delay (2s) to show the premium splash screen
+        // 2. Handle Splash Logic
+        if (hasInitializedSession) {
+          if (!unmount) {
+            setIsAppReady(true);
+            setIsInitialLoading(false);
+          }
+          return;
+        }
+
+        // Minimum delay (2s) to show the premium splash screen on first load
         const elapsed = Date.now() - startTime;
         const wait = Math.max(0, 2000 - elapsed);
         
         setTimeout(() => {
           if (!unmount) {
             setIsAppReady(true);
+            hasInitializedSession = true; // Mark as initialized for the rest of the session
             // Show skeletons for another 800ms while UI transitions
             setTimeout(() => { if (!unmount) setIsInitialLoading(false); }, 800);
           }
@@ -352,21 +374,37 @@ export default function Dashboard() {
   const handleUploadClick = async (path: string, mode: string, password?: string, isFolder?: boolean) => {
     try {
       if (path) {
+        // Security check: ensure encryption secret exists
+        const hasMasterPassword = localStorage.getItem('nexus_master_password') !== null;
+        if (!password && !hasMasterPassword) {
+          showToast("❌ No encryption password provided. Please enter one or set a master password in Settings.", "error");
+          return;
+        }
+
         setUploadOpen(false);
         showToast(isFolder ? "Archiving & starting upload..." : "Starting upload...", "info");
+        
+        // Use provided password or fallback to master password
+        const finalPassword = password || localStorage.getItem('nexus_master_password') || "";
+        
         const res = await fetch(`${API_BASE}/upload`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             path, 
             mode, 
-            password 
+            password: finalPassword
           })
         });
         if (res.ok) {
           showToast("Upload task added to queue.", "success");
         } else {
-          showToast(`Error: ${await res.text()}`, "error");
+          const errorText = await res.text();
+          if (errorText.includes("no encryption secret available")) {
+            showToast("❌ Encryption setup required. Go to Settings > Security & Password to set a master password.", "error");
+          } else {
+            showToast(`Error: ${errorText}`, "error");
+          }
         }
       }
     } catch (err: any) {
@@ -475,12 +513,32 @@ export default function Dashboard() {
           zIndex: 50,
         }}
       >
-        {/* Logo - 256px to match sidebar */}
-        <div style={{ width: 256, display: "flex", alignItems: "center", gap: 10, flexShrink: 0, pointerEvents: "none", userSelect: "none" }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <CloudLightning size={22} color="white" />
+        {/* Logo - 256px to match sidebar. Settings gear placed right of logo for quick access */}
+        <div style={{ width: 256, display: "flex", alignItems: "center", gap: 10, flexShrink: 0, userSelect: "none" }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: 'none' }}>
+              <CloudLightning size={22} color="white" />
+            </div>
+            <span style={{ fontSize: 22, fontWeight: 400, color: c.textPrimary, letterSpacing: -0.3, pointerEvents: 'none' }}>Nexus</span>
           </div>
-          <span style={{ fontSize: 22, fontWeight: 400, color: c.textPrimary, letterSpacing: -0.3 }}>Nexus</span>
+          <button
+            onClick={() => navigate('/settings')}
+            title="Settings"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: c.textPrimary
+            }}
+          >
+            <Settings size={18} />
+          </button>
         </div>
 
         {/* Search - FTS5 Optimized */}
@@ -930,6 +988,15 @@ export default function Dashboard() {
                 {auth.authenticated && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
                     <button 
+                      onClick={() => {
+                        navigate('/settings');
+                        setAccountOpen(false);
+                      }}
+                      style={{ padding: "8px", borderRadius: 8, background: "#667eea20", border: `1px solid #667eea40`, color: "#667eea", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                    >
+                      <Settings size={16} /> Settings
+                    </button>
+                    <button 
                       onClick={handleSyncManifest}
                       style={{ padding: "8px", borderRadius: 8, background: "#1A73E820", border: `1px solid #1A73E840`, color: "#1A73E8", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                     >
@@ -964,6 +1031,24 @@ export default function Dashboard() {
           </>
         )}
       </AnimatePresence>
+
+      {/* ━━━━ PASSWORD MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <PasswordModal
+        isOpen={passwordModalOpen}
+        onClose={() => {
+          setPasswordModalOpen(false);
+          setPendingPasswordOperation(null);
+        }}
+        onSubmit={async (password: string) => {
+          if (pendingPasswordOperation) {
+            await pendingPasswordOperation.callback(password);
+          }
+        }}
+        title={pendingPasswordOperation?.title || "Enter Master Password"}
+        description={pendingPasswordOperation?.description || "This operation requires your master password."}
+        dark={dark}
+        c={c}
+      />
 
       {/* ━━━━ TOAST ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <AnimatePresence>
@@ -1440,19 +1525,54 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
           </div>
         </div>
 
-        {/* Password */}
+        {/* Custom Encryption Password */}
         <div>
-           <p style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Privacy (Optional)</p>
-           <div style={{ position: "relative" }}>
-             <Lock size={16} color={c.textSecondary} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-             <input 
-               type="password" 
-               placeholder="Encryption bypass password..."
-               value={password}
-               onChange={(e) => setPassword(e.target.value)}
-               style={{ width: "100%", padding: "12px 12px 12px 40px", borderRadius: 10, background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
-             />
-           </div>
+           {(() => {
+             const hasMasterPassword = localStorage.getItem('nexus_master_password') !== null;
+             return (
+               <>
+                 <p style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Custom Encryption Password (Optional)</p>
+                 <div style={{ position: "relative" }}>
+                   <Lock size={16} color={c.textSecondary} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+                   <input 
+                     type="password" 
+                     placeholder={hasMasterPassword ? "Leave empty to use master password" : "Required: Set master password first or enter here"}
+                     value={password}
+                     onChange={(e) => setPassword(e.target.value)}
+                     style={{ width: "100%", padding: "12px 12px 12px 40px", borderRadius: 10, background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
+                   />
+                 </div>
+                 
+                 {/* Status indicator */}
+                 <div style={{ marginTop: 8, fontSize: 11, color: hasMasterPassword ? "#4CAF50" : "#FF9800" }}>
+                   {hasMasterPassword ? "✅ Master password is set (will be used if custom password is empty)" : "⚠️ No master password set — enter one below or set it in Settings"}
+                 </div>
+
+                 {!hasMasterPassword && (
+                   <button
+                     onClick={() => window.location.href = '/settings'}
+                     style={{
+                       marginTop: 12,
+                       padding: "8px 12px",
+                       fontSize: 12,
+                       background: "#1A73E8",
+                       color: "white",
+                       border: "none",
+                       borderRadius: 6,
+                       cursor: "pointer",
+                       transition: "all 0.15s",
+                       width: "100%",
+                       fontWeight: 500
+                     }}
+                     onMouseOver={(e) => (e.currentTarget.style.background = "#1565C0")}
+                     onMouseOut={(e) => (e.currentTarget.style.background = "#1A73E8")}
+                   >
+                     🔒 Go to Settings to Set Master Password
+                   </button>
+                 )}
+               </>
+             );
+           })()}
         </div>
 
         {/* Mode */}

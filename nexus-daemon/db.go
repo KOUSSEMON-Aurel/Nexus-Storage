@@ -172,6 +172,31 @@ func (d *Database) Init(dbPath string) error {
 		ALTER TABLE recovery_state ADD COLUMN recovery_packet_drive_id TEXT;
 	`) // Safe: migration checks if column exists before adding
 
+	runMigrate("create_tombstones", `CREATE TABLE IF NOT EXISTS tombstones (
+		file_hash TEXT PRIMARY KEY,
+		deleted_at_lsn INTEGER,
+		deleted_at_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`)
+
+	runMigrate("create_pending_sync", `CREATE TABLE IF NOT EXISTS pending_sync (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		file_path TEXT,
+		lsn INTEGER,
+		status TEXT DEFAULT 'pending',
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`)
+
+	// Initialize kv_store with default values if they don't exist
+	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('manifest_version', '0')`)
+	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('last_push_lsn', '0')`)
+	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('last_push_hash', '')`)
+
+	// Add trigger for tombstones on permanent delete
+	d.db.Exec(`CREATE TRIGGER IF NOT EXISTS files_tombstone AFTER DELETE ON files
+		BEGIN
+			INSERT OR REPLACE INTO tombstones (file_hash, deleted_at_lsn, deleted_at_ts)
+			VALUES (old.sha256, (SELECT value FROM kv_store WHERE key = 'manifest_version'), CURRENT_TIMESTAMP);
+		END;`)
 
 	// Final check: if files_fts is empty but files has data, rebuild it
 	var count int
@@ -483,6 +508,8 @@ func (d *Database) SaveFileWithKey(path, videoID string, size int64, hash, key s
 	if _, err := d.db.Exec(query, path, videoID, size, hash, key, parentID, sha256, fileKey, isArchive); err != nil {
 		return fmt.Errorf("could not save file: %w", err)
 	}
+	d.IncrementLSN()
+	d.AddPendingSync(path)
 	if d.OnConfigChange != nil {
 		d.OnConfigChange()
 	}
@@ -678,6 +705,7 @@ func (d *Database) SoftDelete(id int64) error {
 	defer d.mu.Unlock()
 	_, err := d.db.Exec(
 		`UPDATE files SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
+	d.IncrementLSN()
 	if err == nil && d.OnConfigChange != nil {
 		d.OnConfigChange()
 	}
@@ -689,6 +717,7 @@ func (d *Database) Restore(id int64) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	_, err := d.db.Exec(`UPDATE files SET deleted_at = NULL WHERE id = ?`, id)
+	d.IncrementLSN()
 	if err == nil && d.OnConfigChange != nil {
 		d.OnConfigChange()
 	}
@@ -700,10 +729,86 @@ func (d *Database) PermanentDelete(id int64) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	_, err := d.db.Exec(`DELETE FROM files WHERE id = ?`, id)
+	d.IncrementLSN()
 	if err == nil && d.OnConfigChange != nil {
 		d.OnConfigChange()
 	}
 	return err
+}
+
+// ─── Sync Support ─────────────────────────────────────────────────────────────
+
+func (d *Database) IntegrityCheck() error {
+	var res string
+	err := d.db.QueryRow("PRAGMA integrity_check").Scan(&res)
+	if err != nil {
+		return err
+	}
+	if res != "ok" {
+		return fmt.Errorf("SQLite integrity check failed: %s", res)
+	}
+	return nil
+}
+
+func (d *Database) Checkpoint() error {
+	// wal_checkpoint(TRUNCATE) ensures nexus.db-wal is emptied and truncated to zero bytes
+	_, err := d.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+	return err
+}
+
+func (d *Database) GetLocalLSN() (int64, error) {
+	val, ok := d.GetKV("manifest_version")
+	if !ok {
+		return 0, nil
+	}
+	var lsn int64
+	fmt.Sscanf(val, "%d", &lsn)
+	return lsn, nil
+}
+
+func (d *Database) IncrementLSN() (int64, error) {
+	lsn, _ := d.GetLocalLSN()
+	lsn++
+	err := d.SetKV("manifest_version", fmt.Sprintf("%d", lsn))
+	return lsn, err
+}
+
+func (d *Database) GetLastPushInfo() (int64, string, error) {
+	lsnVal, _ := d.GetKV("last_push_lsn")
+	hashVal, _ := d.GetKV("last_push_hash")
+	var lsn int64
+	fmt.Sscanf(lsnVal, "%d", &lsn)
+	return lsn, hashVal, nil
+}
+
+func (d *Database) UpdatePushStatus(lsn int64, hash string) error {
+	if err := d.SetKV("last_push_lsn", fmt.Sprintf("%d", lsn)); err != nil {
+		return err
+	}
+	return d.SetKV("last_push_hash", hash)
+}
+
+func (d *Database) GetTotalFileCount() (int64, error) {
+	var count int64
+	err := d.db.QueryRow("SELECT COUNT(*) FROM files").Scan(&count)
+	return count, err
+}
+
+func (d *Database) ClearPendingSync() error {
+	_, err := d.db.Exec("DELETE FROM pending_sync")
+	return err
+}
+
+func (d *Database) AddPendingSync(path string) error {
+	lsn, _ := d.GetLocalLSN()
+	_, err := d.db.Exec("INSERT INTO pending_sync (file_path, lsn) VALUES (?, ?)", path, lsn)
+	return err
+}
+
+func (d *Database) HasFailedSyncs() (bool, error) {
+	var count int
+	err := d.db.QueryRow("SELECT COUNT(*) FROM pending_sync WHERE status = 'failed'").Scan(&count)
+	return count > 0, err
 }
 
 // CleanupTrash removes files that have been in trash longer than 'days'.

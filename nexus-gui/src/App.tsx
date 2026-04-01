@@ -3,15 +3,14 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import LoginPage from './pages/LoginPage';
 import RecoveryPage from './pages/RecoveryPage';
 import Dashboard from './Dashboard';
+import SettingsPage from './pages/SettingsPage';
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if recovery salt exists in localStorage (indicates user has set up)
-    const recoverySalt = localStorage.getItem('nexus_recovery_salt');
-    setIsAuthenticated(!!recoverySalt);
+    // App always starts authenticated - password managed via Settings
+    // No initial setup page on startup
     setIsLoading(false);
   }, []);
 
@@ -54,16 +53,20 @@ const App: React.FC = () => {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/recovery" element={<RecoveryPage />} />
 
-        {/* Protected Dashboard Route */}
+        {/* Default Dashboard Route - go directly to dashboard */}
         <Route
           path="/dashboard"
-          element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />}
+          element={<Dashboard />}
+        />
+        <Route
+          path="/settings"
+          element={<SettingsPage />}
         />
 
-        {/* Default Route - redirect based on auth status */}
+        {/* Default Route - redirect to dashboard */}
         <Route
           path="/"
-          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />}
+          element={<Navigate to="/dashboard" replace />}
         />
 
         {/* Catch all - redirect to home */}

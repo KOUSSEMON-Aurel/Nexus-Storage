@@ -49,9 +49,14 @@ type TaskQueue struct {
 	manifestTimer *time.Timer
 	pm            *PlaylistManager
 	cache         *CacheManager
+	syncMgr       *SyncManager
 	// V4 Security: Master key (RAM-only, never persisted)
 	masterKeyHex  string
 	masterKeyMu   sync.RWMutex
+}
+
+func (q *TaskQueue) SetSyncManager(sm *SyncManager) {
+	q.syncMgr = sm
 }
 
 func ensureYtDlp() {
@@ -607,27 +612,21 @@ func (q *TaskQueue) RequestManifestBackup() {
 }
 
 func (q *TaskQueue) QueueManifestBackup() {
+	if q.syncMgr == nil {
+		log.Printf("⚠️  Manifest Backup skipped: SyncManager not initialized")
+		return
+	}
+
 	if q.ytManager == nil || !q.ytManager.IsAuthenticated() {
 		return
 	}
 
-	// CRITICAL: Force SQLite to flush all WAL changes to the main nexus.db file
-	// before we upload it, otherwise the uploaded DB might be empty!
-	if q.db != nil && q.db.db != nil {
-		q.db.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+	// Use strict Push logic
+	if err := q.syncMgr.PushDBToDrive(); err != nil {
+		log.Printf("⚠️  Manifest Backup failed: %v", err)
+	} else {
+		log.Printf("✅ Manifest Backup completed.")
 	}
-
-	dbPath := filepath.Join(getConfigDir(), "nexus.db")
-	t := &Task{
-		ID:         fmt.Sprintf("manifest-%d", time.Now().UnixNano()),
-		Type:       TaskUpload,
-		FilePath:   dbPath,
-		Mode:       "tank",
-		IsManifest: true,
-		Status:     "Pending Manifest",
-		CreatedAt:  time.Now(),
-	}
-	q.AddTask(t)
 }
 
 func (q *TaskQueue) SweepOldManifests(newId string) {

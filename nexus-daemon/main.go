@@ -95,6 +95,10 @@ func main() {
 	pm := NewPlaylistManager(ytManager, db, core)
 	queue.Init(core, db, ytManager, pm, cacheMgr)
 
+	// 6a. Initialize Sync Manager
+	syncMgr := NewSyncManager(db, ytManager, pm, *dbPath)
+	queue.SetSyncManager(syncMgr)
+
 	// 6b. Auto-sync cloud manifest 10s after auth
 	go func() {
 		time.Sleep(5 * time.Second)
@@ -103,6 +107,53 @@ func main() {
 				log.Printf("⚠️  Playlist Manager: %v", err)
 			}
 			time.Sleep(5 * time.Second) // extra delay so playlists are ready
+			
+			// FULL STARTUP MATRIX
+			log.Printf("🔍 Running startup DB state matrix...")
+			
+			// 1. Check for WAL and Checkpoint if needed
+			walPath := (*dbPath) + "-wal"
+			if info, err := os.Stat(walPath); err == nil && info.Size() > 0 {
+				log.Printf("🧹 Found non-empty WAL, checkpointing...")
+				db.Checkpoint()
+			}
+
+			// 2. Integrity Check
+			integrityErr := db.IntegrityCheck()
+			localLSN, _ := db.GetLocalLSN()
+			remoteManifest, _ := syncMgr.GetRemoteManifest()
+
+			if integrityErr != nil {
+				log.Printf("❌ DB CORRUPTION DETECTED: %v", integrityErr)
+				// Quarantaine
+				corruptPath := (*dbPath) + ".corrupt"
+				os.Rename(*dbPath, corruptPath)
+				log.Printf("📁 Corrupted DB moved to %s", corruptPath)
+
+				if remoteManifest != nil {
+					log.Printf("📥 Remote backup found, attempting recovery pull...")
+					if err := syncMgr.PullDBFromDrive(true); err != nil {
+						log.Printf("❌ Recovery pull failed: %v", err)
+					}
+				} else {
+					log.Printf("⚠️ No remote backup found. Starting with fresh DB.")
+					db.Init(*dbPath)
+				}
+			} else if localLSN == 0 {
+				log.Printf("📥 Local DB is empty, checking for cloud backup...")
+				if remoteManifest != nil {
+					if err := syncMgr.PullDBFromDrive(false); err != nil {
+						log.Printf("ℹ️ Initial pull skipped: %v", err)
+					}
+				}
+			} else {
+				log.Printf("✅ Local DB is healthy (LSN %d)", localLSN)
+				if remoteManifest != nil && remoteManifest.LSN > localLSN {
+					log.Printf("📥 Remote DB is newer (Remote: %d), Pulling...", remoteManifest.LSN)
+					syncMgr.PullDBFromDrive(false)
+				}
+			}
+
 			// 6c. Auto-purge trash (default 30 days)
 			purgeDays := 30
 			if v, ok := db.GetKV("trash_purge_days"); ok {
@@ -128,7 +179,7 @@ func main() {
 	}()
 
 	// 7. Start API & Internal VFS Server for GUI
-	api := &APIServer{db: db, queue: &queue, ytManager: ytManager, pm: pm, cache: cacheMgr}
+	api := &APIServer{db: db, queue: &queue, ytManager: ytManager, pm: pm, cache: cacheMgr, syncMgr: syncMgr, dbPath: *dbPath}
 
 	go api.Start(8081)
 
@@ -141,12 +192,13 @@ func main() {
 
 	fmt.Println("\n👋 Shutting down NexusStorage...")
 	
-	// Final Sync before exit
-	log.Println("🔄 Performing final manifest backup...")
-	queue.QueueManifestBackup()
-	
-	// Wait a bit for the backup task to start/finish if it's the only one
-	time.Sleep(2 * time.Second)
+	// Final Sync before exit: Use strict Push logic
+	log.Println("🔄 Performing strict final DB backup to Drive...")
+	if err := syncMgr.PushDBToDrive(); err != nil {
+		log.Printf("⚠️  Final backup failed: %v", err)
+	} else {
+		log.Printf("✅ Final backup completed.")
+	}
 	
 	unmountVirtualDisk()
 }

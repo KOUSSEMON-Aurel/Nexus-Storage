@@ -20,6 +20,8 @@ type APIServer struct {
 	ytManager      *YouTubeManager
 	pm             *PlaylistManager
 	cache          *CacheManager
+	syncMgr        *SyncManager
+	dbPath         string
 	syncMu         sync.Mutex
 	syncInProgress bool
 	// Quota cache to avoid spamming Google Cloud Monitoring API
@@ -778,14 +780,53 @@ func (s *APIServer) handleCloudSync(w http.ResponseWriter, r *http.Request) {
 		s.syncMu.Unlock()
 	}()
 
-	log.Printf("🔄 Manual cloud sync requested via API...")
-	if err := s.pm.DownloadLatestManifest(); err != nil {
+	var req struct {
+		Action string `json:"action"` // "pull", "push", "auto"
+		Force  bool   `json:"force"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	if req.Action == "" {
+		req.Action = "auto"
+	}
+
+	log.Printf("🔄 Manual cloud sync requested via API (action: %s)...", req.Action)
+	
+	var err error
+	switch req.Action {
+	case "pull":
+		err = s.syncMgr.PullDBFromDrive(req.Force)
+	case "push":
+		err = s.syncMgr.PushDBToDrive()
+	case "auto":
+		// Auto logic: Pull if remote is newer, otherwise Push
+		remote, rErr := s.syncMgr.GetRemoteManifest()
+		if rErr != nil {
+			err = rErr
+		} else if remote == nil {
+			err = s.syncMgr.PushDBToDrive()
+		} else {
+			localLSN, _ := s.db.GetLocalLSN()
+			if remote.LSN > localLSN {
+				err = s.syncMgr.PullDBFromDrive(false)
+			} else if localLSN > remote.LSN {
+				err = s.syncMgr.PushDBToDrive()
+			} else {
+				log.Printf("✅ DB already in sync (LSN %d)", localLSN)
+			}
+		}
+	default:
+		err = fmt.Errorf("invalid action: %s", req.Action)
+	}
+
+	if err != nil {
 		log.Printf("❌ Cloud sync failed: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	
 	log.Printf("✅ Manual cloud sync completed.")
-	jsonOK(w, map[string]any{"status": "ok", "message": "Manifest sync completed"})
+	jsonOK(w, map[string]any{"status": "ok", "message": "Cloud sync completed successfully"})
 }
 
 func (s *APIServer) handleQuotaLimit(w http.ResponseWriter, r *http.Request) {

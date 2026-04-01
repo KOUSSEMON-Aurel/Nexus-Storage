@@ -34,3 +34,7 @@ nexus-gui/src-tauri/bin/nexus.db
 *.pem
 .env
 client_secret.json
+
+# Documentation (audit & internal notes)
+*.md
+!README.md
