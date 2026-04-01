@@ -445,8 +445,10 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		return nil
 	}
 
-	// Shard size = 1GB (1024 * 1024 * 1024 bytes)
-	const shardSize = 1024 * 1024 * 1024
+	// Shard size = 2GB (1024 * 1024 * 1024 * 2 bytes) - OPTIMIZATION #5
+	// Larger shards = fewer YouTube API calls = lower quota consumption
+	// Example: 100GB file now needs 50 uploads instead of 100 (saves 600+ units per upload)
+	const shardSize = 2 * 1024 * 1024 * 1024
 	numShards := int((totalSize + shardSize - 1) / shardSize)
 	if numShards == 0 {
 		numShards = 1 // Handle empty files
