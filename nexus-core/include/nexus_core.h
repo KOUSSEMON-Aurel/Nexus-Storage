@@ -142,6 +142,30 @@ int32_t nexus_decrypt_with_key(
     size_t* out_len
 );
 
+/**
+ * (V4 Security) Generate a cryptographically random 16-byte recovery salt for Argon2.
+ * out_ptr will point to a buffer that must be freed with nexus_free_bytes.
+ */
+int32_t nexus_generate_recovery_salt(uint8_t** out_ptr, size_t* out_len);
+
+/**
+ * (V4 Security) Derive a 32-byte master key using Argon2id.
+ * password_ptr: null-terminated C string
+ * password_len: byte length (for validation)
+ * salt_ptr: must point to exactly 16 bytes
+ * salt_len: must be 16
+ * out_ptr will point to a buffer that must be freed with nexus_free_bytes.
+ * Returns 0 on success, negative error code otherwise.
+ */
+int32_t nexus_derive_master_key(
+    const char* password_ptr,
+    size_t password_len,
+    const uint8_t* salt_ptr,
+    size_t salt_len,
+    uint8_t** out_ptr,
+    size_t* out_len
+);
+
 #ifdef __cplusplus
 }
 #endif

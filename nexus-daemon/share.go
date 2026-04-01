@@ -74,11 +74,23 @@ func parseShareToken(token string) (videoID string, fileKey []byte, err error) {
 
 // handleShare is called from handleFileByID when action == "share".
 // POST /api/files/{id}/share
+// Body (optional): { "master_key_hex": "..." }
 // On first call:  generates a per-file key, stores it encrypted with master, returns link.
 // On repeat call: returns the existing link (idempotent).
-func (s *APIServer) handleShare(w http.ResponseWriter, _ *http.Request, fileID int64) {
+func (s *APIServer) handleShare(w http.ResponseWriter, r *http.Request, fileID int64) {
 	nc := &NexusCore{}
-	const masterSecret = "default-secret" // same as upload path
+	
+	// Get masterKey from request or session
+	var req struct {
+		MasterKeyHex string `json:"master_key_hex"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	
+	masterSecret := req.MasterKeyHex
+	if masterSecret == "" {
+		httpError(w, fmt.Errorf("missing master_key_hex in request body"), http.StatusBadRequest)
+		return
+	}
 
 	// Fetch the stored file_key (may be empty first time)
 	storedKeyHex, err := s.db.GetFileKey(fileID)
@@ -105,7 +117,7 @@ func (s *APIServer) handleShare(w http.ResponseWriter, _ *http.Request, fileID i
 		}
 		rawFileKey = rawKey
 
-		// Encrypt the file key with master secret so it's safe at rest
+		// Encrypt the file key with master secret (V4: now password-derived)
 		encryptedKey, err := nc.Encrypt(rawFileKey, masterSecret)
 		if err != nil {
 			httpError(w, err, http.StatusInternalServerError)

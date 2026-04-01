@@ -79,6 +79,11 @@ pub enum Commands {
         #[command(subcommand)]
         cmd: TrashCommands,
     },
+    /// Data recovery and backup management (V4)
+    Recovery {
+        #[command(subcommand)]
+        cmd: RecoveryCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -87,6 +92,17 @@ pub enum AuthCommands {
     Login,
     /// Displays currently linked YouTube channel status
     Status,
+    /// Start V4 session with password (derives master key)
+    SessionStart {
+        #[arg(long, help = "User password")]
+        password: String,
+        #[arg(long, help = "Recovery salt (hex) - stored locally during setup")]
+        salt: Option<String>,
+    },
+    /// End current V4 session (clear server-side master key)
+    SessionEnd,
+    /// Logout completely
+    Logout,
 }
 
 #[derive(Subcommand)]
@@ -151,5 +167,19 @@ pub enum TrashCommands {
     /// Restore a file from trash back to My Drive
     Restore {
         id: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum RecoveryCommands {
+    /// Backup encrypted database to Google Drive
+    Backup {
+        #[arg(long, help = "Master key (hex format) - from session")]
+        master_key: String,
+    },
+    /// Restore encrypted database from Google Drive
+    Restore {
+        #[arg(long, help = "Master key (hex format) - from session")]
+        master_key: String,
     },
 }

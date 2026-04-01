@@ -4,6 +4,8 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+mod commands;
+
 use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 
@@ -55,7 +57,15 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            commands::crypto::generate_recovery_salt,
+            commands::crypto::derive_master_key,
+            commands::session::tauri_session_start,
+            commands::session::tauri_session_end,
+            commands::session::tauri_recovery_restore,
+            commands::session::tauri_recovery_backup,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

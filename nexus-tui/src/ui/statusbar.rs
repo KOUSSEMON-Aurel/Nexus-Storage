@@ -16,6 +16,8 @@ pub fn draw(f: &mut Frame, area: Rect, app: &AppState) {
         AppMode::Confirm(_) => "  [y] confirmer  [n] annuler  ",
         AppMode::Help => "  [Esc] fermer  ",
         AppMode::Loading => "  Initialisation sécurisée...  ",
+        AppMode::Authentication => "  [↑↓] nav  [Enter] login/recover  [Esc] quit  ",
+        AppMode::RecoveryMode => "  [↑↓] nav  [Enter] restore  [Esc] quit  ",
     };
 
     let p = Paragraph::new(Span::styled(mode_str, Style::default().fg(SURFACE).bg(MUTED)))

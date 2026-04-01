@@ -307,3 +307,62 @@ pub unsafe extern "C" fn nexus_decrypt_with_key(
         Err(_) => NEXUS_ERR_CRYPTO,
     }
 }
+
+// --------------------------
+//  Key Derivation (Argon2)
+// --------------------------
+
+/// Generate a cryptographically random 16-byte recovery salt.
+/// Caller must free the result with nexus_free_bytes.
+#[no_mangle]
+pub unsafe extern "C" fn nexus_generate_recovery_salt(
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if out_ptr.is_null() || out_len.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let salt = crate::kdf::generate_recovery_salt();
+    unsafe { alloc_bytes(salt.to_vec(), out_ptr, out_len) }
+}
+
+/// Derive a 32-byte master key from password + salt using Argon2id.
+/// 
+/// # Parameters
+/// - password_ptr: null-terminated C string
+/// - password_len: byte length (not including null terminator, for validation)
+/// - salt_ptr: 16-byte salt
+/// - salt_len: must be 16
+/// - out_ptr: pointer to store result
+/// - out_len: pointer to store result length (32)
+/// 
+/// # Returns
+/// 0 = NEXUS_OK, otherwise error code
+#[no_mangle]
+pub unsafe extern "C" fn nexus_derive_master_key(
+    password_ptr: *const c_char,
+    _password_len: usize,
+    salt_ptr: *const c_uchar,
+    salt_len: usize,
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if password_ptr.is_null() || salt_ptr.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+
+    // Read password as C string
+    let password = match unsafe { CStr::from_ptr(password_ptr) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return NEXUS_ERR_CRYPTO,
+    };
+
+    // Read salt bytes
+    let salt = unsafe { slice::from_raw_parts(salt_ptr, salt_len) };
+
+    // Derive key
+    match crate::kdf::derive_master_key(password, salt) {
+        Ok(key) => unsafe { alloc_bytes(key.to_vec(), out_ptr, out_len) },
+        Err(_) => NEXUS_ERR_CRYPTO,
+    }
+}

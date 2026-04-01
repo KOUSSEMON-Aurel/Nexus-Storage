@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -52,6 +53,14 @@ func (s *APIServer) Start(port int) {
 	mux.HandleFunc("/api/auth/status", s.handleAuthStatus)
 	mux.HandleFunc("/api/auth/login", s.handleAuthLogin)
 	mux.HandleFunc("/api/auth/logout", s.handleAuthLogout)
+	// V4 Security
+	mux.HandleFunc("/api/auth/session-start", s.handleSessionStart)
+	mux.HandleFunc("/api/auth/session-end", s.handleSessionEnd)
+	mux.HandleFunc("/api/auth/password-change", s.handlePasswordChange)
+	// V4 Recovery
+	mux.HandleFunc("/api/recovery/backup", s.handleRecoveryBackup)
+	mux.HandleFunc("/api/recovery/restore", s.handleRecoveryRestore)
+	
 	mux.HandleFunc("/api/quota", s.handleQuota)
 	mux.HandleFunc("/api/quota/live", s.handleQuotaLiveToggle)
 	mux.HandleFunc("/api/quota/limit", s.handleQuotaLimit)
@@ -466,6 +475,193 @@ func (s *APIServer) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	s.ytManager.Logout()
 	jsonOK(w, map[string]any{"status": "logged_out"})
+}
+
+// ─── V4 Security: Session Management ──────────────────────────────────────────
+
+// POST /api/auth/session-start
+// Body: { "master_key_hex": "..." }
+// Stores masterKey in RAM (TaskQueue), valid until logout/shutdown
+func (s *APIServer) handleSessionStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		MasterKeyHex string `json:"master_key_hex"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, fmt.Errorf("invalid request: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	if len(req.MasterKeyHex) != 64 { // 32 bytes * 2 hex chars
+		httpError(w, fmt.Errorf("invalid master_key_hex: expected 64 hex characters, got %d", len(req.MasterKeyHex)), http.StatusBadRequest)
+		return
+	}
+
+	// Validate it's valid hex
+	if _, err := hex.DecodeString(req.MasterKeyHex); err != nil {
+		httpError(w, fmt.Errorf("master_key_hex is not valid hex: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Store in queue (RAM-only)
+	s.queue.SetMasterKeyHex(req.MasterKeyHex)
+
+	jsonOK(w, map[string]any{
+		"status": "session_active",
+		"message": "Master key loaded into session. Valid until logout.",
+	})
+}
+
+// POST /api/auth/session-end
+// Clears masterKey from RAM
+func (s *APIServer) handleSessionEnd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	s.queue.ClearMasterKeyHex()
+
+	jsonOK(w, map[string]any{
+		"status": "session_ended",
+		"message": "Master key cleared from memory.",
+	})
+}
+
+// POST /api/auth/password-change
+// V4.1: Change password and re-encrypt all file_keys
+// Body: { "old_password": "...", "new_password": "..." }
+// Returns: { "status": "success", "files_rotated": N, "new_revision": N }
+func (s *APIServer) handlePasswordChange(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, fmt.Errorf("invalid request: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Validate inputs
+	if req.OldPassword == "" {
+		httpError(w, fmt.Errorf("old_password required"), http.StatusBadRequest)
+		return
+	}
+	if req.NewPassword == "" {
+		httpError(w, fmt.Errorf("new_password required"), http.StatusBadRequest)
+		return
+	}
+	if req.OldPassword == req.NewPassword {
+		httpError(w, fmt.Errorf("new password must differ from old password"), http.StatusBadRequest)
+		return
+	}
+
+	// Perform password rotation
+	count, newRev, err := s.queue.RotatePassword(req.OldPassword, req.NewPassword)
+	if err != nil {
+		httpError(w, fmt.Errorf("password rotation failed: %w", err), http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, map[string]any{
+		"status": "success",
+		"files_rotated": count,
+		"new_revision": newRev,
+		"message": fmt.Sprintf("✅ Password changed successfully. %d files re-encrypted. Manifest backed up.", count),
+	})
+}
+
+// ─── V4 Recovery: Manifest Backup/Restore ────────────────────────────────────
+
+// POST /api/recovery/backup
+// Triggers immediate backup of encrypted manifest to Drive
+// Body (optional): { "master_key_hex": "..." }
+func (s *APIServer) handleRecoveryBackup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		MasterKeyHex string `json:"master_key_hex"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	masterKeyHex := req.MasterKeyHex
+	if masterKeyHex == "" {
+		// Try to use session masterKey
+		masterKeyHex = s.queue.GetMasterKeyHex()
+	}
+
+	if masterKeyHex == "" {
+		httpError(w, fmt.Errorf("no master key available: provide in request or call /api/auth/session-start first"), http.StatusUnauthorized)
+		return
+	}
+
+	// Trigger backup (async via queue)
+	err := s.queue.EncryptAndBackupManifest(masterKeyHex)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, map[string]any{
+		"status": "backup_queued",
+		"message": "Manifest backup initiated. Check Drive shortly.",
+	})
+}
+
+// POST /api/recovery/restore
+// Downloads and decrypts manifest from Drive, restores to DB
+// Body: { "master_key_hex": "..." }
+func (s *APIServer) handleRecoveryRestore(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		MasterKeyHex string `json:"master_key_hex"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, fmt.Errorf("invalid request: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	if req.MasterKeyHex == "" {
+		httpError(w, fmt.Errorf("missing master_key_hex"), http.StatusBadRequest)
+		return
+	}
+
+	// Download & decrypt manifest
+	manifest, err := s.queue.RestoreManifestFromDrive(req.MasterKeyHex)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	// Apply to DB
+	if err := s.queue.ApplyRestoredManifestToDB(manifest); err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, map[string]any{
+		"status": "restored",
+		"file_count": len(manifest.Files),
+		"message": fmt.Sprintf("Restored %d files from Drive backup", len(manifest.Files)),
+	})
 }
 
 func (s *APIServer) handleQuota(w http.ResponseWriter, r *http.Request) {

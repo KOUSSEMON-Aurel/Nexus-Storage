@@ -48,7 +48,10 @@ type TaskQueue struct {
 	manifestMu    sync.Mutex
 	manifestTimer *time.Timer
 	pm            *PlaylistManager
-	cache         *CacheManager 
+	cache         *CacheManager
+	// V4 Security: Master key (RAM-only, never persisted)
+	masterKeyHex  string
+	masterKeyMu   sync.RWMutex
 }
 
 func ensureYtDlp() {
@@ -102,6 +105,137 @@ func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManage
 
 	// Start the single sequential worker
 	go q.worker()
+}
+
+// V4 Security: MasterKey session management (RAM-only)
+
+// SetMasterKeyHex stores the hex-encoded 32-byte masterKey in memory for this session
+func (q *TaskQueue) SetMasterKeyHex(hexKey string) {
+	q.masterKeyMu.Lock()
+	defer q.masterKeyMu.Unlock()
+	q.masterKeyHex = hexKey
+	log.Printf("✅ Master key loaded into session")
+}
+
+// GetMasterKeyHex retrieves the hex-encoded masterKey if session is active
+func (q *TaskQueue) GetMasterKeyHex() string {
+	q.masterKeyMu.RLock()
+	defer q.masterKeyMu.RUnlock()
+	return q.masterKeyHex
+}
+
+// ClearMasterKeyHex clears the masterKey from memory (logout/session-end)
+func (q *TaskQueue) ClearMasterKeyHex() {
+	q.masterKeyMu.Lock()
+	defer q.masterKeyMu.Unlock()
+	q.masterKeyHex = ""
+	log.Printf("✅ Master key cleared from session")
+}
+
+// RotatePassword performs V4.1 password rotation:
+// 1. Derive old masterKey from old_password + recovery_salt
+// 2. Derive new masterKey from new_password + recovery_salt
+// 3. Decrypt all file_keys with old masterKey
+// 4. Re-encrypt all file_keys with new masterKey
+// 5. Update database with new encrypted file_keys
+// 6. Increment manifest_revision
+// 7. Backup manifest to Drive
+// Returns: (files_updated, new_revision, error)
+func (q *TaskQueue) RotatePassword(oldPassword, newPassword string) (int, int, error) {
+	log.Printf("🔄 Starting password rotation...")
+
+	// 1. Get recovery salt from DB
+	saltHex, err := q.db.GetRecoverySalt()
+	if err != nil || saltHex == "" {
+		return 0, 0, fmt.Errorf("recovery salt not found in database")
+	}
+
+	saltBytes, err := hex.DecodeString(saltHex)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid salt format: %w", err)
+	}
+
+	// 2. Derive old masterKey from old_password
+	oldMasterKey, err := q.core.DeriveMasterKey(oldPassword, saltBytes)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to derive old master key: %w", err)
+	}
+
+	// 3. Derive new masterKey from new_password
+	newMasterKey, err := q.core.DeriveMasterKey(newPassword, saltBytes)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to derive new master key: %w", err)
+	}
+
+	// 4. Get all files from database
+	files, err := q.db.ListFiles()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to list files: %w", err)
+	}
+
+	// 5. Re-encrypt all file_keys
+	oldKeyArray := [32]byte{}
+	copy(oldKeyArray[:], oldMasterKey)
+	newKeyArray := [32]byte{}
+	copy(newKeyArray[:], newMasterKey)
+
+	rotatedCount := 0
+	for _, file := range files {
+		if file.FileKey == "" {
+			// No file_key to rotate (file not yet uploaded)
+			continue
+		}
+
+		// Decode old encrypted file_key from hex
+		oldEncrypted, err := hex.DecodeString(file.FileKey)
+		if err != nil {
+			log.Printf("⚠️  Could not decode file_key for %s: %v", file.Path, err)
+			continue
+		}
+
+		// Decrypt with old masterKey
+		decrypted, err := q.core.DecryptWithKey(oldEncrypted, oldKeyArray[:])
+		if err != nil {
+			log.Printf("⚠️  Could not decrypt file_key for %s (wrong password?): %v", file.Path, err)
+			return 0, 0, fmt.Errorf("decryption failed for %s (wrong password?): %w", file.Path, err)
+		}
+
+		// Re-encrypt with new masterKey
+		newEncrypted, err := q.core.EncryptWithKey(decrypted, newKeyArray[:])
+		if err != nil {
+			log.Printf("⚠️  Could not re-encrypt file_key for %s: %v", file.Path, err)
+			continue
+		}
+
+		// Update database with new encrypted file_key
+		newFileKeyHex := hex.EncodeToString(newEncrypted)
+		if err := q.db.UpdateFileKey(file.ID, newFileKeyHex); err != nil {
+			log.Printf("⚠️  Could not update file_key for %s: %v", file.Path, err)
+			continue
+		}
+
+		rotatedCount++
+		log.Printf("✅ Re-encrypted file_key for: %s", file.Path)
+	}
+
+	log.Printf("✅ Password rotation: %d files re-encrypted", rotatedCount)
+
+	// 6. Increment manifest_revision in database
+	newRevision, err := q.db.IncrementManifestRevision()
+	if err != nil {
+		log.Printf("⚠️  Failed to increment manifest revision: %v", err)
+	}
+
+	// 7. Force immediate manifest backup to Drive
+	// Build manifest, encrypt with new masterKey, and backup
+	newMasterKeyHex := hex.EncodeToString(newMasterKey)
+	if err := q.EncryptAndBackupManifest(newMasterKeyHex); err != nil {
+		log.Printf("⚠️  Failed to backup manifest after password rotation: %v", err)
+	} else {
+		log.Printf("✅ Manifest backed up after password rotation (revision %d)", newRevision)
+	}
+
+	return rotatedCount, newRevision, nil
 }
 
 func (q *TaskQueue) AddTask(t *Task) {
@@ -292,15 +426,31 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	var manifestVideoID string
 
 	// V3: Generate a unique random encryption key for this file
-	rawFileKey, _ := q.core.GenerateFileKey()
-	
-	// Nexus 2.0: Use user password if provided, otherwise fallback to masterSecret
-	encryptionSecret := "default-secret"
-	if t.Password != "" {
-		encryptionSecret = t.Password
+	rawFileKey, err := q.core.GenerateFileKey()
+	if err != nil {
+		return fmt.Errorf("key generation failed: %w", err)
 	}
 	
-	encryptedFileKeyBytes, _ := q.core.Encrypt(rawFileKey, encryptionSecret)
+	// V4 Security: Use masterKey from active session (password-derived via Argon2)
+	// Fallback to user-provided password if masterKey not available
+	encryptionSecret := t.Password
+	if encryptionSecret == "" {
+		// No password provided - check if we have an active masterKey
+		q.masterKeyMu.RLock()
+		if q.masterKeyHex != "" {
+			encryptionSecret = q.masterKeyHex // Use hex-encoded masterKey as "password"
+		}
+		q.masterKeyMu.RUnlock()
+	}
+	
+	if encryptionSecret == "" {
+		return fmt.Errorf("no encryption secret available: user must provide password or authenticate first")
+	}
+	
+	encryptedFileKeyBytes, err := q.core.Encrypt(rawFileKey, encryptionSecret)
+	if err != nil {
+		return fmt.Errorf("key encryption failed: %w", err)
+	}
 	storedFileKeyHex := hex.EncodeToString(encryptedFileKeyBytes)
 
 	for i := 0; i < numShards; i++ {
@@ -319,7 +469,11 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		compressed, _ := q.core.Compress(data, 0)
 		var encrypted []byte
 		if t.IsManifest {
-			encrypted, err = q.core.Encrypt(compressed, "default-secret")
+			// V4: Manifest DB backup uses masterKey (same as file_key encryption)
+			if encryptionSecret == "" {
+				return fmt.Errorf("cannot encrypt manifest without encryption secret")
+			}
+			encrypted, err = q.core.Encrypt(compressed, encryptionSecret)
 		} else {
 			encrypted, err = q.core.EncryptWithKey(compressed, rawFileKey)
 		}
@@ -536,10 +690,18 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 		return fmt.Errorf("mock local video cannot be downloaded without real youtube video")
 	}
 
-	// Nexus 2.0: Use user password if provided, otherwise fallback to masterSecret
-	encryptionSecret := "default-secret"
-	if t.Password != "" {
-		encryptionSecret = t.Password
+	// V4 Security: Use masterKey from active session, or fall back to user password
+	encryptionSecret := t.Password
+	if encryptionSecret == "" {
+		q.masterKeyMu.RLock()
+		if q.masterKeyHex != "" {
+			encryptionSecret = q.masterKeyHex // hex-encoded masterKey
+		}
+		q.masterKeyMu.RUnlock()
+	}
+	
+	if encryptionSecret == "" {
+		return fmt.Errorf("no encryption secret available for download: authenticate first or provide password")
 	}
 
 	var rawFileKey []byte

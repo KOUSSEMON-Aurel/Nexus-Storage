@@ -243,3 +243,48 @@ func (nc *NexusCore) DecryptWithKey(data, key []byte) ([]byte, error) {
 	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
 }
 
+// ─── Key Derivation (V4 Security) ─────────────────────────────────────────────
+
+// GenerateRecoverySalt creates a cryptographically random 16-byte salt for Argon2.
+func (nc *NexusCore) GenerateRecoverySalt() ([]byte, error) {
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+	res := C.nexus_generate_recovery_salt(&outPtr, &outLen)
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("salt generation error (code %d)", res)
+	}
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+}
+
+// DeriveMasterKey derives a 32-byte master key from password + salt using Argon2id.
+// CRITICAL: Call this CLIENT-SIDE ONLY (in GUI or CLI).
+// Never send password over network. Only send the result masterKey via IPC/secure channel.
+func (nc *NexusCore) DeriveMasterKey(password string, salt []byte) ([]byte, error) {
+	if len(salt) != 16 {
+		return nil, fmt.Errorf("invalid salt length: expected 16, got %d", len(salt))
+	}
+
+	cPassword := C.CString(password)
+	defer C.free(unsafe.Pointer(cPassword))
+
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+
+	res := C.nexus_derive_master_key(
+		cPassword,
+		C.size_t(len(password)),
+		(*C.uint8_t)(unsafe.Pointer(&salt[0])),
+		C.size_t(len(salt)),
+		&outPtr,
+		&outLen,
+	)
+
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("key derivation error (code %d)", res)
+	}
+
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+}
+

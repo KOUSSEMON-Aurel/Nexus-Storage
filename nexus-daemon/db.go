@@ -157,6 +157,21 @@ func (d *Database) Init(dbPath string) error {
 		last_access TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`)
 
+	// V4 Migrations (Security: Password-based key derivation)
+	runMigrate("create_recovery_state", `CREATE TABLE IF NOT EXISTS recovery_state (
+		id INTEGER PRIMARY KEY CHECK (id = 1),
+		recovery_salt TEXT NOT NULL,
+		manifest_revision INTEGER DEFAULT 1,
+		last_backup_ts TEXT,
+		recovery_packet_drive_id TEXT,
+		created_at TEXT DEFAULT CURRENT_TIMESTAMP
+	)`)
+	
+	// Migration: Add recovery_packet_drive_id column if it doesn't exist
+	runMigrate("add_recovery_packet_drive_id", `
+		ALTER TABLE recovery_state ADD COLUMN recovery_packet_drive_id TEXT;
+	`) // Safe: migration checks if column exists before adding
+
 
 	// Final check: if files_fts is empty but files has data, rebuild it
 	var count int
@@ -176,8 +191,8 @@ func (d *Database) Init(dbPath string) error {
 func (d *Database) GetFileByHash(sha256 string) (*FileRecord, error) {
 	var f FileRecord
 	err := d.db.QueryRow(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(is_archive, 0)
-		FROM files WHERE sha256 = ? LIMIT 1`, sha256).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.IsArchive)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
+		FROM files WHERE sha256 = ? LIMIT 1`, sha256).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -187,7 +202,7 @@ func (d *Database) GetFileByHash(sha256 string) (*FileRecord, error) {
 func (d *Database) SearchFiles(query string) ([]FileRecord, error) {
 	// Try FTS5 first (fast, requires -tags fts5 at build time)
 	rows, err := d.db.Query(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(is_archive, 0)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
 		FROM files WHERE id IN (SELECT rowid FROM files_fts WHERE path MATCH ?)`, query+"*")
 	if err != nil {
 		// FTS5 not available — fall back to LIKE (slower but always works)
@@ -351,6 +366,98 @@ func (d *Database) GetKV(key string) (string, bool) {
 func (d *Database) IsStealthMode() bool {
 	val, ok := d.GetKV("stealth_mode")
 	return ok && val == "true"
+}
+
+// ─── Recovery State (V4 Key Derivation) ───────────────────────────────────────
+
+// GetRecoverySalt returns the recovery salt (hex-encoded).
+// Used to generate the recovery_state table if not found, one row only.
+func (d *Database) GetRecoverySalt() (string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var salt string
+	err := d.db.QueryRow(`SELECT recovery_salt FROM recovery_state WHERE id = 1`).Scan(&salt)
+	if err == sql.ErrNoRows {
+		return "", nil // No salt set yet
+	}
+	return salt, err
+}
+
+// SetRecoverySalt stores the recovery salt (hex-encoded).
+// Inserts or updates the single recovery_state row.
+func (d *Database) SetRecoverySalt(saltHex string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, err := d.db.Exec(`
+		INSERT INTO recovery_state (id, recovery_salt, created_at) VALUES (1, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(id) DO UPDATE SET recovery_salt = excluded.recovery_salt
+	`, saltHex)
+	return err
+}
+
+// GetManifestRevision returns the manifest revision number (default 1).
+func (d *Database) GetManifestRevision() (int, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var revision int
+	err := d.db.QueryRow(`SELECT COALESCE(manifest_revision, 1) FROM recovery_state WHERE id = 1`).Scan(&revision)
+	if err == sql.ErrNoRows {
+		return 1, nil // Default
+	}
+	return revision, err
+}
+
+// IncrementManifestRevision increments the manifest revision (for password rotation tracking).
+// Returns the new revision number.
+func (d *Database) IncrementManifestRevision() (int, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, err := d.db.Exec(`
+		UPDATE recovery_state SET manifest_revision = manifest_revision + 1 WHERE id = 1
+	`)
+	if err != nil {
+		return 0, err
+	}
+	// Fetch the new revision
+	var revision int
+	err = d.db.QueryRow(`SELECT COALESCE(manifest_revision, 1) FROM recovery_state WHERE id = 1`).Scan(&revision)
+	return revision, err
+}
+
+// UpdateFileKey updates the encrypted file_key for a file (used in password rotation).
+func (d *Database) UpdateFileKey(fileID int64, newFileKeyHex string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, err := d.db.Exec(`UPDATE files SET file_key = ? WHERE id = ?`, newFileKeyHex, fileID)
+	return err
+}
+
+// SetLastManifestBackup records the timestamp of last successful Drive backup.
+func (d *Database) SetLastManifestBackup(ts string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, err := d.db.Exec(`UPDATE recovery_state SET last_backup_ts = ? WHERE id = 1`, ts)
+	return err
+}
+
+// GetRecoveryPacketDriveID retrieves the Drive file ID of the recovery packet.
+func (d *Database) GetRecoveryPacketDriveID() (string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var driveID string
+	err := d.db.QueryRow(`SELECT COALESCE(recovery_packet_drive_id, '') FROM recovery_state WHERE id = 1`).Scan(&driveID)
+	if err != nil && err.Error() != "sql: no rows in result set" {
+		return "", err
+	}
+	return driveID, nil
+}
+
+// SetRecoveryPacketDriveID stores the Drive file ID of the recovery packet.
+func (d *Database) SetRecoveryPacketDriveID(driveID string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, err := d.db.Exec(`UPDATE recovery_state SET recovery_packet_drive_id = ? WHERE id = 1`, driveID)
+	return err
 }
 
 func (d *Database) SaveFile(path, videoID string, size int64, hash, key string, parentID *int64, sha256 string, isArchive bool) error {

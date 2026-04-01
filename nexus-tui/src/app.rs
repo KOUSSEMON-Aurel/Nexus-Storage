@@ -12,6 +12,8 @@ pub enum AppMode {
     #[allow(dead_code)]
     Confirm(String),
     Help,
+    Authentication,      // New: Authentication screen (password input for V4)
+    RecoveryMode,         // New: Recovery/restore workflow
 }
 
 #[allow(dead_code)]

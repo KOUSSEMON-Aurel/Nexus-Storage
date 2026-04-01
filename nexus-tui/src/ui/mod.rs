@@ -12,9 +12,25 @@ pub mod tasks;
 pub mod statusbar;
 pub mod command_bar;
 pub mod helpers;
+pub mod auth_ui;
 
 pub fn render(f: &mut Frame, app: &mut AppState) {
-    let area = f.area();
+    let area = f.size();
+
+    // Handle authentication screen
+    if app.mode == AppMode::Authentication {
+        let mut auth = crate::ui::auth_ui::AuthScreen::new();
+        crate::ui::auth_ui::draw_auth_screen(f, &auth, "http://127.0.0.1:8080");
+        return;
+    }
+
+    // Handle recovery mode
+    if app.mode == AppMode::RecoveryMode {
+        let mut auth = crate::ui::auth_ui::AuthScreen::new();
+        auth.recovering = true;
+        crate::ui::auth_ui::draw_auth_screen(f, &auth, "http://127.0.0.1:8080");
+        return;
+    }
 
     if app.mode == AppMode::Loading {
         draw_loading_screen(f, area, app);
