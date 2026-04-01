@@ -1281,7 +1281,7 @@ function DetailPanel({ file, onClose, onAction, c, section }: { file: NFile; onC
         ) : (
           <>
             <button onClick={() => onAction("download", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "#1A73E8", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-              Open Shard
+              Download
             </button>
             <button onClick={() => onAction("evict", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "transparent", color: c.textSecondary, border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
               Free up space (clear local cache)

@@ -7,7 +7,11 @@ import {
   RefreshCw,
   Lock,
   Shield,
-  Key
+  Key,
+  Eye,
+  EyeOff,
+  Trash2,
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -53,8 +57,11 @@ interface SettingsPageProps {
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'encryption' | 'about'>('encryption');
+  const [activeTab, setActiveTab] = useState<'encryption' | 'password' | 'trash' | 'about'>('encryption');
   const [dark, setDark] = useState(document.documentElement.classList.contains('dark'));
+  const [showPassword, setShowPassword] = useState(false);
+  const [customPassword, setCustomPassword] = useState('');
+  const [trashRetentionDays, setTrashRetentionDays] = useState(30);
 
   // Listen for dark mode changes
   useEffect(() => {
@@ -69,6 +76,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
 
   const navItems = [
     { id: 'encryption', label: 'Encryption & Security', icon: Shield },
+    { id: 'password', label: 'Custom Password', icon: Lock },
+    { id: 'trash', label: 'Trash & Storage', icon: Trash2 },
     { id: 'about', label: 'About Nexus', icon: Info },
   ];
 
@@ -251,6 +260,132 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                         </div>
                       ))}
                     </div>
+                  </section>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'password' && (
+              <motion.div 
+                key="password"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                style={{ maxWidth: 640 }}
+              >
+                <div style={{ padding: "20px 0" }}>
+                  <section style={{ marginBottom: 32 }}>
+                    <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
+                      <Lock size={20} /> Custom Password (Optional)
+                    </h2>
+                    <p style={{ fontSize: 14, color: c.textSecondary, marginBottom: 16 }}>
+                      By default, your files are encrypted using your Google account. You can optionally set a custom password to override this for specific files.
+                    </p>
+                    <div style={{ background: c.bgSurface, padding: 16, borderRadius: 12, border: `1px solid ${c.border}` }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase" }}>Password (if set)</label>
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <input 
+                          type={showPassword ? "text" : "password"}
+                          value={customPassword}
+                          onChange={(e) => setCustomPassword(e.target.value)}
+                          style={{
+                            flex: 1,
+                            padding: "10px 12px",
+                            borderRadius: 8,
+                            border: `1px solid ${c.border}`,
+                            background: c.bgApp,
+                            color: c.textPrimary,
+                            fontSize: 14,
+                            outline: "none",
+                          }}
+                          placeholder="Enter optional password..."
+                        />
+                        <button
+                          onClick={() => setShowPassword(!showPassword)}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            border: `1px solid ${c.border}`,
+                            background: "transparent",
+                            color: c.textSecondary,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                          title={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                      <p style={{ fontSize: 12, color: c.textSecondary, marginTop: 10 }}>
+                        💡 Leave empty to use automatic encryption via your Google account (recommended).
+                      </p>
+                    </div>
+                  </section>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'trash' && (
+              <motion.div 
+                key="trash"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                style={{ maxWidth: 640 }}
+              >
+                <div style={{ padding: "20px 0" }}>
+                  <section style={{ marginBottom: 32 }}>
+                    <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
+                      <Trash2 size={20} /> Trash & Storage
+                    </h2>
+                    
+                    <div style={{ background: c.bgSurface, padding: 16, borderRadius: 12, border: `1px solid ${c.border}`, marginBottom: 16 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", display: "block" }}>
+                        <Clock size={14} style={{ display: "inline", marginRight: 6 }} /> Auto-Empty Trash After (days)
+                      </label>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+                        <input 
+                          type="range"
+                          min="1"
+                          max="90"
+                          value={trashRetentionDays}
+                          onChange={(e) => setTrashRetentionDays(parseInt(e.target.value))}
+                          style={{ flex: 1, height: 6, borderRadius: 3 }}
+                        />
+                        <span style={{ fontSize: 14, fontWeight: 600, minWidth: 50 }}>{trashRetentionDays} days</span>
+                      </div>
+                      <p style={{ fontSize: 12, color: c.textSecondary, marginTop: 12 }}>
+                        Files in trash will be permanently deleted after {trashRetentionDays} days of inactivity.
+                      </p>
+                    </div>
+
+                    <div style={{ background: "#FEF3E2", padding: 12, borderRadius: 8, borderLeft: "4px solid #F59E0B", marginBottom: 16 }}>
+                      <p style={{ fontSize: 12, color: "#92400E" }}>
+                        ⚠️ <strong>Warning:</strong> Permanently deleted files cannot be recovered from trash. Ensure you have a backup before emptying.
+                      </p>
+                    </div>
+
+                    <button style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      borderRadius: 8,
+                      background: "#EA4335",
+                      color: "white",
+                      border: "none",
+                      fontSize: 14,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      transition: "opacity 0.2s"
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget as HTMLButtonElement).style.opacity = "0.9"}
+                    onMouseLeave={(e) => (e.currentTarget as HTMLButtonElement).style.opacity = "1"}
+                    >
+                      Empty Trash Now
+                    </button>
                   </section>
                 </div>
               </motion.div>
