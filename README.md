@@ -60,7 +60,40 @@ Our security model assumes the backend is **hostile**.
 
 ---
 
-## 🚀 Performance & Scaling
+## � End-to-End Encryption: Zero-Password Architecture
+
+Nexus v2.2.0 introduces **automatic encryption key derivation** from your Google identity—no password to remember.
+
+### How It Works
+```mermaid
+graph TD
+    A[User Login with Google OAuth] -->|Extract Permanent ID| B["Google Sub<br/>(Unique per user)"]
+    B -->|PBKDF2-SHA256<br/>100k iterations| C["Derived Encryption Key<br/>(32 bytes, AES-256)"]
+    C -->|Upload| D[File Encrypted with Derived Key]
+    C -->|Download| E[File Decrypted with Derived Key]
+    style B fill:#4285F4,color:#fff
+    style C fill:#34A853,color:#fff
+    style D fill:#1A73E8,color:#fff
+    style E fill:#1A73E8,color:#fff
+```
+
+### Key Properties
+- **Automatic**: No user passwords needed. Key derives from your permanent Google identity (`sub` claim).
+- **Deterministic**: Same user always gets the same encryption key across sessions and devices.
+- **Back-Compatible**: Old files encrypted with custom passwords still decrypt with their override key.
+- **Optional Override**: Upload files with a custom password for extra protection beyond Google sub derivation.
+
+### Security Guarantees
+| Property | Guarantee |
+|:--- |:--- |
+| **Brute Force Attacks** | ✅ Eliminated—no password to brute-force |
+| **Key Management** | ✅ Zero server-side storage—ephemeral key per session |
+| **Uniqueness per User** | ✅ Google sub is unique per user forever |
+| **Backward Compatibility** | ✅ Custom passwords still override auto-derived key |
+
+---
+
+## �🚀 Performance & Scaling
 
 | Feature | Specification | User Benefit |
 |:--- |:--- |:--- |

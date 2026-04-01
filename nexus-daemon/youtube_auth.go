@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -30,6 +31,7 @@ type YouTubeManager struct {
 	authed       bool
 	user         string
 	channelID    string
+	googleSub    string // ← Unique, permanent Google user ID
 }
 
 func getConfigDir() string {
@@ -57,11 +59,12 @@ func NewYouTubeManager() *YouTubeManager {
 		return m // Return unauthenticated manager, never nil
 	}
 
-	// Pro Scope: YoutubeScope + Monitoring for real-time quota + Drive for manifest
+	// Pro Scope: YoutubeScope + Monitoring for real-time quota + Drive for manifest + OpenID for user identity
 	config, err := google.ConfigFromJSON(b, 
 		youtube.YoutubeScope, 
 		"https://www.googleapis.com/auth/monitoring.read",
 		drive.DriveFileScope,
+		"openid",  // ← REQUIRED for id_token (contains 'sub' claim)
 	)
 	if err != nil {
 		log.Printf("⚠️  YouTube: could not parse client_secret.json: %v", err)
@@ -71,19 +74,28 @@ func NewYouTubeManager() *YouTubeManager {
 	m.config = config
 	m.TryLoadToken()
 
-	// VALIDATION: If authenticated, check if we have the 'Search' scope by doing a minimal validation call
+	// VALIDATION: If authenticated, check scope compatibility
 	if m.authed {
 		go func() {
+			// Check 1: Verify API scope (existing check)
 			svc := m.GetService()
 			if svc == nil { return }
-			// Use Videos.List (1 unit) instead of Search.List (100 units) for scope validation
 			_, err := svc.Videos.List([]string{"id"}).MaxResults(1).Do()
 			if err != nil && strings.Contains(err.Error(), "insufficientPermissions") {
 				log.Printf("⚠️  OAuth Scope mismatch detected (Old Token). Forcing Re-Auth...")
 				m.mu.Lock()
 				m.authed = false
 				m.mu.Unlock()
-				// Delete old token file to prevent loop
+				os.Remove(filepath.Join(getConfigDir(), "token.json"))
+				return
+			}
+			
+			// Check 2: Verify OpenID scope (needed for auto-encryption via Google sub)
+			if m.GetGoogleSub() == "" {
+				log.Printf("⚠️  'openid' scope missing from token - auto-encryption disabled. Re-auth required.")
+				m.mu.Lock()
+				m.authed = false
+				m.mu.Unlock()
 				os.Remove(filepath.Join(getConfigDir(), "token.json"))
 			}
 		}()
@@ -112,10 +124,19 @@ func (m *YouTubeManager) TryLoadToken() bool {
 		log.Printf("⚠️  Drive: could not create service: %v", err)
 	}
 
+	// Extract Google sub from ID token
+	googleSub := extractGoogleSubFromToken(tok)
+	if googleSub != "" {
+		log.Printf("✅ Google sub extracted: %s (auto-encryption enabled)", googleSub[:8]+"...")
+	} else {
+		log.Printf("⚠️  Google sub not found in token. ID token may not be available (check 'openid' scope). Auto-encryption will not work.")
+	}
+
 	m.mu.Lock()
 	m.service = service
 	m.driveService = driveService
 	m.authed = true
+	m.googleSub = googleSub
 	m.mu.Unlock()
 
 	// Async fetch channel info
@@ -131,6 +152,7 @@ func (m *YouTubeManager) Logout() {
 	m.authed = false
 	m.user = ""
 	m.channelID = ""
+	m.googleSub = ""
 	m.mu.Unlock()
 	os.Remove(filepath.Join(getConfigDir(), "token.json"))
 }
@@ -154,6 +176,12 @@ func (m *YouTubeManager) GetService() *youtube.Service {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.service
+}
+
+func (m *YouTubeManager) GetGoogleSub() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.googleSub
 }
 
 func (m *YouTubeManager) FetchChannelID() {
@@ -485,6 +513,46 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
 	tok := &oauth2.Token{}
 	err = json.NewDecoder(f).Decode(tok)
 	return tok, err
+}
+
+// extractGoogleSubFromToken extracts the Google subject ID from the OAuth token's ID token (JWT)
+func extractGoogleSubFromToken(token *oauth2.Token) string {
+	if token == nil {
+		return ""
+	}
+
+	// The ID token is in token.Extra()["id_token"]
+	idTokenRaw, ok := token.Extra("id_token").(string)
+	if !ok || idTokenRaw == "" {
+		return ""
+	}
+
+	// JWT format: header.payload.signature
+	parts := strings.Split(idTokenRaw, ".")
+	if len(parts) != 3 {
+		return ""
+	}
+
+	// Decode the payload (second part)
+	payload := parts[1]
+	// Add padding if needed for base64 decoding
+	padding := (4 - len(payload)%4) % 4
+	payload += strings.Repeat("=", padding)
+
+	decodedBytes, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		return ""
+	}
+
+	// Parse JSON to extract 'sub' claim
+	var claims struct {
+		Sub string `json:"sub"`
+	}
+	if err := json.Unmarshal(decodedBytes, &claims); err != nil {
+		return ""
+	}
+
+	return claims.Sub
 }
 
 func saveToken(path string, token *oauth2.Token) {

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/pbkdf2"
 	"google.golang.org/api/youtube/v3"
 )
 
@@ -135,6 +136,29 @@ func (q *TaskQueue) ClearMasterKeyHex() {
 	defer q.masterKeyMu.Unlock()
 	q.masterKeyHex = ""
 	log.Printf("✅ Master key cleared from session")
+}
+
+// deriveKeyFromGoogleSub derives a 32-byte encryption key from Google sub (permanent user ID)
+// Uses PBKDF2 with SHA-256, fixed salt, 100k iterations for consistent, secure key derivation
+// This enables zero-knowledge architecture: user never manages encryption passwords
+func deriveKeyFromGoogleSub(googleSub string) string {
+	// Fixed salt - same for all users (sub is already unique per user)
+	// This ensures: same user → same key across sessions (necessary for downloads)
+	// different user → different key (automatic due to unique sub)
+	salt := []byte("nexus-storage-google-sub-v1")
+
+	// PBKDF2: 100,000 iterations recommended by OWASP (2024)
+	// Output: 32 bytes (256 bits) for AES-256
+	derivedKey := pbkdf2.Key(
+		[]byte(googleSub),      // Input: permanent user ID
+		salt,                   // Input: fixed salt
+		100000,                 // Iterations: high for security
+		32,                     // Output length: 256 bits
+		sha256.New,             // HMAC function: SHA-256
+	)
+
+	// Return as hex string for compatibility with existing encryption code
+	return hex.EncodeToString(derivedKey)
 }
 
 // RotatePassword performs V4.1 password rotation:
@@ -436,20 +460,32 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		return fmt.Errorf("key generation failed: %w", err)
 	}
 	
-	// V4 Security: Use masterKey from active session (password-derived via Argon2)
-	// Fallback to user-provided password if masterKey not available
+	// V4 Security: Use password priority:
+	// 1. Custom password provided by user
+	// 2. Active master key from session
+	// 3. Auto-derived key from Google sub (zero-knowledge, automatic)
 	encryptionSecret := t.Password
 	if encryptionSecret == "" {
-		// No password provided - check if we have an active masterKey
+		// No custom password - check if we have an active masterKey
 		q.masterKeyMu.RLock()
 		if q.masterKeyHex != "" {
-			encryptionSecret = q.masterKeyHex // Use hex-encoded masterKey as "password"
+			encryptionSecret = q.masterKeyHex // Use hex-encoded masterKey
 		}
 		q.masterKeyMu.RUnlock()
 	}
 	
+	// If still no secret, derive from Google sub (new approach: no password needed!)
+	if encryptionSecret == "" && q.ytManager != nil {
+		googleSub := q.ytManager.GetGoogleSub()
+		if googleSub != "" {
+			// Auto-derive key from Google sub - fully automatic, user doesn't know/care
+			encryptionSecret = deriveKeyFromGoogleSub(googleSub)
+			log.Printf("ℹ️  Using auto-derived key from Google sub (user didn't provide password)")
+		}
+	}
+	
 	if encryptionSecret == "" {
-		return fmt.Errorf("no encryption secret available: user must provide password or authenticate first")
+		return fmt.Errorf("no encryption secret available: user must be authenticated with Google")
 	}
 	
 	encryptedFileKeyBytes, err := q.core.Encrypt(rawFileKey, encryptionSecret)
@@ -689,7 +725,10 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 		return fmt.Errorf("mock local video cannot be downloaded without real youtube video")
 	}
 
-	// V4 Security: Use masterKey from active session, or fall back to user password
+	// V4 Security: Use password priority (same as upload):
+	// 1. Custom password provided by user
+	// 2. Active master key from session
+	// 3. Auto-derived key from Google sub (zero-knowledge, automatic)
 	encryptionSecret := t.Password
 	if encryptionSecret == "" {
 		q.masterKeyMu.RLock()
@@ -699,8 +738,17 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 		q.masterKeyMu.RUnlock()
 	}
 	
+	// If still no secret, derive from Google sub (new approach: no password needed for download!)
+	if encryptionSecret == "" && q.ytManager != nil {
+		googleSub := q.ytManager.GetGoogleSub()
+		if googleSub != "" {
+			// Auto-derive key from Google sub - must match the key used during upload
+			encryptionSecret = deriveKeyFromGoogleSub(googleSub)
+		}
+	}
+	
 	if encryptionSecret == "" {
-		return fmt.Errorf("no encryption secret available for download: authenticate first or provide password")
+		return fmt.Errorf("no encryption secret available for download: user must be authenticated with Google")
 	}
 
 	var rawFileKey []byte

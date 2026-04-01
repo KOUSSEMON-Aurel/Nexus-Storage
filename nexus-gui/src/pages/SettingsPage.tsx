@@ -2,15 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
-  Lock, 
-  Info, 
-  Shield, 
-  AlertTriangle,
+  Info,
   ChevronRight,
-  Check,
-  RefreshCw,
-  Eye,
-  EyeOff
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -56,13 +50,7 @@ interface SettingsPageProps {
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'password' | 'about'>('password');
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' | '' }>({ text: '', type: '' });
+  const [activeTab, setActiveTab] = useState<'about'>('about');
   const [dark, setDark] = useState(document.documentElement.classList.contains('dark'));
 
   // Listen for dark mode changes
@@ -75,56 +63,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
   }, []);
 
   const c = dark ? DARK : LIGHT;
-  const hasPassword = !!localStorage.getItem('nexus_master_password');
-
-  const showToast = (text: string, type: 'success' | 'error') => {
-    setMessage({ text, type });
-    setTimeout(() => setMessage({ text: '', type: '' }), 3000);
-  };
-
-  const handleSetPassword = async () => {
-    if (newPassword.length < 12) {
-      showToast('Password must be at least 12 characters', 'error');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      showToast('Passwords do not match', 'error');
-      return;
-    }
-    try {
-      localStorage.setItem('nexus_master_password', newPassword);
-      localStorage.setItem('nexus_recovery_salt', 'initialized');
-      showToast('✅ Password set successfully!', 'success');
-      setNewPassword('');
-      setConfirmPassword('');
-      setTimeout(() => setShowPasswordForm(false), 1500);
-    } catch (err) {
-      showToast('Failed to set password', 'error');
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (newPassword.length < 12) {
-      showToast('Password must be at least 12 characters', 'error');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      showToast('Passwords do not match', 'error');
-      return;
-    }
-    try {
-      localStorage.setItem('nexus_master_password', newPassword);
-      showToast('✅ Password changed successfully', 'success');
-      setNewPassword('');
-      setConfirmPassword('');
-      setTimeout(() => setShowPasswordForm(false), 1500);
-    } catch (err) {
-      showToast('Failed to change password', 'error');
-    }
-  };
 
   const navItems = [
-    { id: 'password', label: 'Security & Password', icon: Lock },
     { id: 'about', label: 'About Nexus', icon: Info },
   ];
 
@@ -221,174 +161,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
           position: "relative"
         }}>
           <AnimatePresence mode="wait">
-            {activeTab === 'password' && (
-              <motion.div 
-                key="password"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                style={{ maxWidth: 600 }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: 12, background: "#1A73E815", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Shield size={24} color="#1A73E8" />
-                  </div>
-                  <div>
-                    <h2 style={{ fontSize: 20, fontWeight: 600, color: c.textPrimary, margin: 0 }}>Master Password</h2>
-                    <p style={{ fontSize: 14, color: c.textSecondary, margin: "4px 0 0 0" }}>Control how your files are encrypted</p>
-                  </div>
-                </div>
-
-                {!showPasswordForm ? (
-                  <div style={{ background: c.bgApp, padding: 24, borderRadius: 16, border: `1px solid ${c.border}` }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                      {hasPassword ? (
-                        <Check size={20} color="#34A853" />
-                      ) : (
-                        <AlertTriangle size={20} color="#F9AB00" />
-                      )}
-                      <span style={{ fontSize: 15, fontWeight: 600, color: hasPassword ? "#34A853" : "#F9AB00" }}>
-                        {hasPassword ? 'Password is active' : 'No password set'}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: 14, color: c.textSecondary, lineHeight: 1.6, marginBottom: 24 }}>
-                      {hasPassword 
-                        ? 'Your master password is used to derive encryption keys for all your file shards on YouTube. Changing it will only affect new uploads.'
-                        : 'Set a master password to enable end-to-end encryption. Nexus uses Argon2id for key derivation and XChaCha20-Poly1305 for encryption.'}
-                    </p>
-                    <button 
-                      onClick={() => setShowPasswordForm(true)}
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: 10,
-                        background: "#1A73E8",
-                        color: "white",
-                        border: "none",
-                        fontSize: 14,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        boxShadow: "0 2px 4px rgba(26,115,232,0.2)"
-                      }}
-                    >
-                      {hasPassword ? 'Change Master Password' : 'Set Master Password'}
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <label style={{ fontSize: 13, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5 }}>New Password</label>
-                      <div style={{ position: "relative" }}>
-                        <input
-                          type={showNewPassword ? "text" : "password"}
-                          placeholder="Min. 12 characters recommended"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "12px 44px 12px 16px",
-                            borderRadius: 12,
-                            background: c.bgApp,
-                            border: `1px solid ${c.border}`,
-                            color: c.textPrimary,
-                            fontSize: 14,
-                            outline: "none",
-                            boxSizing: "border-box"
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                          style={{
-                            position: "absolute",
-                            right: 12,
-                            top: "50%",
-                            transform: "translateY(-50%)",
-                            background: "transparent",
-                            border: "none",
-                            cursor: "pointer",
-                            color: c.textSecondary,
-                            display: "flex",
-                            alignItems: "center",
-                            padding: 0
-                          }}
-                        >
-                          {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                      <div style={{ fontSize: 12, color: newPassword.length < 12 ? "#EA4335" : "#34A853", fontWeight: 500 }}>
-                        {newPassword.length === 0 ? "" : (newPassword.length < 12 ? "Too short" : "Strength: Good")}
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <label style={{ fontSize: 13, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5 }}>Confirm Password</label>
-                      <div style={{ position: "relative" }}>
-                        <input
-                          type={showConfirmPassword ? "text" : "password"}
-                          placeholder="Repeat password"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "12px 44px 12px 16px",
-                            borderRadius: 12,
-                            background: c.bgApp,
-                            border: `1px solid ${c.border}`,
-                            color: c.textPrimary,
-                            fontSize: 14,
-                            outline: "none",
-                            boxSizing: "border-box"
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          style={{
-                            position: "absolute",
-                            right: 12,
-                            top: "50%",
-                            transform: "translateY(-50%)",
-                            background: "transparent",
-                            border: "none",
-                            cursor: "pointer",
-                            color: c.textSecondary,
-                            display: "flex",
-                            alignItems: "center",
-                            padding: 0
-                          }}
-                        >
-                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div style={{ padding: 16, background: "#EA433510", border: "1px solid #EA433530", borderRadius: 12, display: "flex", gap: 12 }}>
-                      <AlertTriangle size={20} color="#EA4335" style={{ flexShrink: 0 }} />
-                      <p style={{ fontSize: 13, color: "#EA4335", margin: 0, lineHeight: 1.5 }}>
-                        <strong>Warning:</strong> If you lose this password, your previously encrypted data cannot be recovered. Nexus does not store your password on any server.
-                      </p>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
-                      <button 
-                        onClick={() => { setShowPasswordForm(false); setNewPassword(''); setConfirmPassword(''); }}
-                        style={{ flex: 1, padding: "12px", borderRadius: 12, background: "transparent", border: `1px solid ${c.border}`, color: c.textPrimary, cursor: "pointer", fontWeight: 500 }}
-                      >
-                        Cancel
-                      </button>
-                      <button 
-                        onClick={hasPassword ? handleChangePassword : handleSetPassword}
-                        style={{ flex: 1, padding: "12px", borderRadius: 12, background: "#1A73E8", color: "white", border: "none", cursor: "pointer", fontWeight: 600 }}
-                      >
-                        {hasPassword ? 'Update Password' : 'Save Password'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            )}
-
             {activeTab === 'about' && (
               <motion.div 
                 key="about"
@@ -462,26 +234,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
           </AnimatePresence>
         </main>
       </div>
-
-      {/* ━━━━ TOAST ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <AnimatePresence>
-        {message.text && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            style={{
-              position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-              background: message.type === "error" ? "#EA4335" : "#323232",
-              color: "white", padding: "12px 24px", borderRadius: 8,
-              fontSize: 14, fontWeight: 500, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              zIndex: 9999
-            }}
-          >
-            {message.text}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

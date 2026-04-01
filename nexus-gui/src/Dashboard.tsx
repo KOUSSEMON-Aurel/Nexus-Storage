@@ -374,18 +374,8 @@ export default function Dashboard() {
   const handleUploadClick = async (path: string, mode: string, password?: string, isFolder?: boolean) => {
     try {
       if (path) {
-        // Security check: ensure encryption secret exists
-        const hasMasterPassword = localStorage.getItem('nexus_master_password') !== null;
-        if (!password && !hasMasterPassword) {
-          showToast("❌ No encryption password provided. Please enter one or set a master password in Settings.", "error");
-          return;
-        }
-
         setUploadOpen(false);
         showToast(isFolder ? "Archiving & starting upload..." : "Starting upload...", "info");
-        
-        // Use provided password or fallback to master password
-        const finalPassword = password || localStorage.getItem('nexus_master_password') || "";
         
         const res = await fetch(`${API_BASE}/upload`, {
           method: "POST",
@@ -393,18 +383,13 @@ export default function Dashboard() {
           body: JSON.stringify({ 
             path, 
             mode, 
-            password: finalPassword
+            password: password || "" // Password is optional, empty string if not provided
           })
         });
         if (res.ok) {
           showToast("Upload task added to queue.", "success");
         } else {
-          const errorText = await res.text();
-          if (errorText.includes("no encryption secret available")) {
-            showToast("❌ Encryption setup required. Go to Settings > Security & Password to set a master password.", "error");
-          } else {
-            showToast(`Error: ${errorText}`, "error");
-          }
+          showToast(`Error: ${await res.text()}`, "error");
         }
       }
     } catch (err: any) {
@@ -1525,54 +1510,24 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
           </div>
         </div>
 
-        {/* Custom Encryption Password */}
+        {/* Custom Encryption Password (Optional) */}
         <div>
-           {(() => {
-             const hasMasterPassword = localStorage.getItem('nexus_master_password') !== null;
-             return (
-               <>
-                 <p style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Custom Encryption Password (Optional)</p>
-                 <div style={{ position: "relative" }}>
-                   <Lock size={16} color={c.textSecondary} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-                   <input 
-                     type="password" 
-                     placeholder={hasMasterPassword ? "Leave empty to use master password" : "Required: Set master password first or enter here"}
-                     value={password}
-                     onChange={(e) => setPassword(e.target.value)}
-                     style={{ width: "100%", padding: "12px 12px 12px 40px", borderRadius: 10, background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
-                   />
-                 </div>
-                 
-                 {/* Status indicator */}
-                 <div style={{ marginTop: 8, fontSize: 11, color: hasMasterPassword ? "#4CAF50" : "#FF9800" }}>
-                   {hasMasterPassword ? "✅ Master password is set (will be used if custom password is empty)" : "⚠️ No master password set — enter one below or set it in Settings"}
-                 </div>
-
-                 {!hasMasterPassword && (
-                   <button
-                     onClick={() => window.location.href = '/settings'}
-                     style={{
-                       marginTop: 12,
-                       padding: "8px 12px",
-                       fontSize: 12,
-                       background: "#1A73E8",
-                       color: "white",
-                       border: "none",
-                       borderRadius: 6,
-                       cursor: "pointer",
-                       transition: "all 0.15s",
-                       width: "100%",
-                       fontWeight: 500
-                     }}
-                     onMouseOver={(e) => (e.currentTarget.style.background = "#1565C0")}
-                     onMouseOut={(e) => (e.currentTarget.style.background = "#1A73E8")}
-                   >
-                     🔒 Go to Settings to Set Master Password
-                   </button>
-                 )}
-               </>
-             );
-           })()}
+           <p style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Custom Encryption Password (Optional)</p>
+           <div style={{ position: "relative" }}>
+             <Lock size={16} color={c.textSecondary} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+             <input 
+               type="password" 
+               placeholder="Leave empty for automatic encryption (recommended)"
+               value={password}
+               onChange={(e) => setPassword(e.target.value)}
+               style={{ width: "100%", padding: "12px 12px 12px 40px", borderRadius: 10, background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
+             />
+           </div>
+           
+           {/* Info text */}
+           <div style={{ marginTop: 8, fontSize: 11, color: c.textSecondary }}>
+             ℹ️ Encryption is automatic via your Google account. Add a custom password here only if you want extra protection for this specific file.
+           </div>
         </div>
 
         {/* Mode */}

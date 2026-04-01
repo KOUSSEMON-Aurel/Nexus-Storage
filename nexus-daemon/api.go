@@ -348,7 +348,11 @@ func (s *APIServer) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.ytManager == nil {
-		jsonOK(w, map[string]any{"authenticated": false, "user": ""})
+		jsonOK(w, map[string]any{
+			"authenticated": false,
+			"user":          "",
+			"googleSub":     "",
+		})
 		return
 	}
 	s.ytManager.mu.RLock()
@@ -356,6 +360,7 @@ func (s *APIServer) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{
 		"authenticated": s.ytManager.authed,
 		"user":          s.ytManager.user,
+		"googleSub":     s.ytManager.googleSub,  // Permanent unique Google user ID (debug/monitoring)
 	})
 }
 
