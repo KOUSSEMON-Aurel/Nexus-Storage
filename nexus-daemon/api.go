@@ -149,6 +149,10 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 		}
 		lsn, _ := s.db.GetLocalLSN()
 		log.Printf("🗑️  Soft delete complete id=%d, lsn=%d", id, lsn)
+		// Flush WAL to ensure change is immediately visible to readers
+		if err := s.db.Checkpoint(); err != nil {
+			log.Printf("⚠️  Checkpoint failed after soft delete: %v", err)
+		}
 		s.queue.RequestManifestBackup()
 		jsonOK(w, map[string]string{"status": "deleted"})
 		
@@ -192,6 +196,10 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 		}
 		lsn, _ := s.db.GetLocalLSN()
 		log.Printf("♻️  Restore complete id=%d, lsn=%d", id, lsn)
+		// Flush WAL to ensure change is immediately visible to readers
+		if err := s.db.Checkpoint(); err != nil {
+			log.Printf("⚠️  Checkpoint failed after restore: %v", err)
+		}
 		s.queue.RequestManifestBackup()
 		jsonOK(w, map[string]string{"status": "restored"})
 
@@ -205,6 +213,10 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 		}
 		lsn, _ := s.db.GetLocalLSN()
 		log.Printf("🗑️  Permanent delete complete id=%d, lsn=%d", id, lsn)
+		// Flush WAL to ensure change is immediately visible to readers
+		if err := s.db.Checkpoint(); err != nil {
+			log.Printf("⚠️  Checkpoint failed after permanent delete: %v", err)
+		}
 		s.queue.RequestManifestBackup()
 		// Queue YouTube video deletion if VideoID present
 		// Task queueing is async - if orphaned tasks slip through, hourly cleanup will catch them
