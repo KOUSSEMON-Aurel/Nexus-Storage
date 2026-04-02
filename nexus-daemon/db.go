@@ -695,7 +695,7 @@ func (d *Database) ListTrash() ([]FileRecord, error) {
 	defer d.mu.Unlock()
 
 	rows, err := d.db.Query(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
 		FROM files WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC`)
 	if err != nil {
 		return nil, err
@@ -704,7 +704,7 @@ func (d *Database) ListTrash() ([]FileRecord, error) {
 	var files []FileRecord
 	for rows.Next() {
 		var f FileRecord
-		err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive)
+		err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
 		if err == nil {
 			files = append(files, f)
 		} else {

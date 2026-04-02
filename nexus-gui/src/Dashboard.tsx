@@ -210,6 +210,19 @@ export default function Dashboard() {
     }
   };
 
+  const refreshFiles = async () => {
+    try {
+      const fetchFilesUrl = section === "trash" ? `${API_BASE}/trash` : `${API_BASE}/files`;
+      const res = await fetch(fetchFilesUrl, { cache: "no-store", headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" } });
+      if (res.ok) {
+        const data: BackendFile[] = await res.json();
+        setDbFiles(data.map(mapBackendToFile));
+      }
+    } catch (e) {
+      console.error("Refresh files failed", e);
+    }
+  };
+
   const handleCalibrateQuota = async () => {
     try {
       showToast("🔄 Refreshing metrics...", "info");
@@ -414,20 +427,56 @@ export default function Dashboard() {
       else if (action === "delete") {
         if (!confirm(`Move ${file.name} to trash?`)) return;
         const res = await fetch(`${API_BASE}/files/${file.id}`, { method: "DELETE" });
-        if (res.ok) { showToast("Moved to trash"); setDbFiles(dbFiles.map(f => f.id === file.id ? { ...f, deleted: true } : f)); setSelected(null); }
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === "deleted" || data.status === "success") {
+            showToast("Moved to trash");
+            await refreshFiles();
+            setSelected(null);
+          } else {
+            showToast(`Error: ${data.error || "Unknown error"}`, "error");
+          }
+        } else {
+          showToast("Delete failed", "error");
+        }
       }
       else if (action === "permanent") {
         if (!confirm(`Permanently delete ${file.name}? This cannot be undone.`)) return;
         const res = await fetch(`${API_BASE}/files/${file.id}/permanent`, { method: "DELETE" });
-        if (res.ok) { showToast("Permanently deleted"); setDbFiles(dbFiles.filter(f => f.id !== file.id)); setSelected(null); }
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === "permanently_deleted" || data.status === "success") {
+            showToast("Permanently deleted");
+            await refreshFiles();
+            setSelected(null);
+          } else {
+            showToast(`Error: ${data.error || "Unknown error"}`, "error");
+          }
+        } else {
+          showToast("Delete failed", "error");
+        }
       }
       else if (action === "evict") {
         const res = await fetch(`${API_BASE}/files/${file.id}/evict`, { method: "POST" });
-        if (res.ok) { showToast("Local cache freed"); }
+        if (res.ok) {
+          showToast("Local cache freed");
+        } else {
+          showToast("Action failed", "error");
+        }
       }
       else if (action === "restore") {
         const res = await fetch(`${API_BASE}/files/${file.id}/restore`, { method: "POST" });
-        if (res.ok) { showToast("File restored"); setDbFiles(dbFiles.map(f => f.id === file.id ? { ...f, deleted: false } : f)); }
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === "restored" || data.status === "success") {
+            showToast("File restored");
+            await refreshFiles();
+          } else {
+            showToast(`Error: ${data.error || "Unknown error"}`, "error");
+          }
+        } else {
+          showToast("Restore failed", "error");
+        }
       }
       else if (action === "star") {
         const newStarred = !file.starred;
@@ -437,12 +486,15 @@ export default function Dashboard() {
           body: JSON.stringify({ starred: newStarred })
         });
         if (res.ok) {
+          await res.json(); // Consume response but don't need to validate
           showToast(newStarred ? "Starred" : "Unstarred");
           const updatedFiles = dbFiles.map(f => f.id === file.id ? { ...f, starred: newStarred } : f);
           setDbFiles(updatedFiles);
           if (selected?.id === file.id) {
             setSelected({ ...file, starred: newStarred });
           }
+        } else {
+          showToast("Star action failed", "error");
         }
       }
     } catch (err: any) {
