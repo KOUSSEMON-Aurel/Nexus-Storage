@@ -26,17 +26,18 @@ const (
 )
 
 type Task struct {
-	ID         string    `json:"id"`
-	Type       TaskType  `json:"type"`
-	FilePath   string    `json:"filePath"`
-	Mode       string    `json:"mode"`
-	IsManifest bool      `json:"isManifest"`
-	Status     string    `json:"status"`
-	Progress   float64   `json:"progress"`
-	CreatedAt  time.Time `json:"createdAt"`
-	ParentID   *int64    `json:"parentId"`
-	SHA256     string    `json:"sha256,omitempty"`
-	Password   string    `json:"password,omitempty"`
+	ID                   string    `json:"id"`
+	Type                 TaskType  `json:"type"`
+	FilePath             string    `json:"filePath"`
+	Mode                 string    `json:"mode"`
+	IsManifest           bool      `json:"isManifest"`
+	Status               string    `json:"status"`
+	Progress             float64   `json:"progress"`
+	CreatedAt            time.Time `json:"createdAt"`
+	ParentID             *int64    `json:"parentId"`
+	SHA256               string    `json:"sha256,omitempty"`
+	Password             string    `json:"password,omitempty"`
+	CustomEncryptPassword string    `json:"customEncryptPassword,omitempty"` // Optional 2nd layer encryption
 }
 
 type TaskQueue struct {
@@ -521,6 +522,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		t.Status = fmt.Sprintf("Encrypting Shard %d/%d", i+1, numShards)
 		compressed, _ := q.core.Compress(data, 0)
 		var encrypted []byte
+		
 		if t.IsManifest {
 			// V4: Manifest DB backup uses masterKey (same as file_key encryption)
 			if encryptionSecret == "" {
@@ -528,7 +530,19 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 			}
 			encrypted, err = q.core.Encrypt(compressed, encryptionSecret)
 		} else {
-			encrypted, err = q.core.EncryptWithKey(compressed, rawFileKey)
+			// OPTIMIZATION #6: Double encryption (optional, per-file)
+			// Layer 1: If custom password set, encrypt with it first
+			encrypted = compressed
+			if t.CustomEncryptPassword != "" {
+				encrypted, err = q.core.Encrypt(encrypted, t.CustomEncryptPassword)
+				if err != nil {
+					return fmt.Errorf("custom password encryption failed: %w", err)
+				}
+				log.Printf("[%s] 🔐 Applied custom password encryption (Layer 1)", t.ID)
+			}
+			
+			// Layer 2: Always encrypt with file-specific rawFileKey
+			encrypted, err = q.core.EncryptWithKey(encrypted, rawFileKey)
 		}
 		if err != nil {
 			return err
@@ -622,7 +636,8 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 				if stat, err := os.Stat(t.FilePath); err == nil && stat.IsDir() {
 					isArchive = true
 				}
-				q.db.SaveFileWithKey(filepath.Base(t.FilePath), response.Id, totalSize, t.SHA256[:16], "default-key", t.ParentID, t.SHA256, storedFileKeyHex, isArchive)
+				hasCustomPassword := t.CustomEncryptPassword != ""
+				q.db.SaveFileWithKey(filepath.Base(t.FilePath), response.Id, totalSize, t.SHA256[:16], "default-key", t.ParentID, t.SHA256, storedFileKeyHex, isArchive, hasCustomPassword)
 			}
 			fileRecord, _ := q.db.GetFileByHash(t.SHA256)
 			if fileRecord != nil {
@@ -766,8 +781,12 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 	var rawFileKey []byte
 	fileRecord, _ := q.db.GetFileByHash(t.SHA256)
 	var shardIDs []string
+	// If CustomEncryptPassword is provided, use it for decryption layer 1
+	needsCustomPassword := t.CustomEncryptPassword != ""
+	
 	if fileRecord != nil {
 		shardIDs, _ = q.db.GetShardsForFile(fileRecord.ID)
+		
 		// V3: Try to recover the per-file key
 		if fileRecord.FileKey != "" {
 			log.Printf("[%s] 🔍 Attempting to decrypt file_key (%d bytes hex)...", t.ID, len(fileRecord.FileKey))
@@ -882,6 +901,16 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 
 		if err != nil {
 			return fmt.Errorf("decryption failed: %w", err)
+		}
+
+		// OPTIMIZATION #6: Double decryption (optional, per-file)
+		// If file has custom password, decrypt the second layer
+		if needsCustomPassword {
+			log.Printf("[%s] 🔑 Shard %d: Decrypting custom password layer (Layer 1)", t.ID, i+1)
+			decrypted, err = q.core.Decrypt(decrypted, t.CustomEncryptPassword)
+			if err != nil {
+				return fmt.Errorf("custom password decryption failed (wrong password?): %w", err)
+			}
 		}
 
 		t.Status = fmt.Sprintf("Decompressing Shard %d/%d", i+1, len(shardIDs))

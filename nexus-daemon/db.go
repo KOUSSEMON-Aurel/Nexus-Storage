@@ -18,19 +18,19 @@ type Database struct {
 }
 
 type FileRecord struct {
-	ID         int64
-	Path       string
-	VideoID    string
-	Size       int64
-	Hash       string
-	Key        string
+	ID        int64
+	Path      string
+	VideoID   string
+	Size      int64
+	Hash      string
+	Key       string
 	LastUpdate string
-	Starred    bool
-	DeletedAt  *string
-	ParentID   *int64
-	SHA256     string
-	FileKey    string // V3: per-file encryption key (hex-encoded, encrypted with master)
-	IsArchive  bool   // V3: true if the payload is a .tar archive
+	Starred   bool
+	DeletedAt *string
+	ParentID  *int64
+	SHA256    string
+	FileKey   string // V3: per-file encryption key (hex-encoded, encrypted with master)
+	IsArchive bool   // V3: true if the payload is a .tar archive
 }
 
 type FolderRecord struct {
@@ -186,7 +186,9 @@ func (d *Database) Init(dbPath string) error {
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`)
 
-	// Initialize kv_store with default values if they don't exist
+	// V5 Migrations (Optional password-based encryption)
+	runMigrate("add_has_custom_password", `ALTER TABLE files ADD COLUMN has_custom_password BOOLEAN DEFAULT 0`)
+	runMigrate("add_custom_password_hint", `ALTER TABLE files ADD COLUMN custom_password_hint TEXT DEFAULT ''`)
 	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('manifest_version', '0')`)
 	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('last_push_lsn', '0')`)
 	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('last_push_hash', '')`)
@@ -224,7 +226,6 @@ func (d *Database) GetFileByHash(sha256 string) (*FileRecord, error) {
 	return &f, err
 }
 
-// GetFileByVideoID retrieves a file record by its primary video ID (first shard)
 func (d *Database) GetFileByVideoID(videoID string) (*FileRecord, error) {
 	var f FileRecord
 	err := d.db.QueryRow(`
@@ -239,13 +240,13 @@ func (d *Database) GetFileByVideoID(videoID string) (*FileRecord, error) {
 func (d *Database) SearchFiles(query string) ([]FileRecord, error) {
 	// Try FTS5 first (fast, requires -tags fts5 at build time)
 	rows, err := d.db.Query(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
 		FROM files WHERE id IN (SELECT rowid FROM files_fts WHERE path MATCH ?)`, query+"*")
 	if err != nil {
 		// FTS5 not available — fall back to LIKE (slower but always works)
 		log.Printf("⚠️  FTS5 unavailable, falling back to LIKE search: %v", err)
 		rows, err = d.db.Query(`
-			SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
+			SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
 			FROM files WHERE path LIKE ? AND deleted_at IS NULL`, "%"+query+"%")
 		if err != nil {
 			return nil, err
@@ -498,13 +499,13 @@ func (d *Database) SetRecoveryPacketDriveID(driveID string) error {
 }
 
 func (d *Database) SaveFile(path, videoID string, size int64, hash, key string, parentID *int64, sha256 string, isArchive bool) error {
-	return d.SaveFileWithKey(path, videoID, size, hash, key, parentID, sha256, "", isArchive)
+	return d.SaveFileWithKey(path, videoID, size, hash, key, parentID, sha256, "", isArchive, false)
 }
 
-func (d *Database) SaveFileWithKey(path, videoID string, size int64, hash, key string, parentID *int64, sha256, fileKey string, isArchive bool) error {
+func (d *Database) SaveFileWithKey(path, videoID string, size int64, hash, key string, parentID *int64, sha256, fileKey string, isArchive bool, hasCustomPassword bool) error {
 	query := `
-	INSERT INTO files (path, video_id, size, hash, key, parent_id, sha256, file_key, is_archive)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO files (path, video_id, size, hash, key, parent_id, sha256, file_key, is_archive, has_custom_password)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(path) DO UPDATE SET
 		video_id = excluded.video_id,
 		size = excluded.size,
@@ -514,10 +515,11 @@ func (d *Database) SaveFileWithKey(path, videoID string, size int64, hash, key s
 		sha256 = excluded.sha256,
 		file_key = excluded.file_key,
 		is_archive = excluded.is_archive,
+		has_custom_password = excluded.has_custom_password,
 		last_update = CURRENT_TIMESTAMP,
 		deleted_at = NULL;
 	`
-	if _, err := d.db.Exec(query, path, videoID, size, hash, key, parentID, sha256, fileKey, isArchive); err != nil {
+	if _, err := d.db.Exec(query, path, videoID, size, hash, key, parentID, sha256, fileKey, isArchive, hasCustomPassword); err != nil {
 		return fmt.Errorf("could not save file: %w", err)
 	}
 	d.IncrementLSN()

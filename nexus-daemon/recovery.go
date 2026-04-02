@@ -274,6 +274,7 @@ func (q *TaskQueue) ApplyRestoredManifestToDB(manifest *DecryptedManifest) error
 			entry.SHA256,
 			entry.FileKeyEncrypted, // The encrypted file_key
 			false, // is_archive
+			false, // has_custom_password
 		)
 		if err != nil {
 			log.Printf("⚠️  Failed to restore file %s: %v", entry.FileName, err)
