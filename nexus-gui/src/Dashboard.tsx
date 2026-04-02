@@ -247,6 +247,57 @@ export default function Dashboard() {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
+  // ─── LSN REAL-TIME UPDATES (Server-Sent Events) ──────────────────────────
+  // Subscribe to DB change notifications and refresh files instantly
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const connectLSNWatch = () => {
+      try {
+        eventSource = new EventSource(`${API_BASE}/lsn/watch`);
+        
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            // On any LSN change, refresh files immediately (not waiting for poll)
+            if (data.type === "change" || data.type === "init") {
+              // Debounce rapid changes with a small delay
+              if (reconnectTimeout) clearTimeout(reconnectTimeout);
+              reconnectTimeout = setTimeout(() => {
+                if (isAppReady) refreshFiles();
+              }, 100);
+            }
+          } catch (e) {
+            // Ignore parse errors for SSE
+          }
+        };
+
+        eventSource.onerror = () => {
+          console.warn("LSN watch disconnected, will reconnect in 3s");
+          eventSource?.close();
+          eventSource = null;
+          // Attempt reconnect after 3 seconds
+          if (reconnectTimeout) clearTimeout(reconnectTimeout);
+          reconnectTimeout = setTimeout(connectLSNWatch, 3000);
+        };
+      } catch (e) {
+        console.error("LSN watch connection failed", e);
+      }
+    };
+
+    // Start watching only after app is ready
+    const timer = setTimeout(() => {
+      if (isAppReady) connectLSNWatch();
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      eventSource?.close();
+    };
+  }, [isAppReady]);
+
   // ─── INITIALIZATION & GATING ──────────────────────────────────────────────
   useEffect(() => {
     let unmount = false;

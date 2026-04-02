@@ -969,3 +969,51 @@ func (q *TaskQueue) handleDelete(t *Task) error {
 	t.Progress = 90
 	return nil
 }
+
+// CleanupOrphanedVideos finds permanently deleted files with VideoIDs that don't have a deletion task queued.
+// This handles race conditions where DB delete succeeds but task queueing fails.
+func (q *TaskQueue) CleanupOrphanedVideos() error {
+	if q.db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	// Get all deleted files
+	deletedFiles, err := q.db.ListTrash()
+	if err != nil {
+		return fmt.Errorf("failed to list trash: %v", err)
+	}
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	var orphanCount int
+	for _, file := range deletedFiles {
+		// Skip files without VideoID
+		if file.VideoID == "" {
+			continue
+		}
+
+		// Check if this VideoID already has a delete task queued
+		if _, taskExists := q.tasks[file.VideoID]; !taskExists {
+			// This is an orphan - queue the deletion task
+			orphanTask := &Task{
+				ID:        file.VideoID,
+				Type:      TaskDelete,
+				Status:    "Pending (Orphan Cleanup)",
+				CreatedAt: time.Now(),
+			}
+			q.tasks[file.VideoID] = orphanTask
+			go func(task *Task) {
+				q.taskChan <- task
+			}(orphanTask)
+			orphanCount++
+			log.Printf("🔧 Orphan Cleanup: Queued deletion for orphaned VideoID %s", file.VideoID)
+		}
+	}
+
+	if orphanCount > 0 {
+		log.Printf("✅ Orphan Cleanup: Found and queued %d orphaned videos for deletion", orphanCount)
+	}
+
+	return nil
+}

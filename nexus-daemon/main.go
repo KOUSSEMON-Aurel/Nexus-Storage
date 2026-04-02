@@ -168,6 +168,10 @@ func main() {
 	// schedule it to run once per day at 3:00 AM
 	go scheduleTrashCleanup(db, &queue)
 
+	// 9. ROBUSTNESS #2: Orphaned video cleanup (handles race conditions in delete operations)
+	// Run at startup and then every hour to catch any orphaned videos
+	go scheduleOrphanCleanup(&queue)
+
 	// Keep alive until interrupted
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -232,6 +236,30 @@ func scheduleTrashCleanup(db *Database, queue *TaskQueue) {
 			} else {
 				log.Printf("ℹ️  [SCHEDULED] No expired trash found")
 			}
+		}
+	}
+}
+
+// scheduleOrphanCleanup runs cleanup for orphaned videos on startup and hourly thereafter
+func scheduleOrphanCleanup(queue *TaskQueue) {
+	// Run at startup immediately
+	log.Printf("🔧 [STARTUP] Running orphan video cleanup...")
+	if err := queue.CleanupOrphanedVideos(); err != nil {
+		log.Printf("❌ [STARTUP] Orphan cleanup failed: %v", err)
+	} else {
+		log.Printf("✅ [STARTUP] Orphan cleanup completed")
+	}
+
+	// Then run every hour
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		log.Printf("🔧 [HOURLY] Running orphan video cleanup...")
+		if err := queue.CleanupOrphanedVideos(); err != nil {
+			log.Printf("❌ [HOURLY] Orphan cleanup failed: %v", err)
+		} else {
+			log.Printf("✅ [HOURLY] Orphan cleanup completed")
 		}
 	}
 }

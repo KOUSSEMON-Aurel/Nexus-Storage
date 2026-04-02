@@ -77,6 +77,9 @@ func (s *APIServer) Start(port int) {
 	mux.HandleFunc("/api/download/shared", s.handleSharedDownload)
 	mux.HandleFunc("/api/settings/trash", s.handleTrashSettings)
 
+	// LSN Real-time Updates (Server-Sent Events for instant UI refresh)
+	mux.HandleFunc("/api/lsn/watch", s.handleLSNWatch)
+
 	handler := corsMiddleware(mux)
 	fmt.Printf("🌐 API Server starting on http://localhost:%d\n", port)
 	
@@ -194,13 +197,16 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.queue.RequestManifestBackup()
+		// Queue YouTube video deletion if VideoID present
+		// Task queueing is async - if orphaned tasks slip through, hourly cleanup will catch them
 		if fileRec != nil && fileRec.VideoID != "" {
-			s.queue.AddTask(&Task{
+			task := &Task{
 				ID:        fileRec.VideoID,
 				Type:      TaskDelete,
 				Status:    "Pending",
 				CreatedAt: time.Now(),
-			})
+			}
+			s.queue.AddTask(task)
 		}
 		jsonOK(w, map[string]string{"status": "permanently_deleted"})
 
@@ -885,6 +891,56 @@ func (s *APIServer) handleTrashSettings(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+// handleLSNWatch implements Server-Sent Events for real-time DB change notifications
+// Clients connect and receive LSN updates whenever the database changes
+func (s *APIServer) handleLSNWatch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Set headers for Server-Sent Events
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Server does not support flushing", http.StatusInternalServerError)
+		return
+	}
+
+	// Get initial LSN
+	lastLSN, _ := s.db.GetLocalLSN()
+	fmt.Fprintf(w, "data: {\"lsn\":%d,\"type\":\"init\"}\n\n", lastLSN)
+	flusher.Flush()
+
+	// Poll for LSN changes every 500ms
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	// Context for early exit
+	ctx := r.Context()
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Client disconnected
+			return
+		case <-ticker.C:
+			// Check if LSN has changed
+			currentLSN, _ := s.db.GetLocalLSN()
+			if currentLSN != lastLSN {
+				// LSN changed - notify client
+				fmt.Fprintf(w, "data: {\"lsn\":%d,\"type\":\"change\"}\n\n", currentLSN)
+				flusher.Flush()
+				lastLSN = currentLSN
+			}
+		}
+	}
 }
 
 func httpError(w http.ResponseWriter, err error, code int) {
