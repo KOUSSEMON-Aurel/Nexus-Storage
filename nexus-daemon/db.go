@@ -18,19 +18,20 @@ type Database struct {
 }
 
 type FileRecord struct {
-	ID        int64
-	Path      string
-	VideoID   string
-	Size      int64
-	Hash      string
-	Key       string
-	LastUpdate string
-	Starred   bool
-	DeletedAt *string
-	ParentID  *int64
-	SHA256    string
-	FileKey   string // V3: per-file encryption key (hex-encoded, encrypted with master)
-	IsArchive bool   // V3: true if the payload is a .tar archive
+	ID                int64
+	Path              string
+	VideoID           string
+	Size              int64
+	Hash              string
+	Key               string
+	LastUpdate        string
+	Starred           bool
+	DeletedAt         *string
+	ParentID          *int64
+	SHA256            string
+	FileKey           string // V3: per-file encryption key (hex-encoded, encrypted with master)
+	IsArchive         bool   // V3: true if the payload is a .tar archive
+	HasCustomPassword bool   // V5: true if file has optional custom encryption password
 }
 
 type FolderRecord struct {
@@ -218,8 +219,8 @@ func (d *Database) Init(dbPath string) error {
 func (d *Database) GetFileByHash(sha256 string) (*FileRecord, error) {
 	var f FileRecord
 	err := d.db.QueryRow(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
-		FROM files WHERE sha256 = ? LIMIT 1`, sha256).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
+		FROM files WHERE sha256 = ? LIMIT 1`, sha256).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -229,8 +230,8 @@ func (d *Database) GetFileByHash(sha256 string) (*FileRecord, error) {
 func (d *Database) GetFileByVideoID(videoID string) (*FileRecord, error) {
 	var f FileRecord
 	err := d.db.QueryRow(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
-		FROM files WHERE video_id = ? LIMIT 1`, videoID).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
+		FROM files WHERE video_id = ? LIMIT 1`, videoID).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -670,7 +671,7 @@ func (d *Database) ListFiles() ([]FileRecord, error) {
 	defer d.mu.Unlock()
 
 	rows, err := d.db.Query(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
 		FROM files WHERE deleted_at IS NULL ORDER BY last_update DESC`)
 	if err != nil {
 		return nil, err
@@ -679,7 +680,7 @@ func (d *Database) ListFiles() ([]FileRecord, error) {
 	var files []FileRecord
 	for rows.Next() {
 		var f FileRecord
-		err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive)
+		err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
 		if err == nil {
 			files = append(files, f)
 		} else {

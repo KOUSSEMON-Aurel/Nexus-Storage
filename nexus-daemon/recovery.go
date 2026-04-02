@@ -36,14 +36,15 @@ type DecryptedManifest struct {
 
 // FileEntry represents a single file in the manifest
 type FileEntry struct {
-	FileID           int64        `json:"file_id"`
-	SHA256           string       `json:"sha256"`
-	FileName         string       `json:"file_name"`
-	VideoID          string       `json:"video_id"`           // primary YouTube shard
-	FileKeyEncrypted string       `json:"file_key_encrypted"` // hex, encrypted with masterKey
-	Status           string       `json:"status"`             // "pending" | "confirmed"
-	CreatedAt        string       `json:"created_at"`
-	Shards           []ShardEntry `json:"shards"`
+	FileID            int64        `json:"file_id"`
+	SHA256            string       `json:"sha256"`
+	FileName          string       `json:"file_name"`
+	VideoID           string       `json:"video_id"`           // primary YouTube shard
+	FileKeyEncrypted  string       `json:"file_key_encrypted"` // hex, encrypted with masterKey
+	HasCustomPassword bool         `json:"has_custom_password"` // V5: true if file has optional custom encryption
+	Status            string       `json:"status"`             // "pending" | "confirmed"
+	CreatedAt         string       `json:"created_at"`
+	Shards            []ShardEntry `json:"shards"`
 }
 
 // ShardEntry represents a single shard video on YouTube
@@ -100,14 +101,15 @@ func (q *TaskQueue) BuildDecryptedManifest() (*DecryptedManifest, error) {
 		}
 
 		entry := FileEntry{
-			FileID:           f.ID,
-			SHA256:           f.SHA256,
-			FileName:         f.Path,
-			VideoID:          f.VideoID,
-			FileKeyEncrypted: f.FileKey, // Already encrypted (hex)
-			Status:           "confirmed", // Default; upload flow updates to "pending" first
-			CreatedAt:        f.LastUpdate,
-			Shards:           shards,
+			FileID:            f.ID,
+			SHA256:            f.SHA256,
+			FileName:          f.Path,
+			VideoID:           f.VideoID,
+			FileKeyEncrypted:  f.FileKey, // Already encrypted (hex)
+			HasCustomPassword: f.HasCustomPassword, // V5: flag for optional custom encryption
+			Status:            "confirmed", // Default; upload flow updates to "pending" first
+			CreatedAt:         f.LastUpdate,
+			Shards:            shards,
 		}
 		manifest.Files = append(manifest.Files, entry)
 	}
