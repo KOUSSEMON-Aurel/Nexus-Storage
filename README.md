@@ -125,5 +125,5 @@ cd Nexus-Storage
 
 <div align="center">
   <p><i>Developed for Absolute Persistence. Built for the Decentralized Era.</i></p>
-  <img src="https://img.shields.io/badge/Maintained%20by-Antigravity-blue?style=flat-square" alt="Antigravity" />
+  <img src="https://img.shields.io/badge/Maintained%20by-Me-blue?style=flat-square" alt="Antigravity" />
 </div>
