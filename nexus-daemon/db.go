@@ -718,37 +718,64 @@ func (d *Database) ListTrash() ([]FileRecord, error) {
 func (d *Database) SoftDelete(id int64) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	log.Printf("🗑️ DB: SoftDelete id=%d", id)
 	_, err := d.db.Exec(
 		`UPDATE files SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
-	d.IncrementLSN()
+	if err != nil {
+		log.Printf("❌ DB: SoftDelete failed id=%d err=%v", id, err)
+		return err
+	}
+	lsn, lsnErr := d.IncrementLSN()
+	if lsnErr != nil {
+		log.Printf("⚠️ DB: SoftDelete IncrementLSN failed id=%d err=%v", id, lsnErr)
+	}
+	log.Printf("✅ DB: SoftDelete complete id=%d lsn=%d", id, lsn)
 	if err == nil && d.OnConfigChange != nil {
 		d.OnConfigChange()
 	}
-	return err
+	return nil
 }
 
 // Restore moves a file out of trash.
 func (d *Database) Restore(id int64) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	log.Printf("♻️ DB: Restore id=%d", id)
 	_, err := d.db.Exec(`UPDATE files SET deleted_at = NULL WHERE id = ?`, id)
-	d.IncrementLSN()
+	if err != nil {
+		log.Printf("❌ DB: Restore failed id=%d err=%v", id, err)
+		return err
+	}
+	lsn, lsnErr := d.IncrementLSN()
+	if lsnErr != nil {
+		log.Printf("⚠️ DB: Restore IncrementLSN failed id=%d err=%v", id, lsnErr)
+	}
+	log.Printf("✅ DB: Restore complete id=%d lsn=%d", id, lsn)
 	if err == nil && d.OnConfigChange != nil {
 		d.OnConfigChange()
 	}
-	return err
+	return nil
 }
 
 // PermanentDelete removes the record entirely.
 func (d *Database) PermanentDelete(id int64) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	log.Printf("🗑️ DB: PermanentDelete id=%d", id)
 	_, err := d.db.Exec(`DELETE FROM files WHERE id = ?`, id)
-	d.IncrementLSN()
+	if err != nil {
+		log.Printf("❌ DB: PermanentDelete failed id=%d err=%v", id, err)
+		return err
+	}
+	lsn, lsnErr := d.IncrementLSN()
+	if lsnErr != nil {
+		log.Printf("⚠️ DB: PermanentDelete IncrementLSN failed id=%d err=%v", id, lsnErr)
+	}
+	log.Printf("✅ DB: PermanentDelete complete id=%d lsn=%d", id, lsn)
 	if err == nil && d.OnConfigChange != nil {
 		d.OnConfigChange()
 	}
-	return err
+	return nil
 }
 
 // ─── Sync Support ─────────────────────────────────────────────────────────────

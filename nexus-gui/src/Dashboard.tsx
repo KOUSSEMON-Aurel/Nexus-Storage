@@ -384,10 +384,14 @@ export default function Dashboard() {
 
         // Files polling
         if (tick % 2 === 0) { // Every 4s
+          console.log("Polling files", { section, fetchFilesUrl, tick });
           const filesRes = await fetch(fetchFilesUrl, fetchOpts);
           if (filesRes.ok) {
             const data: BackendFile[] = await filesRes.json();
+            console.log("Polling files result count", data.length);
             setDbFiles(data.map(mapBackendToFile));
+          } else {
+            console.warn("Polling files failed", filesRes.status);
           }
         }
 
@@ -477,9 +481,12 @@ export default function Dashboard() {
       }
       else if (action === "delete") {
         if (!confirm(`Move ${file.name} to trash?`)) return;
+        console.log("Action delete-> API call", file.id);
         const res = await fetch(`${API_BASE}/files/${file.id}`, { method: "DELETE" });
+        console.log("Action delete-> API response", res.status);
         if (res.ok) {
           const data = await res.json();
+          console.log("Action delete-> API body", data);
           if (data.status === "deleted" || data.status === "success") {
             showToast("Moved to trash");
             await refreshFiles();

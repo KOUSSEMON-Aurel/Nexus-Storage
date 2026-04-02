@@ -142,10 +142,13 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 	switch {
 	// DELETE /api/files/{id}  → soft delete
 	case action == "" && r.Method == http.MethodDelete:
+		log.Printf("🗑️  API: Soft deleting file id=%d", id)
 		if err := s.db.SoftDelete(id); err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
 		}
+		lsn, _ := s.db.GetLocalLSN()
+		log.Printf("🗑️  Soft delete complete id=%d, lsn=%d", id, lsn)
 		s.queue.RequestManifestBackup()
 		jsonOK(w, map[string]string{"status": "deleted"})
 		
@@ -182,20 +185,26 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 
 	// POST /api/files/{id}/restore
 	case action == "restore" && r.Method == http.MethodPost:
+		log.Printf("♻️  API: Restoring file id=%d", id)
 		if err := s.db.Restore(id); err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
 		}
+		lsn, _ := s.db.GetLocalLSN()
+		log.Printf("♻️  Restore complete id=%d, lsn=%d", id, lsn)
 		s.queue.RequestManifestBackup()
 		jsonOK(w, map[string]string{"status": "restored"})
 
 	// DELETE /api/files/{id}/permanent
 	case action == "permanent" && r.Method == http.MethodDelete:
+		log.Printf("🗑️ API: Permanently deleting file id=%d", id)
 		fileRec, _ := s.db.GetFileByID(id)
 		if err := s.db.PermanentDelete(id); err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
 		}
+		lsn, _ := s.db.GetLocalLSN()
+		log.Printf("🗑️  Permanent delete complete id=%d, lsn=%d", id, lsn)
 		s.queue.RequestManifestBackup()
 		// Queue YouTube video deletion if VideoID present
 		// Task queueing is async - if orphaned tasks slip through, hourly cleanup will catch them
