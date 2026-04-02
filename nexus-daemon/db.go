@@ -730,9 +730,6 @@ func (d *Database) SoftDelete(id int64) error {
 		log.Printf("⚠️ DB: SoftDelete IncrementLSN failed id=%d err=%v", id, lsnErr)
 	}
 	log.Printf("✅ DB: SoftDelete complete id=%d lsn=%d", id, lsn)
-	if err == nil && d.OnConfigChange != nil {
-		d.OnConfigChange()
-	}
 	return nil
 }
 
@@ -751,9 +748,6 @@ func (d *Database) Restore(id int64) error {
 		log.Printf("⚠️ DB: Restore IncrementLSN failed id=%d err=%v", id, lsnErr)
 	}
 	log.Printf("✅ DB: Restore complete id=%d lsn=%d", id, lsn)
-	if err == nil && d.OnConfigChange != nil {
-		d.OnConfigChange()
-	}
 	return nil
 }
 
@@ -772,9 +766,6 @@ func (d *Database) PermanentDelete(id int64) error {
 		log.Printf("⚠️ DB: PermanentDelete IncrementLSN failed id=%d err=%v", id, lsnErr)
 	}
 	log.Printf("✅ DB: PermanentDelete complete id=%d lsn=%d", id, lsn)
-	if err == nil && d.OnConfigChange != nil {
-		d.OnConfigChange()
-	}
 	return nil
 }
 
