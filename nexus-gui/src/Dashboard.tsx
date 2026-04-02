@@ -1445,6 +1445,7 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
   const [mode, setMode] = useState<string>("base");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [useCustomPassword, setUseCustomPassword] = useState(false);
   const [isFolder, setIsFolder] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
 
@@ -1514,40 +1515,74 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
 
         {/* Custom Encryption Password (Optional) */}
         <div>
-           <p style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Custom Encryption Password (Optional)</p>
-           <div style={{ position: "relative" }}>
-             <Lock size={16} color={c.textSecondary} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-             <input
-               type={showPassword ? "text" : "password"}
-               placeholder="Leave empty for automatic encryption (recommended)"
-               value={password}
-               onChange={(e) => setPassword(e.target.value)}
-               style={{ width: "100%", padding: "12px 40px 12px 40px", borderRadius: 10, background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
-             />
+           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+             <p style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>Custom Password Protection</p>
              <button
-               type="button"
-               onClick={() => setShowPassword(!showPassword)}
+               onClick={() => {
+                 setUseCustomPassword(!useCustomPassword);
+                 if (!useCustomPassword) setShowPassword(false);
+                 setPassword("");
+               }}
                style={{
-                 position: "absolute",
-                 right: 12,
-                 top: "50%",
-                 transform: "translateY(-50%)",
-                 background: "none",
-                 border: "none",
-                 cursor: "pointer",
-                 color: c.textSecondary,
                  display: "flex",
                  alignItems: "center",
-                 padding: 4
+                 gap: 8,
+                 padding: "6px 12px",
+                 borderRadius: 6,
+                 background: useCustomPassword ? "#E8F0FE" : c.bgApp,
+                 border: `1px solid ${useCustomPassword ? "#1A73E8" : c.border}`,
+                 cursor: "pointer",
+                 fontSize: 12,
+                 fontWeight: 600,
+                 color: useCustomPassword ? "#1A73E8" : c.textSecondary,
+                 transition: "all 0.2s"
                }}
              >
-               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+               <Lock size={14} />
+               {useCustomPassword ? "Enabled" : "Disabled"}
              </button>
-           </div>           
-           {/* Info text */}
-           <div style={{ marginTop: 8, fontSize: 11, color: c.textSecondary }}>
-             ℹ️ Encryption is automatic via your Google account. Add a custom password here only if you want extra protection for this specific file.
            </div>
+           {useCustomPassword && (
+             <div style={{ position: "relative" }}>
+               <Lock size={16} color={c.textSecondary} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+               <input
+                 type={showPassword ? "text" : "password"}
+                 placeholder="Enter password (write it down, it cannot be recovered!)"
+                 value={password}
+                 onChange={(e) => setPassword(e.target.value)}
+                 style={{ width: "100%", padding: "12px 40px 12px 40px", borderRadius: 10, background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
+               />
+               <button
+                 type="button"
+                 onClick={() => setShowPassword(!showPassword)}
+                 style={{
+                   position: "absolute",
+                   right: 12,
+                   top: "50%",
+                   transform: "translateY(-50%)",
+                   background: "none",
+                   border: "none",
+                   cursor: "pointer",
+                   color: c.textSecondary,
+                   display: "flex",
+                   alignItems: "center",
+                   padding: 4
+                 }}
+               >
+                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+               </button>
+             </div>
+           )}
+           {useCustomPassword && (
+             <div style={{ marginTop: 8, fontSize: 11, color: "#D33B27" }}>
+               ⚠️ <strong>Important:</strong> If you forget this password, your file will be locked forever. Write it down!
+             </div>
+           )}
+           {!useCustomPassword && (
+             <div style={{ marginTop: 8, fontSize: 11, color: c.textSecondary }}>
+               ℹ️ Encryption is automatic via your Google account. Password protection is optional.
+             </div>
+           )}
         </div>
 
         {/* Mode */}
@@ -1576,7 +1611,7 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
         </div>
         <button 
           disabled={!selectedPath}
-          onClick={() => selectedPath && onUpload(selectedPath, mode, password, isFolder)}
+          onClick={() => selectedPath && onUpload(selectedPath, mode, useCustomPassword ? password : "", isFolder)}
           style={{ 
             width: "100%", padding: "13px 20px", borderRadius: 12, 
             background: !selectedPath ? c.border : "#1A73E8", 
