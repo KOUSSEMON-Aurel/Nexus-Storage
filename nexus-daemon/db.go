@@ -760,14 +760,17 @@ func (d *Database) Restore(id int64) error {
 
 // PermanentDelete removes the record entirely.
 func (d *Database) PermanentDelete(id int64) error {
+	// Lock only for the DB update; release before IncrementLSN to avoid deadlock.
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	log.Printf("🗑️ DB: PermanentDelete id=%d", id)
 	_, err := d.db.Exec(`DELETE FROM files WHERE id = ?`, id)
 	if err != nil {
 		log.Printf("❌ DB: PermanentDelete failed id=%d err=%v", id, err)
+		d.mu.Unlock()
 		return err
 	}
+	d.mu.Unlock()
+
 	lsn, lsnErr := d.IncrementLSN()
 	if lsnErr != nil {
 		log.Printf("⚠️ DB: PermanentDelete IncrementLSN failed id=%d err=%v", id, lsnErr)
