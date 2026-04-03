@@ -716,15 +716,19 @@ func (d *Database) ListTrash() ([]FileRecord, error) {
 
 // SoftDelete moves a file to trash.
 func (d *Database) SoftDelete(id int64) error {
+	// Lock only for the DB update, release before IncrementLSN to avoid
+	// deadlock (IncrementLSN performs its own locking).
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	log.Printf("🗑️ DB: SoftDelete id=%d", id)
 	_, err := d.db.Exec(
 		`UPDATE files SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
 	if err != nil {
 		log.Printf("❌ DB: SoftDelete failed id=%d err=%v", id, err)
+		d.mu.Unlock()
 		return err
 	}
+	d.mu.Unlock()
+
 	lsn, lsnErr := d.IncrementLSN()
 	if lsnErr != nil {
 		log.Printf("⚠️ DB: SoftDelete IncrementLSN failed id=%d err=%v", id, lsnErr)
@@ -735,14 +739,17 @@ func (d *Database) SoftDelete(id int64) error {
 
 // Restore moves a file out of trash.
 func (d *Database) Restore(id int64) error {
+	// Lock only for the DB update, release before IncrementLSN to avoid deadlock.
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	log.Printf("♻️ DB: Restore id=%d", id)
 	_, err := d.db.Exec(`UPDATE files SET deleted_at = NULL WHERE id = ?`, id)
 	if err != nil {
 		log.Printf("❌ DB: Restore failed id=%d err=%v", id, err)
+		d.mu.Unlock()
 		return err
 	}
+	d.mu.Unlock()
+
 	lsn, lsnErr := d.IncrementLSN()
 	if lsnErr != nil {
 		log.Printf("⚠️ DB: Restore IncrementLSN failed id=%d err=%v", id, lsnErr)
@@ -854,7 +861,6 @@ func (d *Database) HasFailedSyncs() (bool, error) {
 // CleanupTrash removes files that have been in trash longer than 'days'.
 func (d *Database) CleanupTrash(days int) ([]string, error) {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	threshold := time.Now().AddDate(0, 0, -days).Format("2006-01-02 15:04:05")
 	
 	// Find VideoIDs to also queue cloud deletion
@@ -873,10 +879,7 @@ func (d *Database) CleanupTrash(days int) ([]string, error) {
 	}
 
 	_, err = d.db.Exec(`DELETE FROM files WHERE deleted_at < ? AND deleted_at IS NOT NULL`, threshold)
-	if err == nil && d.OnConfigChange != nil {
-		d.OnConfigChange()
-	}
-	
+	d.mu.Unlock()
 	return videoIDs, err
 }
 
