@@ -50,11 +50,11 @@ func (s *SyncManager) retryWithBackoff(maxAttempts int, opName string, fn func(c
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		err := fn(ctx)
 		cancel()
-		
+
 		if err == nil {
 			return nil
 		}
-		
+
 		lastErr = err
 		if attempt < maxAttempts {
 			backoffDur := time.Duration(math.Pow(2, float64(attempt-1))) * time.Second
@@ -128,13 +128,19 @@ func (s *SyncManager) PushDBToDrive() error {
 				return nil
 			}
 			// CRITICAL: Spec rule — same LSN but different hash = conflict. Do not push.
-			return fmt.Errorf("CONFLICT DETECTED: Local LSN matches remote (%d) but hash differs.\n  Local: %s\n  Remote: %s\nManual intervention required. Do not proceed with push.", 
+			return fmt.Errorf("CONFLICT DETECTED: Local LSN matches remote (%d) but hash differs.\n  Local: %s\n  Remote: %s\nManual intervention required. Do not proceed with push.",
 				localLSN, localHash[:16], remoteManifest.HashSHA256[:16])
 		}
 	}
 
-	// 6. Calculate Hash and Record Count
-	localHash, err := s.CalculateDBHash()
+	// 6. Create a consistent DB snapshot, calculate Hash and Record Count
+	tmpSnapshot := s.dbPath + ".push_tmp"
+	if err := s.createDBSnapshot(tmpSnapshot); err != nil {
+		return fmt.Errorf("failed to create DB snapshot: %w", err)
+	}
+	defer os.Remove(tmpSnapshot)
+
+	localHash, err := s.calculateFileHash(tmpSnapshot)
 	if err != nil {
 		return err
 	}
@@ -143,7 +149,7 @@ func (s *SyncManager) PushDBToDrive() error {
 		return err
 	}
 
-	// 7. Upload to Drive (Atomic)
+	// 7. Upload snapshot to Drive (Atomic)
 	manifest := SyncManifest{
 		LSN:         localLSN,
 		HashSHA256:  localHash,
@@ -151,7 +157,7 @@ func (s *SyncManager) PushDBToDrive() error {
 		RecordCount: recordCount,
 	}
 
-	if err := s.UploadToDrive(manifest); err != nil {
+	if err := s.UploadDBFileToDrive(manifest, tmpSnapshot); err != nil {
 		return fmt.Errorf("upload failed: %w", err)
 	}
 
@@ -252,7 +258,7 @@ func (s *SyncManager) PullDBFromDrive(force bool) error {
 	if err := os.Rename(tempPath, s.dbPath); err != nil {
 		return fmt.Errorf("failed to replace local DB: %w", err)
 	}
-	
+
 	// Re-open DB
 	if err := s.db.Init(s.dbPath); err != nil {
 		// This is bad, we might need to restore the backup
@@ -272,16 +278,16 @@ func (s *SyncManager) GetRemoteManifest() (*SyncManifest, error) {
 	// Spec: Must read remote LSN before push, but first push has no manifest
 	var lastErr error
 	maxAttempts := 2
-	
+
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		manifest, err := s.getRemoteManifestWithContext(ctx)
 		cancel()
-		
+
 		if err == nil {
 			return manifest, nil
 		}
-		
+
 		lastErr = err
 		if attempt < maxAttempts && !isNotFoundError(err) {
 			backoffDur := time.Duration(math.Pow(2, float64(attempt-1))) * time.Second
@@ -332,6 +338,7 @@ func (s *SyncManager) getRemoteManifestWithContext(ctx context.Context) (*SyncMa
 
 // Helper to detect "not found" errors (not retryable, just first backup)
 type notFoundError struct{ msg string }
+
 func (e *notFoundError) Error() string { return e.msg }
 func isNotFoundError(err error) bool {
 	_, ok := err.(*notFoundError)
@@ -340,6 +347,28 @@ func isNotFoundError(err error) bool {
 
 func (s *SyncManager) CalculateDBHash() (string, error) {
 	return s.calculateFileHash(s.dbPath)
+}
+
+// createDBSnapshot tries to produce a consistent snapshot of the DB at destPath.
+// Preferred method is `VACUUM INTO` (atomic and consistent). If not supported
+// fall back to checkpoint + file copy.
+func (s *SyncManager) createDBSnapshot(destPath string) error {
+	// Try VACUUM INTO first (requires recent SQLite)
+	_, err := s.db.db.Exec(fmt.Sprintf("VACUUM INTO '%s'", destPath))
+	if err == nil {
+		return nil
+	}
+
+	// Fallback: checkpoint WAL and copy file
+	if cerr := s.db.Checkpoint(); cerr != nil {
+		return fmt.Errorf("snapshot checkpoint failed: %w (vacuum err: %v)", cerr, err)
+	}
+
+	// Copy the DB file to destPath
+	if copyErr := s.copyFile(s.dbPath, destPath); copyErr != nil {
+		return fmt.Errorf("snapshot copy failed: %w (vacuum err: %v)", copyErr, err)
+	}
+	return nil
 }
 
 func (s *SyncManager) calculateFileHash(path string) (string, error) {
@@ -385,11 +414,17 @@ func (s *SyncManager) UploadToDrive(manifest SyncManifest) error {
 		_, err = driveSvc.Files.Update(tmpFileID, nil).Media(dbFile).Do()
 	} else {
 		f := &drive.File{Name: tmpName, MimeType: "application/x-sqlite3"}
-		if folderID != "" { f.Parents = []string{folderID} }
+		if folderID != "" {
+			f.Parents = []string{folderID}
+		}
 		res, err := driveSvc.Files.Create(f).Media(dbFile).Do()
-		if err == nil { tmpFileID = res.Id }
+		if err == nil {
+			tmpFileID = res.Id
+		}
 	}
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	// 2. Rename .tmp to nexus.db on Drive
 	query = "name = 'nexus.db' and trashed = false"
@@ -402,7 +437,9 @@ func (s *SyncManager) UploadToDrive(manifest SyncManifest) error {
 	}
 
 	_, err = driveSvc.Files.Update(tmpFileID, &drive.File{Name: "nexus.db"}).Do()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	// 3. Upload Manifest
 	manifestJSON, _ := json.MarshalIndent(manifest, "", "  ")
@@ -415,7 +452,88 @@ func (s *SyncManager) UploadToDrive(manifest SyncManifest) error {
 		_, err = driveSvc.Files.Update(fileList.Files[0].Id, nil).Media(bytes.NewReader(manifestJSON)).Do()
 	} else {
 		f := &drive.File{Name: "nexus-sync.json", MimeType: "application/json"}
-		if folderID != "" { f.Parents = []string{folderID} }
+		if folderID != "" {
+			f.Parents = []string{folderID}
+		}
+		_, err = driveSvc.Files.Create(f).Media(bytes.NewReader(manifestJSON)).Do()
+	}
+
+	return err
+}
+
+// UploadDBFileToDrive uploads the provided DB file path as the nexus.db atomic
+// upload and then uploads the manifest. This allows uploading a snapshot file
+// rather than the live DB file.
+func (s *SyncManager) UploadDBFileToDrive(manifest SyncManifest, dbFilePath string) error {
+	driveSvc := s.yt.GetDriveService()
+	if driveSvc == nil {
+		return fmt.Errorf("drive service not available")
+	}
+
+	folderID, _ := s.pm.getRecoveryFolderID()
+
+	// 1. Upload nexus.db.tmp
+	dbFile, err := os.Open(dbFilePath)
+	if err != nil {
+		return err
+	}
+	defer dbFile.Close()
+
+	// Atomic push: write to .tmp then rename
+	tmpName := "nexus.db.tmp"
+	query := fmt.Sprintf("name = '%s' and trashed = false", tmpName)
+	if folderID != "" {
+		query = fmt.Sprintf("name = '%s' and '%s' in parents and trashed = false", tmpName, folderID)
+	}
+
+	var tmpFileID string
+	fileList, err := driveSvc.Files.List().Q(query).Fields("files(id)").Do()
+	if err == nil && len(fileList.Files) > 0 {
+		tmpFileID = fileList.Files[0].Id
+		_, err = driveSvc.Files.Update(tmpFileID, nil).Media(dbFile).Do()
+	} else {
+		f := &drive.File{Name: tmpName, MimeType: "application/x-sqlite3"}
+		if folderID != "" {
+			f.Parents = []string{folderID}
+		}
+		res, err := driveSvc.Files.Create(f).Media(dbFile).Do()
+		if err == nil {
+			tmpFileID = res.Id
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	// 2. Rename .tmp to nexus.db on Drive
+	query = "name = 'nexus.db' and trashed = false"
+	if folderID != "" {
+		query = fmt.Sprintf("name = 'nexus.db' and '%s' in parents and trashed = false", folderID)
+	}
+	fileList, err = driveSvc.Files.List().Q(query).Fields("files(id)").Do()
+	if err == nil && len(fileList.Files) > 0 {
+		driveSvc.Files.Delete(fileList.Files[0].Id).Do()
+	}
+
+	_, err = driveSvc.Files.Update(tmpFileID, &drive.File{Name: "nexus.db"}).Do()
+	if err != nil {
+		return err
+	}
+
+	// 3. Upload Manifest
+	manifestJSON, _ := json.MarshalIndent(manifest, "", "  ")
+	query = "name = 'nexus-sync.json' and trashed = false"
+	if folderID != "" {
+		query = fmt.Sprintf("name = 'nexus-sync.json' and '%s' in parents and trashed = false", folderID)
+	}
+	fileList, err = driveSvc.Files.List().Q(query).Fields("files(id)").Do()
+	if err == nil && len(fileList.Files) > 0 {
+		_, err = driveSvc.Files.Update(fileList.Files[0].Id, nil).Media(bytes.NewReader(manifestJSON)).Do()
+	} else {
+		f := &drive.File{Name: "nexus-sync.json", MimeType: "application/json"}
+		if folderID != "" {
+			f.Parents = []string{folderID}
+		}
 		_, err = driveSvc.Files.Create(f).Media(bytes.NewReader(manifestJSON)).Do()
 	}
 
@@ -463,10 +581,14 @@ func (s *SyncManager) DownloadFromDrive(destPath string) error {
 
 func (s *SyncManager) copyFile(src, dst string) error {
 	in, err := os.Open(src)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer in.Close()
 	out, err := os.Create(dst)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer out.Close()
 	_, err = io.Copy(out, in)
 	return err
@@ -477,7 +599,7 @@ func (s *SyncManager) checkIntegrityOfFile(path string) error {
 	// This should not happen in normal flow, but check for corruption
 	shmPath := path + "-shm"
 	walPath := path + "-wal"
-	
+
 	if _, err := os.Stat(shmPath); err == nil {
 		return fmt.Errorf("shadow file .shm exists on downloaded temp file: %s (WAL corruption?)", shmPath)
 	}
@@ -486,11 +608,17 @@ func (s *SyncManager) checkIntegrityOfFile(path string) error {
 	}
 
 	tempDB, err := sql.Open("sqlite3", path)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer tempDB.Close()
 	var res string
 	err = tempDB.QueryRow("PRAGMA integrity_check").Scan(&res)
-	if err != nil { return err }
-	if res != "ok" { return fmt.Errorf("integrity check failed: %s", res) }
+	if err != nil {
+		return err
+	}
+	if res != "ok" {
+		return fmt.Errorf("integrity check failed: %s", res)
+	}
 	return nil
 }
