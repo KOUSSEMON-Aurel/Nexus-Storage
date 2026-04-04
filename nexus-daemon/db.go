@@ -257,7 +257,7 @@ func (d *Database) SearchFiles(query string) ([]FileRecord, error) {
 	var files []FileRecord
 	for rows.Next() {
 		var f FileRecord
-		if err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive); err == nil {
+		if err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword); err == nil {
 			files = append(files, f)
 		} else {
 			log.Printf("⚠️  SearchFiles scan error: %v", err)
@@ -647,8 +647,8 @@ func (d *Database) GetShardsForFile(fileID int64) ([]string, error) {
 func (d *Database) GetFile(path string) (*FileRecord, error) {
 	var f FileRecord
 	err := d.db.QueryRow(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
-		FROM files WHERE path = ?`, path).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
+		FROM files WHERE path = ?`, path).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -658,8 +658,8 @@ func (d *Database) GetFile(path string) (*FileRecord, error) {
 func (d *Database) GetFileByID(id int64) (*FileRecord, error) {
 	var f FileRecord
 	err := d.db.QueryRow(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
-		FROM files WHERE id = ?`, id).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
+		FROM files WHERE id = ?`, id).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -937,7 +937,7 @@ func (d *Database) ListSubfolders(parentID *int64) ([]FolderRecord, error) {
 
 func (d *Database) ListFilesByFolder(parentID *int64) ([]FileRecord, error) {
 	rows, err := d.db.Query(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
 		FROM files
 		WHERE deleted_at IS NULL AND parent_id IS ?`, parentID)
 	if err != nil {
@@ -947,7 +947,7 @@ func (d *Database) ListFilesByFolder(parentID *int64) ([]FileRecord, error) {
 	var files []FileRecord
 	for rows.Next() {
 		var f FileRecord
-		err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive)
+		err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
 		if err == nil {
 			files = append(files, f)
 		} else {
