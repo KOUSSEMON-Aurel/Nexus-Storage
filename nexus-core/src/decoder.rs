@@ -10,11 +10,7 @@
 use image::{open, ImageBuffer, Luma};
 use rayon::prelude::*;
 use std::path::Path;
-use crate::encoder::{
-    BASE_WIDTH, BASE_HEIGHT, BASE_COLS, BASE_ROWS,
-    HIGH_WIDTH, HIGH_HEIGHT, HIGH_COLS, HIGH_ROWS, HIGH_BYTES_PER_FRAME,
-    BLOCK_SIZE,
-};
+use crate::encoder::{BASE_WIDTH, BASE_HEIGHT, HIGH_WIDTH, HIGH_HEIGHT, BLOCK_SIZE};
 use crate::types::{EncodingMode, NexusError, NexusResult};
 
 pub fn decode_from_frames(frame_dir: &Path, mode: EncodingMode) -> NexusResult<Vec<u8>> {
