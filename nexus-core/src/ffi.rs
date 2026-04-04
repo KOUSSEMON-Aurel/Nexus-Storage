@@ -14,7 +14,7 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_uchar};
 use std::slice;
-use std::path::Path;
+
 use crate::{crypto, compress, hasher, encoder};
 use crate::types::{CompressionLevel, EncodingMode};
 
@@ -196,20 +196,30 @@ pub unsafe extern "C" fn nexus_encode_to_frames(
     if in_ptr.is_null() || output_dir.is_null() {
         return NEXUS_ERR_NULL_PTR;
     }
-    let data = unsafe { slice::from_raw_parts(in_ptr, in_len) };
+    let data = unsafe { slice::from_raw_parts(in_ptr, in_len) }.to_vec();
     let path_str = match unsafe { CStr::from_ptr(output_dir) }.to_str() {
-        Ok(s) => s,
+        Ok(s) => s.to_owned(),
         Err(_) => return NEXUS_ERR_NULL_PTR,
     };
-    let path = Path::new(path_str);
     let encoding_mode = match mode {
         1 => EncodingMode::High,
         _ => EncodingMode::Base,
     };
 
-    match encoder::encode_to_frames(data, path, encoding_mode) {
-        Ok(n) => n as c_int,
-        Err(_) => -4, // NEXUS_ERR_ENCODE
+    // catch_unwind prevents a Rust panic from crossing the FFI boundary and
+    // crashing the Go daemon with a SIGSEGV.
+    let result = std::panic::catch_unwind(|| {
+        let path = std::path::Path::new(&path_str);
+        encoder::encode_to_frames(&data, path, encoding_mode)
+    });
+
+    match result {
+        Ok(Ok(n)) => n as c_int,
+        Ok(Err(_)) => -4, // NEXUS_ERR_ENCODE
+        Err(_) => {
+            eprintln!("[nexus-core] PANIC caught in nexus_encode_to_frames — returning error code");
+            -4 // NEXUS_ERR_ENCODE
+        }
     }
 }
 
@@ -227,18 +237,28 @@ pub unsafe extern "C" fn nexus_decode_from_frames(
         return NEXUS_ERR_NULL_PTR;
     }
     let path_str = match unsafe { CStr::from_ptr(frame_dir) }.to_str() {
-        Ok(s) => s,
+        Ok(s) => s.to_owned(),
         Err(_) => return NEXUS_ERR_NULL_PTR,
     };
-    let path = Path::new(path_str);
     let encoding_mode = match mode {
         1 => EncodingMode::High,
         _ => EncodingMode::Base,
     };
 
-    match crate::decoder::decode_from_frames(path, encoding_mode) {
-        Ok(data) => unsafe { alloc_bytes(data, out_ptr, out_len) },
-        Err(_) => -5, // NEXUS_ERR_DECODE
+    // catch_unwind prevents a Rust panic (e.g. image resolution mismatch, OOB pixel
+    // access) from crossing the FFI boundary and killing the Go daemon with SIGSEGV.
+    let result = std::panic::catch_unwind(|| {
+        let path = std::path::Path::new(&path_str);
+        crate::decoder::decode_from_frames(path, encoding_mode)
+    });
+
+    match result {
+        Ok(Ok(data)) => unsafe { alloc_bytes(data, out_ptr, out_len) },
+        Ok(Err(_)) => -5, // NEXUS_ERR_DECODE
+        Err(_) => {
+            eprintln!("[nexus-core] PANIC caught in nexus_decode_from_frames — returning error code");
+            -5 // NEXUS_ERR_DECODE
+        }
     }
 }
 

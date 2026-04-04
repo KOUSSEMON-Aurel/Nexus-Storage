@@ -410,7 +410,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		if err == nil && exists {
 			q.db.LogQuotaUsage(1)
 			log.Printf("[%s] ♻️  Deduplication: File verified on cloud. Linking locally...", t.ID)
-			q.db.SaveFile(t.FilePath, existing.VideoID, totalSize, existing.Hash, existing.Key, t.ParentID, t.SHA256, existing.IsArchive)
+			q.db.SaveFile(t.FilePath, existing.VideoID, totalSize, existing.Hash, existing.Key, t.ParentID, t.SHA256, existing.IsArchive, t.Mode)
 			t.Status = "Completed"
 			return nil
 		} else {
@@ -637,7 +637,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 					isArchive = true
 				}
 				hasCustomPassword := t.CustomEncryptPassword != ""
-				q.db.SaveFileWithKey(filepath.Base(t.FilePath), response.Id, totalSize, t.SHA256[:16], "default-key", t.ParentID, t.SHA256, storedFileKeyHex, isArchive, hasCustomPassword)
+				q.db.SaveFileWithKey(filepath.Base(t.FilePath), response.Id, totalSize, t.SHA256[:16], "default-key", t.ParentID, t.SHA256, storedFileKeyHex, isArchive, hasCustomPassword, t.Mode)
 			}
 			fileRecord, _ := q.db.GetFileByHash(t.SHA256)
 			if fileRecord != nil {
@@ -785,6 +785,9 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 	needsCustomPassword := t.CustomEncryptPassword != ""
 	
 	if fileRecord != nil {
+		if fileRecord.Mode != "" {
+			t.Mode = fileRecord.Mode // V6: Override empty mode with database value
+		}
 		shardIDs, _ = q.db.GetShardsForFile(fileRecord.ID)
 		
 		// V3: Try to recover the per-file key
@@ -853,20 +856,29 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 			t.Status = fmt.Sprintf("Downloading Shard %d/%d", i+1, len(shardIDs))
 			q.updateTaskState(t)
 
-			videoFile := filepath.Join(tempDir, fmt.Sprintf("download_%d.mp4", i))
+			videoFile := filepath.Join(tempDir, fmt.Sprintf("download_%d.mkv", i))
 			framesDir := filepath.Join(tempDir, fmt.Sprintf("frames_%d", i))
 			os.MkdirAll(framesDir, 0755)
 
 			ytURL := "https://www.youtube.com/watch?v=" + vID
-			dlCmd := exec.Command("yt-dlp", "-f", "bestvideo[ext=mp4]", "-o", videoFile, ytURL)
+			dlCmd := exec.Command("yt-dlp", "-f", "bestvideo", "--merge-output-format", "mkv", "-o", videoFile, ytURL)
 			if out, err := dlCmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("yt-dlp failed: %v\nOutput: %s", err, string(out))
 			}
 
 			t.Status = fmt.Sprintf("Extracting Shard %d/%d", i+1, len(shardIDs))
 			q.updateTaskState(t)
-			// Ensure we extract as grayscale for Luma-only decoder
-			ffCmd := exec.Command("ffmpeg", "-y", "-i", videoFile, "-pix_fmt", "gray", filepath.Join(framesDir, "frame_%06d.png"))
+			// Determine target resolution based on mode
+			// Use nearest-neighbor (flags=neighbor) to preserve hard block edges — critical for data integrity
+			targetScale := "1280:720:flags=neighbor"
+			if t.Mode == "high" {
+				targetScale = "3840:2160:flags=neighbor"
+			}
+			// Ensure we extract as grayscale + scale to original encode resolution for Luma-only decoder
+			ffCmd := exec.Command("ffmpeg", "-y", "-i", videoFile,
+				"-vf", "scale="+targetScale,
+				"-pix_fmt", "gray",
+				filepath.Join(framesDir, "frame_%06d.png"))
 			if err := ffCmd.Run(); err != nil {
 				return fmt.Errorf("ffmpeg extraction failed: %w", err)
 			}

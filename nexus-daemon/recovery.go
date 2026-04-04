@@ -42,6 +42,7 @@ type FileEntry struct {
 	VideoID           string       `json:"video_id"`           // primary YouTube shard
 	FileKeyEncrypted  string       `json:"file_key_encrypted"` // hex, encrypted with masterKey
 	HasCustomPassword bool         `json:"has_custom_password"` // V5: true if file has optional custom encryption
+	Mode              string       `json:"mode"`               // V6: encoding mode ('base' or 'high')
 	Status            string       `json:"status"`             // "pending" | "confirmed"
 	CreatedAt         string       `json:"created_at"`
 	Shards            []ShardEntry `json:"shards"`
@@ -107,6 +108,7 @@ func (q *TaskQueue) BuildDecryptedManifest() (*DecryptedManifest, error) {
 			VideoID:           f.VideoID,
 			FileKeyEncrypted:  f.FileKey, // Already encrypted (hex)
 			HasCustomPassword: f.HasCustomPassword, // V5: flag for optional custom encryption
+			Mode:              f.Mode, // V6: encoding mode
 			Status:            "confirmed", // Default; upload flow updates to "pending" first
 			CreatedAt:         f.LastUpdate,
 			Shards:            shards,
@@ -277,6 +279,7 @@ func (q *TaskQueue) ApplyRestoredManifestToDB(manifest *DecryptedManifest) error
 			entry.FileKeyEncrypted, // The encrypted file_key
 			false, // is_archive
 			false, // has_custom_password
+			entry.Mode, // mode
 		)
 		if err != nil {
 			log.Printf("⚠️  Failed to restore file %s: %v", entry.FileName, err)

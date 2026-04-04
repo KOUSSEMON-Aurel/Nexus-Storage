@@ -32,6 +32,7 @@ type FileRecord struct {
 	FileKey           string // V3: per-file encryption key (hex-encoded, encrypted with master)
 	IsArchive         bool   // V3: true if the payload is a .tar archive
 	HasCustomPassword bool   // V5: true if file has optional custom encryption password
+	Mode              string // V6: encoding mode (base, high)
 }
 
 type FolderRecord struct {
@@ -190,6 +191,10 @@ func (d *Database) Init(dbPath string) error {
 	// V5 Migrations (Optional password-based encryption)
 	runMigrate("add_has_custom_password", `ALTER TABLE files ADD COLUMN has_custom_password BOOLEAN DEFAULT 0`)
 	runMigrate("add_custom_password_hint", `ALTER TABLE files ADD COLUMN custom_password_hint TEXT DEFAULT ''`)
+	
+	// V6 Migrations (Encoding Mode persistence)
+	runMigrate("add_mode_column", `ALTER TABLE files ADD COLUMN mode TEXT DEFAULT 'base'`)
+	
 	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('manifest_version', '0')`)
 	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('last_push_lsn', '0')`)
 	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('last_push_hash', '')`)
@@ -219,8 +224,8 @@ func (d *Database) Init(dbPath string) error {
 func (d *Database) GetFileByHash(sha256 string) (*FileRecord, error) {
 	var f FileRecord
 	err := d.db.QueryRow(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
-		FROM files WHERE sha256 = ? LIMIT 1`, sha256).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0), COALESCE(mode, 'base')
+		FROM files WHERE sha256 = ? LIMIT 1`, sha256).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword, &f.Mode)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -230,8 +235,8 @@ func (d *Database) GetFileByHash(sha256 string) (*FileRecord, error) {
 func (d *Database) GetFileByVideoID(videoID string) (*FileRecord, error) {
 	var f FileRecord
 	err := d.db.QueryRow(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
-		FROM files WHERE video_id = ? LIMIT 1`, videoID).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0), COALESCE(mode, 'base')
+		FROM files WHERE video_id = ? LIMIT 1`, videoID).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword, &f.Mode)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -241,13 +246,13 @@ func (d *Database) GetFileByVideoID(videoID string) (*FileRecord, error) {
 func (d *Database) SearchFiles(query string) ([]FileRecord, error) {
 	// Try FTS5 first (fast, requires -tags fts5 at build time)
 	rows, err := d.db.Query(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, deleted_at, last_update, parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0), COALESCE(mode, 'base')
 		FROM files WHERE id IN (SELECT rowid FROM files_fts WHERE path MATCH ?)`, query+"*")
 	if err != nil {
 		// FTS5 not available — fall back to LIKE (slower but always works)
 		log.Printf("⚠️  FTS5 unavailable, falling back to LIKE search: %v", err)
 		rows, err = d.db.Query(`
-			SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
+			SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0), COALESCE(mode, 'base')
 			FROM files WHERE path LIKE ? AND deleted_at IS NULL`, "%"+query+"%")
 		if err != nil {
 			return nil, err
@@ -257,7 +262,7 @@ func (d *Database) SearchFiles(query string) ([]FileRecord, error) {
 	var files []FileRecord
 	for rows.Next() {
 		var f FileRecord
-		if err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword); err == nil {
+		if err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword, &f.Mode); err == nil {
 			files = append(files, f)
 		} else {
 			log.Printf("⚠️  SearchFiles scan error: %v", err)
@@ -288,6 +293,7 @@ func (d *Database) MergeManifest(driveManifestPath string) error {
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN sha256 TEXT`)
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN file_key TEXT DEFAULT ''`)
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN is_archive BOOLEAN DEFAULT 0`)
+	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN mode TEXT DEFAULT 'base'`)
 
 	// 2. Merge Folders (Simplified level-by-level)
 	for i := 0; i < 5; i++ { 
@@ -313,7 +319,7 @@ func (d *Database) MergeManifest(driveManifestPath string) error {
 	_, err = d.db.Exec(`
 		CREATE TEMP TABLE cloud_merge AS 
 		SELECT 
-			cf.path, cf.video_id, cf.size, cf.hash, cf.key, cf.starred, cf.deleted_at, cf.last_update, cf.sha256, cf.file_key, cf.is_archive,
+			cf.path, cf.video_id, cf.size, cf.hash, cf.key, cf.starred, cf.deleted_at, cf.last_update, cf.sha256, cf.file_key, cf.is_archive, cf.mode,
 			lf.id as local_parent_id
 		FROM cloud.files cf
 		LEFT JOIN cloud.folders cfolder ON cf.parent_id = cfolder.id
@@ -336,7 +342,8 @@ func (d *Database) MergeManifest(driveManifestPath string) error {
 			parent_id   = (SELECT local_parent_id FROM cloud_merge WHERE cloud_merge.path = files.path),
 			sha256      = (SELECT sha256 FROM cloud_merge WHERE cloud_merge.path = files.path),
 			file_key    = (SELECT file_key FROM cloud_merge WHERE cloud_merge.path = files.path),
-			is_archive  = (SELECT is_archive FROM cloud_merge WHERE cloud_merge.path = files.path)
+			is_archive  = (SELECT is_archive FROM cloud_merge WHERE cloud_merge.path = files.path),
+			mode        = (SELECT mode FROM cloud_merge WHERE cloud_merge.path = files.path)
 		WHERE path IN (SELECT path FROM cloud_merge)
 		  AND (SELECT last_update FROM cloud_merge WHERE cloud_merge.path = files.path) > files.last_update
 		  AND files.deleted_at IS NULL
@@ -344,8 +351,8 @@ func (d *Database) MergeManifest(driveManifestPath string) error {
 	
 	// 5. Insert new files
 	_, err = d.db.Exec(`
-		INSERT INTO files (path, video_id, size, hash, key, starred, deleted_at, last_update, parent_id, sha256, file_key, is_archive)
-		SELECT path, video_id, size, hash, key, starred, deleted_at, last_update, local_parent_id, sha256, file_key, is_archive
+		INSERT INTO files (path, video_id, size, hash, key, starred, deleted_at, last_update, parent_id, sha256, file_key, is_archive, mode)
+		SELECT path, video_id, size, hash, key, starred, deleted_at, last_update, local_parent_id, sha256, file_key, is_archive, mode
 		FROM cloud_merge
 		WHERE path NOT IN (SELECT path FROM files)
 	`)
@@ -499,14 +506,14 @@ func (d *Database) SetRecoveryPacketDriveID(driveID string) error {
 	return err
 }
 
-func (d *Database) SaveFile(path, videoID string, size int64, hash, key string, parentID *int64, sha256 string, isArchive bool) error {
-	return d.SaveFileWithKey(path, videoID, size, hash, key, parentID, sha256, "", isArchive, false)
+func (d *Database) SaveFile(path, videoID string, size int64, hash, key string, parentID *int64, sha256 string, isArchive bool, mode string) error {
+	return d.SaveFileWithKey(path, videoID, size, hash, key, parentID, sha256, "", isArchive, false, mode)
 }
 
-func (d *Database) SaveFileWithKey(path, videoID string, size int64, hash, key string, parentID *int64, sha256, fileKey string, isArchive bool, hasCustomPassword bool) error {
+func (d *Database) SaveFileWithKey(path, videoID string, size int64, hash, key string, parentID *int64, sha256, fileKey string, isArchive bool, hasCustomPassword bool, mode string) error {
 	query := `
-	INSERT INTO files (path, video_id, size, hash, key, parent_id, sha256, file_key, is_archive, has_custom_password)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO files (path, video_id, size, hash, key, parent_id, sha256, file_key, is_archive, has_custom_password, mode)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(path) DO UPDATE SET
 		video_id = excluded.video_id,
 		size = excluded.size,
@@ -517,10 +524,11 @@ func (d *Database) SaveFileWithKey(path, videoID string, size int64, hash, key s
 		file_key = excluded.file_key,
 		is_archive = excluded.is_archive,
 		has_custom_password = excluded.has_custom_password,
+		mode = excluded.mode,
 		last_update = CURRENT_TIMESTAMP,
 		deleted_at = NULL;
 	`
-	if _, err := d.db.Exec(query, path, videoID, size, hash, key, parentID, sha256, fileKey, isArchive, hasCustomPassword); err != nil {
+	if _, err := d.db.Exec(query, path, videoID, size, hash, key, parentID, sha256, fileKey, isArchive, hasCustomPassword, mode); err != nil {
 		return fmt.Errorf("could not save file: %w", err)
 	}
 	d.IncrementLSN()
@@ -647,8 +655,8 @@ func (d *Database) GetShardsForFile(fileID int64) ([]string, error) {
 func (d *Database) GetFile(path string) (*FileRecord, error) {
 	var f FileRecord
 	err := d.db.QueryRow(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
-		FROM files WHERE path = ?`, path).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0), COALESCE(mode, 'base')
+		FROM files WHERE path = ?`, path).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword, &f.Mode)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -658,8 +666,8 @@ func (d *Database) GetFile(path string) (*FileRecord, error) {
 func (d *Database) GetFileByID(id int64) (*FileRecord, error) {
 	var f FileRecord
 	err := d.db.QueryRow(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
-		FROM files WHERE id = ?`, id).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0), COALESCE(mode, 'base')
+		FROM files WHERE id = ?`, id).Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword, &f.Mode)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -671,7 +679,7 @@ func (d *Database) ListFiles() ([]FileRecord, error) {
 	defer d.mu.Unlock()
 
 	rows, err := d.db.Query(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0), COALESCE(mode, 'base')
 		FROM files WHERE deleted_at IS NULL ORDER BY last_update DESC`)
 	if err != nil {
 		return nil, err
@@ -680,7 +688,7 @@ func (d *Database) ListFiles() ([]FileRecord, error) {
 	var files []FileRecord
 	for rows.Next() {
 		var f FileRecord
-		err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
+		err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword, &f.Mode)
 		if err == nil {
 			files = append(files, f)
 		} else {
@@ -695,7 +703,7 @@ func (d *Database) ListTrash() ([]FileRecord, error) {
 	defer d.mu.Unlock()
 
 	rows, err := d.db.Query(`
-		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0)
+		SELECT id, path, COALESCE(video_id,''), size, hash, COALESCE(key,''), starred, CAST(deleted_at AS TEXT), CAST(last_update AS TEXT), parent_id, COALESCE(sha256,''), COALESCE(file_key,''), COALESCE(is_archive, 0), COALESCE(has_custom_password, 0), COALESCE(mode, 'base')
 		FROM files WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC`)
 	if err != nil {
 		return nil, err
@@ -704,7 +712,7 @@ func (d *Database) ListTrash() ([]FileRecord, error) {
 	var files []FileRecord
 	for rows.Next() {
 		var f FileRecord
-		err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword)
+		err := rows.Scan(&f.ID, &f.Path, &f.VideoID, &f.Size, &f.Hash, &f.Key, &f.Starred, &f.DeletedAt, &f.LastUpdate, &f.ParentID, &f.SHA256, &f.FileKey, &f.IsArchive, &f.HasCustomPassword, &f.Mode)
 		if err == nil {
 			files = append(files, f)
 		} else {

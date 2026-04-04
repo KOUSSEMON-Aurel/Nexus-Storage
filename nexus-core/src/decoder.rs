@@ -73,11 +73,25 @@ fn read_calibration_threshold(path: &Path) -> NexusResult<u8> {
 
 fn read_base_frame(path: &Path, threshold: u8) -> NexusResult<Vec<u8>> {
     let img = open(path).map_err(|e| NexusError::Decode(e.to_string()))?.into_luma8();
-    let mut bits = Vec::with_capacity((BASE_COLS * BASE_ROWS) as usize);
+    let (img_w, img_h) = img.dimensions();
 
-    for row in 0..BASE_ROWS {
-        for col in 0..BASE_COLS {
-            let lum = sample_block(&img, col, row, BASE_WIDTH, BASE_HEIGHT);
+    // Log warning if resolution doesn't match expected, so we catch YouTube downgrades
+    if img_w != BASE_WIDTH || img_h != BASE_HEIGHT {
+        eprintln!(
+            "[nexus-core] WARNING: base frame resolution mismatch — expected {}x{}, got {}x{}. \
+             FFmpeg may have not applied correct scaling.",
+            BASE_WIDTH, BASE_HEIGHT, img_w, img_h
+        );
+    }
+
+    // Compute actual col/row counts from real image dimensions
+    let cols = img_w / BLOCK_SIZE;
+    let rows = img_h / BLOCK_SIZE;
+    let mut bits = Vec::with_capacity((cols * rows) as usize);
+
+    for row in 0..rows {
+        for col in 0..cols {
+            let lum = sample_block(&img, col, row, img_w, img_h);
             bits.push(if lum > threshold { 1u8 } else { 0u8 });
         }
     }
@@ -86,16 +100,31 @@ fn read_base_frame(path: &Path, threshold: u8) -> NexusResult<Vec<u8>> {
 
 fn read_high_frame(path: &Path) -> NexusResult<Vec<u8>> {
     let img = open(path).map_err(|e| NexusError::Decode(e.to_string()))?.into_luma8();
-    let _num_symbols = (HIGH_COLS * HIGH_ROWS) as usize;
-    
+    let (img_w, img_h) = img.dimensions();
+
+    // Log warning if resolution doesn't match expected
+    if img_w != HIGH_WIDTH || img_h != HIGH_HEIGHT {
+        eprintln!(
+            "[nexus-core] WARNING: high frame resolution mismatch — expected {}x{}, got {}x{}. \
+             FFmpeg may have not applied correct scaling.",
+            HIGH_WIDTH, HIGH_HEIGHT, img_w, img_h
+        );
+    }
+
+    // Compute actual col/row counts from real image dimensions
+    let cols = img_w / BLOCK_SIZE;
+    let rows = img_h / BLOCK_SIZE;
+    let sym_per_frame = (cols * rows) as usize;
+    let capacity = (sym_per_frame * 3) / 8;
+
     let mut bit_buf = 0u64;
     let mut bits_in_buf = 0usize;
-    let mut bytes = Vec::with_capacity(HIGH_BYTES_PER_FRAME);
+    let mut bytes = Vec::with_capacity(capacity);
 
-    for row in 0..HIGH_ROWS {
-        for col in 0..HIGH_COLS {
-            let lum = sample_block(&img, col, row, HIGH_WIDTH, HIGH_HEIGHT);
-            
+    for row in 0..rows {
+        for col in 0..cols {
+            let lum = sample_block(&img, col, row, img_w, img_h);
+
             // Map luminance to 3-bit symbol (8 levels)
             // Levels: 0, 36, 72, 108, 144, 180, 216, 255
             let symbol = if lum > 235 {
