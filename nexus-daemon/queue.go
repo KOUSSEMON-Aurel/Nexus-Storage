@@ -636,7 +636,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 				if stat, err := os.Stat(t.FilePath); err == nil && stat.IsDir() {
 					isArchive = true
 				}
-				hasCustomPassword := t.CustomEncryptPassword != ""
+				hasCustomPassword := t.Password != "" || t.CustomEncryptPassword != ""
 				q.db.SaveFileWithKey(filepath.Base(t.FilePath), response.Id, totalSize, t.SHA256[:16], "default-key", t.ParentID, t.SHA256, storedFileKeyHex, isArchive, hasCustomPassword, t.Mode)
 			}
 			fileRecord, _ := q.db.GetFileByHash(t.SHA256)

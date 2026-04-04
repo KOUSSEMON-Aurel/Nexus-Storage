@@ -31,6 +31,8 @@ interface NFile {
   sha256: string;
   parentId?: number;
   videoID: string;
+  hasCustomPassword?: boolean;
+  customPasswordHint?: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -52,6 +54,8 @@ interface BackendFile {
   DeletedAt: string | null;
   ParentID: number | null;
   SHA256: string;
+  HasCustomPassword?: boolean;
+  CustomPasswordHint?: string;
 }
 
 interface BackendTask {
@@ -101,6 +105,8 @@ function mapBackendToFile(bf: BackendFile): NFile {
     rawDate: bf.LastUpdate ? new Date(bf.LastUpdate).getTime() : 0,
     sha256: bf.SHA256 ?? "",
     parentId: bf.ParentID ?? undefined,
+    hasCustomPassword: bf.HasCustomPassword ?? false,
+    customPasswordHint: bf.CustomPasswordHint ?? "",
   };
 }
 
@@ -131,7 +137,7 @@ export default function Dashboard() {
   const [selected, setSelected] = useState<NFile | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [downloadPasswordOpen, setDownloadPasswordOpen] = useState(false);
-  const [pendingDownloadFile] = useState<NFile | null>(null);
+  const [pendingDownloadFile, setPendingDownloadFile] = useState<NFile | null>(null);
   const [downloadPassword, setDownloadPassword] = useState("");
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "info" } | null>(null);
   
@@ -470,14 +476,45 @@ export default function Dashboard() {
   const handleAction = async (action: "download" | "delete" | "star" | "restore" | "permanent" | "evict", file: NFile) => {
     try {
       if (action === "download") {
+        if (file.hasCustomPassword && !downloadPassword) {
+          setPendingDownloadFile(file);
+          setDownloadPasswordOpen(true);
+          return;
+        }
+        
         showToast("Starting download...", "success");
+        const payload = {
+          video_id: file.videoID,
+          path: file.name,
+          password: downloadPassword || ""
+        };
+
         const res = await fetch(`${API_BASE}/download`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ video_id: file.videoID, path: file.name })
+          body: JSON.stringify(payload)
         });
-        if (res.ok) showToast("Download started", "success");
-        else showToast("Download failed", "error");
+
+        if (res.ok) {
+          showToast("Download started", "success");
+          setDownloadPasswordOpen(false);
+          setPendingDownloadFile(null);
+          setDownloadPassword("");
+        } else if (res.status === 401) {
+          const errData = await res.json();
+          if (errData.error === "password_required") {
+            showToast("Password required: " + (errData.hint || "No hint"), "info");
+            setPendingDownloadFile(file);
+            if (errData.hint) {
+              file.customPasswordHint = errData.hint;
+            }
+            setDownloadPasswordOpen(true);
+          } else {
+             showToast("Download failed", "error");
+          }
+        } else {
+          showToast("Download failed", "error");
+        }
       }
       else if (action === "delete") {
         if (!confirm(`Move ${file.name} to trash?`)) return;

@@ -321,12 +321,26 @@ func (s *APIServer) handleDownload(w http.ResponseWriter, r *http.Request) {
 
 	// If SHA256 not provided, try to lookup from VideoID
 	sha256 := req.SHA256
+	var fileRecord *FileRecord
 	if sha256 == "" && req.VideoID != "" {
-		fileRecord, _ := s.queue.db.GetFileByVideoID(req.VideoID)
+		fileRecord, _ = s.queue.db.GetFileByVideoID(req.VideoID)
 		if fileRecord != nil {
 			sha256 = fileRecord.SHA256
 			log.Printf("📝 Lookup SHA256 from VideoID: %s → %s", req.VideoID[:8], sha256[:8])
 		}
+	} else if sha256 != "" {
+		fileRecord, _ = s.queue.db.GetFileByHash(sha256)
+	}
+
+	// Fail fast if file requires a custom password and none was provided
+	if fileRecord != nil && fileRecord.HasCustomPassword && req.Password == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": "password_required",
+			"hint":  fileRecord.CustomPasswordHint,
+		})
+		return
 	}
 
 	task := &Task{
