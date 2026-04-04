@@ -7,12 +7,14 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  border-radius: 20px 20px 0 0;
+  overflow: hidden;
 }
 
 .login-box {
   background: white;
   padding: 40px;
-  border-radius: 12px;
+  border-radius: 32px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   width: 100%;
   max-width: 400px;
@@ -36,7 +38,7 @@
 .login-box .warning {
   background: #fff3cd;
   border: 1px solid #ffc107;
-  border-radius: 6px;
+  border-radius: 10px;
   padding: 12px;
   margin: 15px 0;
   font-size: 13px;
@@ -60,7 +62,7 @@
   width: 100%;
   padding: 12px;
   border: 1px solid #ddd;
-  border-radius: 6px;
+  border-radius: 10px;
   font-size: 14px;
   font-family: inherit;
   box-sizing: border-box;
@@ -81,7 +83,7 @@
 .login-box .error {
   background: #f8d7da;
   border: 1px solid #f5c6cb;
-  border-radius: 6px;
+  border-radius: 10px;
   padding: 12px;
   margin: 15px 0;
   color: #721c24;
@@ -96,7 +98,7 @@
   padding: 12px;
   margin: 8px 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;

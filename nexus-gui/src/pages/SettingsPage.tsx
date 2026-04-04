@@ -84,7 +84,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
       height: "100vh", 
       display: "flex", 
       flexDirection: "column", 
-      overflow: "hidden" 
+      overflow: "hidden",
+      borderRadius: "var(--radius-xl) var(--radius-xl) 0 0",
+      border: `1px solid ${c.border}`,
+      boxShadow: "0 0 40px rgba(0,0,0,0.15)"
     }}>
       {/* ━━━━ HEADER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <header style={{
@@ -137,7 +140,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                   onClick={() => setActiveTab(item.id as any)}
                   style={{
                     display: "flex", alignItems: "center", gap: 14,
-                    padding: "10px 16px", borderRadius: 24,
+                    padding: "10px 16px", borderRadius: 12,
                     background: active ? c.bgActive : "transparent",
                     color: active ? c.textActive : c.textPrimary,
                     fontSize: 14, fontWeight: active ? 600 : 400,
@@ -162,7 +165,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
           flexDirection: "column",
           background: c.bgSurface,
           margin: "8px 16px 8px 0",
-          borderRadius: 16,
+          borderRadius: "var(--radius-lg)",
           border: `1px solid ${c.border}`,
           overflowY: "auto",
           padding: "32px",
@@ -179,7 +182,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                 style={{ maxWidth: 640 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: 12, background: "#34A85315", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: 48, height: 48, borderRadius: "var(--radius-md)", background: "#34A85315", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Lock size={24} color="#34A853" />
                   </div>
                   <div>
@@ -190,7 +193,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
                   {/* Auto-Encryption Section */}
-                  <section style={{ background: c.bgApp, padding: 20, borderRadius: 16, border: `1px solid ${c.border}` }}>
+                  <section style={{ background: c.bgApp, padding: 20, borderRadius: 20, border: `1px solid ${c.border}` }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                       <Key size={20} color="#34A853" />
                       <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, margin: 0 }}>Auto-Encryption (Google-Based)</h3>
@@ -207,7 +210,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                   </section>
 
                   {/* Custom Override Section */}
-                  <section style={{ background: c.bgApp, padding: 20, borderRadius: 16, border: `1px solid ${c.border}` }}>
+                  <section style={{ background: c.bgApp, padding: 20, borderRadius: 20, border: `1px solid ${c.border}` }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                       <Shield size={20} color="#1A73E8" />
                       <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, margin: 0 }}>Custom Password (Optional)</h3>
@@ -226,7 +229,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                   {/* Technical Details */}
                   <section>
                     <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, marginBottom: 12 }}>How It Works</h3>
-                    <div style={{ background: c.bgApp, padding: 16, borderRadius: 12, border: `1px solid ${c.border}`, fontSize: 13, color: c.textSecondary, lineHeight: 1.7 }}>
+                    <div style={{ background: c.bgApp, padding: 16, borderRadius: "var(--radius-md)", border: `1px solid ${c.border}`, fontSize: 13, color: c.textSecondary, lineHeight: 1.7 }}>
                       <p style={{ margin: "0 0 12px 0" }}>
                         <strong style={{ color: c.textPrimary }}>Your Google Account</strong> contains a permanent, unique ID called "sub". Nexus uses this ID with cryptographic key derivation (PBKDF2-SHA256) to generate your encryption key.
                       </p>
@@ -275,7 +278,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                       <Trash2 size={20} /> Trash & Storage
                     </h2>
                     
-                    <div style={{ background: c.bgSurface, padding: 16, borderRadius: 12, border: `1px solid ${c.border}`, marginBottom: 16 }}>
+                    <div style={{ background: c.bgSurface, padding: 16, borderRadius: "var(--radius-md)", border: `1px solid ${c.border}`, marginBottom: 16 }}>
                       <label style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", display: "block" }}>
                         <Clock size={14} style={{ display: "inline", marginRight: 6 }} /> Auto-Empty Trash After (days)
                       </label>
@@ -304,7 +307,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                     <button style={{
                       width: "100%",
                       padding: "12px 16px",
-                      borderRadius: 8,
+                      borderRadius: "var(--radius-sm)",
                       background: "#EA4335",
                       color: "white",
                       border: "none",
@@ -333,7 +336,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                 style={{ maxWidth: 640 }}
               >
                 <div style={{ textAlign: "center", padding: "20px 0 40px" }}>
-                  <div style={{ width: 80, height: 80, borderRadius: 24, background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", boxShadow: "0 20px 40px rgba(26,115,232,0.2)" }}>
+                  <div style={{ width: 80, height: 80, borderRadius: "var(--radius-xl)", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", boxShadow: "0 20px 40px rgba(26,115,232,0.2)" }}>
                     <RefreshCw size={44} color="white" />
                   </div>
                   <h2 style={{ fontSize: 28, fontWeight: 700, color: c.textPrimary, margin: "0 0 8px 0" }}>Nexus Storage</h2>
@@ -360,7 +363,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                         { title: "Metadata Stealth", desc: "Private file names & sizes" },
                         { title: "Universal Access", desc: "Cloud-sync manifest recovery" },
                       ].map(f => (
-                        <div key={f.title} style={{ padding: 16, background: c.bgApp, borderRadius: 12, border: `1px solid ${c.border}` }}>
+                        <div key={f.title} style={{ padding: 16, background: c.bgApp, borderRadius: "var(--radius-md)", border: `1px solid ${c.border}` }}>
                           <p style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary, margin: "0 0 4px 0" }}>{f.title}</p>
                           <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{f.desc}</p>
                         </div>

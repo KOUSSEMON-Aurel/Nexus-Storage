@@ -133,7 +133,10 @@ export default function Dashboard() {
   const [section, setSection] = useState<Section>("my-drive");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [search, setSearch] = useState("");
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem("nexus_theme");
+    return saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  });
   const [selected, setSelected] = useState<NFile | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [downloadPasswordOpen, setDownloadPasswordOpen] = useState(false);
@@ -249,8 +252,10 @@ export default function Dashboard() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // ─── Theme Sync ─────────────────────────────────────────────────────────────
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem("nexus_theme", dark ? "dark" : "light");
   }, [dark]);
 
   // ─── LSN REAL-TIME UPDATES (Server-Sent Events) ──────────────────────────
@@ -629,7 +634,19 @@ export default function Dashboard() {
       <SplashScreen b={isAppReady} loading={isInitialLoading} c={c} />
       <div 
         data-tauri-drag-region
-        style={{ background: c.bgApp, color: c.textPrimary, fontFamily: "'Inter', system-ui, sans-serif", height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        style={{ 
+          background: c.bgApp, 
+          color: c.textPrimary, 
+          fontFamily: "'Inter', system-ui, sans-serif", 
+          height: "100vh", 
+          display: "flex", 
+          flexDirection: "column", 
+          overflow: "hidden",
+          borderRadius: "var(--radius-xl) var(--radius-xl) 0 0", 
+          boxShadow: "0 0 40px rgba(0,0,0,0.15)",
+          border: `1px solid ${c.border}`
+        }}
+      >
       
       {/* ━━━━ HEADER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <header
@@ -649,7 +666,7 @@ export default function Dashboard() {
         {/* Logo - 256px to match sidebar. Settings gear placed right of logo for quick access */}
         <div style={{ width: 256, display: "flex", alignItems: "center", gap: 10, flexShrink: 0, userSelect: "none" }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: 'none' }}>
+            <div style={{ width: 40, height: 40, borderRadius: "var(--radius-md)", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: 'none' }}>
               <CloudLightning size={22} color="white" />
             </div>
             <span style={{ fontSize: 22, fontWeight: 400, color: c.textPrimary, letterSpacing: -0.3, pointerEvents: 'none' }}>Nexus</span>
@@ -660,7 +677,7 @@ export default function Dashboard() {
             style={{
               width: 40,
               height: 40,
-              borderRadius: 10,
+              borderRadius: "var(--radius-sm)",
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -675,7 +692,7 @@ export default function Dashboard() {
         </div>
 
         {/* Search - FTS5 Optimized */}
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, background: c.bgSearch, borderRadius: 24, padding: "0 20px", height: 46 }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, background: c.bgSearch, borderRadius: "var(--radius-xl)", padding: "0 20px", height: 46 }}>
           <Search size={20} color={c.textSecondary} style={{ flexShrink: 0, pointerEvents: "none" }} />
           <input
             type="text"
@@ -744,7 +761,7 @@ export default function Dashboard() {
                 alignItems: "center",
                 gap: 12,
                 padding: "14px 20px",
-                borderRadius: 16,
+                borderRadius: "var(--radius-lg)",
                 background: c.bgSurface,
                 border: "none",
                 boxShadow: c.btnShadow,
@@ -808,7 +825,7 @@ export default function Dashboard() {
               onClick={handleSyncManifest}
               style={{
                 display: "flex", alignItems: "center", gap: 14,
-                padding: "9px 16px", borderRadius: 24,
+                padding: "9px 16px", borderRadius: 12,
                 color: syncing ? c.textSecondary : c.textPrimary,
                 fontSize: 14, cursor: syncing ? "not-allowed" : "pointer", transition: "background 0.15s",
                 userSelect: "none",
@@ -824,7 +841,7 @@ export default function Dashboard() {
 
           {/* Virtual Disk Mount */}
           <div style={{ padding: "0 16px", marginBottom: 24 }}>
-            <div style={{ padding: 16, background: c.bgSurface, border: `1px solid ${c.border}`, borderRadius: 16 }}>
+            <div style={{ padding: 16, background: c.bgSurface, border: `1px solid ${c.border}`, borderRadius: "var(--radius-md)" }}>
               <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 8 }}>VIRTUAL DISK</div>
               {isMounted ? (
                 <button 
@@ -888,8 +905,9 @@ export default function Dashboard() {
             flexDirection: "column",
             background: c.bgSurface,
             margin: "8px 16px 8px 0",
-            borderRadius: 16,
+            borderRadius: "var(--radius-lg)",
             border: `1px solid ${c.border}`,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
             overflow: "hidden",
             position: "relative"
           }}
@@ -1002,9 +1020,9 @@ export default function Dashboard() {
                 width: 460, zIndex: 101,
                 background: c.bgSurface,
                 border: `1px solid ${c.border}`,
-                borderRadius: 24,
+                borderRadius: "var(--radius-xl)",
                 overflow: "hidden",
-                boxShadow: "0 24px 60px rgba(0,0,0,0.2)",
+                boxShadow: "0 24px 80px rgba(0,0,0,0.25)",
               }}
             >
               <UploadModal onClose={() => setUploadOpen(false)} onUpload={handleUploadClick} c={c} />
@@ -1031,9 +1049,9 @@ export default function Dashboard() {
                 width: 400, zIndex: 151,
                 background: c.bgSurface,
                 border: `1px solid ${c.border}`,
-                borderRadius: 24,
+                borderRadius: "var(--radius-xl)",
                 overflow: "hidden",
-                boxShadow: "0 24px 60px rgba(0,0,0,0.3)",
+                boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
                 padding: 32,
               }}
             >
@@ -1050,19 +1068,19 @@ export default function Dashboard() {
                    value={downloadPassword}
                    onChange={(e) => setDownloadPassword(e.target.value)}
                    onKeyDown={(e) => e.key === "Enter" && handleAction("download", pendingDownloadFile!)}
-                   style={{ width: "100%", padding: "14px 14px 14px 44px", borderRadius: 12, background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 14 }}
+                   style={{ width: "100%", padding: "14px 14px 14px 44px", borderRadius: "var(--radius-sm)", background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 14 }}
                  />
                </div>
                <div style={{ display: "flex", gap: 12 }}>
                  <button 
                    onClick={() => setDownloadPasswordOpen(false)}
-                   style={{ flex: 1, padding: "12px", borderRadius: 12, background: "transparent", border: `1px solid ${c.border}`, color: c.textSecondary, cursor: "pointer", fontWeight: 500 }}
+                   style={{ flex: 1, padding: "12px", borderRadius: "var(--radius-sm)", background: "transparent", border: `1px solid ${c.border}`, color: c.textSecondary, cursor: "pointer", fontWeight: 500 }}
                  >
                    Cancel
                  </button>
                  <button 
                    onClick={() => handleAction("download", pendingDownloadFile!)}
-                   style={{ flex: 1, padding: "12px", borderRadius: 12, background: "#1A73E8", color: "white", border: "none", cursor: "pointer", fontWeight: 600 }}
+                   style={{ flex: 1, padding: "12px", borderRadius: "var(--radius-sm)", background: "#1A73E8", color: "white", border: "none", cursor: "pointer", fontWeight: 600 }}
                  >
                    Start Recovery
                  </button>
@@ -1090,9 +1108,9 @@ export default function Dashboard() {
                 width: 380, zIndex: 201,
                 background: c.bgSurface,
                 border: `1px solid ${c.border}`,
-                borderRadius: 24,
+                borderRadius: "var(--radius-xl)",
                 overflow: "hidden",
-                boxShadow: "0 24px 60px rgba(0,0,0,0.3)",
+                boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
                 padding: 32,
                 display: "flex", flexDirection: "column", alignItems: "center"
               }}
@@ -1125,13 +1143,13 @@ export default function Dashboard() {
                         navigate('/settings');
                         setAccountOpen(false);
                       }}
-                      style={{ padding: "8px", borderRadius: 8, background: "#667eea20", border: `1px solid #667eea40`, color: "#667eea", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                      style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#667eea20", border: `1px solid #667eea40`, color: "#667eea", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                     >
                       <Settings size={16} /> Settings
                     </button>
                     <button 
                       onClick={handleSyncManifest}
-                      style={{ padding: "8px", borderRadius: 8, background: "#1A73E820", border: `1px solid #1A73E840`, color: "#1A73E8", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                      style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#1A73E820", border: `1px solid #1A73E840`, color: "#1A73E8", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                     >
                       Sync Manifest Now
                     </button>
@@ -1140,7 +1158,7 @@ export default function Dashboard() {
                         setAccountOpen(false);
                         await fetch(`${API_BASE}/studio`);
                       }}
-                      style={{ padding: "8px", borderRadius: 8, background: "#FF000015", border: `1px solid #FF000030`, color: "#CC0000", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                      style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#FF000015", border: `1px solid #FF000030`, color: "#CC0000", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                     >
                       <CloudLightning size={16} /> Open YouTube Studio
                     </button>
@@ -1148,7 +1166,7 @@ export default function Dashboard() {
                 )}
                 <button 
                   onClick={handleLogout}
-                  style={{ padding: "8px", borderRadius: 8, background: "#EA433520", border: `1px solid #EA433540`, color: "#EA4335", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                  style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#EA433520", border: `1px solid #EA433540`, color: "#EA4335", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                 >
                   Logout
                 </button>
@@ -1156,7 +1174,7 @@ export default function Dashboard() {
               
               <button 
                 onClick={() => setAccountOpen(false)}
-                style={{ marginTop: 32, width: "100%", padding: "12px", borderRadius: 12, background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, cursor: "pointer", fontWeight: 500 }}
+                style={{ marginTop: 32, width: "100%", padding: "12px", borderRadius: "var(--radius-md)", background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, cursor: "pointer", fontWeight: 500 }}
               >
                 Close Profile
               </button>
@@ -1193,7 +1211,7 @@ export default function Dashboard() {
             style={{
               position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
               background: toast?.type === "error" ? "#EA4335" : (toast?.type === "info" ? "#1A73E8" : "#323232"),
-              color: "white", padding: "12px 24px", borderRadius: 8,
+              color: "white", padding: "12px 24px", borderRadius: "var(--radius-md)",
               fontSize: 14, fontWeight: 500, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
               zIndex: 9999, display: "flex", alignItems: "center", gap: 12
             }}
@@ -1236,7 +1254,7 @@ function SignInView({ c }: { c: ColorSet }) {
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: c.bgApp, padding: 40, textAlign: "center" }}>
-      <div style={{ width: 80, height: 80, borderRadius: 24, background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 32, boxShadow: "0 20px 40px rgba(26,115,232,0.3)" }}>
+      <div style={{ width: 80, height: 80, borderRadius: "var(--radius-xl)", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 32, boxShadow: "0 20px 40px rgba(26,115,232,0.3)" }}>
         <CloudLightning size={44} color="white" />
       </div>
       <h1 style={{ fontSize: 32, fontWeight: 700, color: c.textPrimary, marginBottom: 12 }}>Welcome to Nexus</h1>
@@ -1249,7 +1267,7 @@ function SignInView({ c }: { c: ColorSet }) {
         disabled={loading}
         style={{
           display: "flex", alignItems: "center", gap: 12,
-          padding: "16px 32px", borderRadius: 16,
+          padding: "16px 32px", borderRadius: "var(--radius-md)",
           background: "#1A73E8", color: "white",
           border: "none", fontSize: 16, fontWeight: 600,
           cursor: "pointer", boxShadow: "0 8px 16px rgba(26,115,232,0.2)",
@@ -1286,7 +1304,7 @@ function FileGrid({ files, onSelect, selected, c, dark }: { files: NFile[]; onSe
             onClick={() => onSelect(isSelected ? null : f)}
             title={f.name}
             style={{
-              borderRadius: 12,
+              borderRadius: 20,
               border: `1px solid ${isSelected ? "#1A73E8" : c.border}`,
               background: isSelected ? (dark ? "#1A3456" : "#E8F0FE") : c.bgSurface,
               cursor: "pointer",
@@ -1320,7 +1338,7 @@ function FileGrid({ files, onSelect, selected, c, dark }: { files: NFile[]; onSe
 
 function FileList({ files, onSelect, selected, c, dark }: { files: NFile[]; onSelect: (f: NFile | null) => void; selected: NFile | null; c: ColorSet; dark: boolean }) {
   return (
-    <div style={{ borderRadius: 12, border: `1px solid ${c.border}`, overflow: "hidden" }}>
+    <div style={{ borderRadius: "var(--radius-md)", border: `1px solid ${c.border}`, overflow: "hidden" }}>
       {/* Header row */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 160px 100px 40px", alignItems: "center", height: 44, padding: "0 16px", background: c.bgApp, borderBottom: `1px solid ${c.border}` }}>
         {["Name", "Shard ID", "Modified", "Size", ""].map(col => (
@@ -1351,7 +1369,7 @@ function FileList({ files, onSelect, selected, c, dark }: { files: NFile[]; onSe
           >
             {/* Name */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div style={{ width: 32, height: 32, borderRadius: "var(--radius-sm)", background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Ico size={16} color={cfg.color} />
               </div>
               <span style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
@@ -1390,7 +1408,7 @@ function DetailPanel({ file, onClose, onAction, c, section }: { file: NFile; onC
       </div>
 
       {/* Preview */}
-      <div style={{ height: 140, borderRadius: 12, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16, border: `1px solid ${c.border}` }}>
+      <div style={{ height: 140, borderRadius: "var(--radius-md)", background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16, border: `1px solid ${c.border}` }}>
         <Ico size={56} color={cfg.color} strokeWidth={1.5} />
       </div>
 
@@ -1418,25 +1436,25 @@ function DetailPanel({ file, onClose, onAction, c, section }: { file: NFile; onC
       <div style={{ marginTop: "auto", paddingTop: 20, display: "flex", flexDirection: "column", gap: 8 }}>
         {file.deleted || section === "trash" ? (
           <>
-            <button onClick={() => onAction("restore", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "#34A853", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+            <button onClick={() => onAction("restore", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: "var(--radius-sm)", background: "#34A853", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
               Restore File
             </button>
-            <button onClick={() => onAction("permanent", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "transparent", color: "#EA4335", border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+            <button onClick={() => onAction("permanent", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: "var(--radius-sm)", background: "transparent", color: "#EA4335", border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
               Delete Permanently
             </button>
           </>
         ) : (
           <>
-            <button onClick={() => onAction("download", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "#1A73E8", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+            <button onClick={() => onAction("download", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: "var(--radius-sm)", background: "#1A73E8", color: "white", border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
               Download
             </button>
-            <button onClick={() => onAction("evict", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "transparent", color: c.textSecondary, border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+            <button onClick={() => onAction("evict", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: "var(--radius-sm)", background: "transparent", color: c.textSecondary, border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
               Free up space (clear local cache)
             </button>
-            <button onClick={() => onAction("star", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "transparent", color: file.starred ? "#F59E0B" : c.textPrimary, border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+            <button onClick={() => onAction("star", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: "var(--radius-sm)", background: "transparent", color: file.starred ? "#F59E0B" : c.textPrimary, border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
               {file.starred ? "Unstar" : "Star"}
             </button>
-            <button onClick={() => onAction("delete", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, background: "transparent", color: "#EA4335", border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+            <button onClick={() => onAction("delete", file)} style={{ width: "100%", padding: "10px 16px", borderRadius: "var(--radius-sm)", background: "transparent", color: "#EA4335", border: `1px solid ${c.border}`, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
               Move to Trash
             </button>
           </>
@@ -1464,8 +1482,8 @@ function TaskOverlay({ tasks, c }: { tasks: Record<string, BackendTask>; c: Colo
     <div style={{
       position: "absolute", bottom: 16, right: 16,
       width: 320, background: c.bgSurface,
-      borderRadius: 12, border: `1px solid ${c.border}`,
-      boxShadow: "0 12px 32px rgba(0,0,0,0.15)",
+      borderRadius: "var(--radius-md)", border: `1px solid ${c.border}`,
+      boxShadow: "0 12px 40px rgba(0,0,0,0.18)",
       zIndex: 100, overflow: "hidden"
     }}>
       <div style={{ padding: "12px 16px", background: c.bgApp, borderBottom: `1px solid ${c.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1550,7 +1568,7 @@ function SecuritySection({ c }: { c: ColorSet }) {
   return (
     <div style={{ maxWidth: 640 }}>
       <p style={{ fontSize: 14, fontWeight: 500, color: c.textSecondary, marginBottom: 20 }}>Security Protocols</p>
-      <div style={{ borderRadius: 12, border: `1px solid ${c.border}`, overflow: "hidden" }}>
+      <div style={{ borderRadius: "var(--radius-md)", border: `1px solid ${c.border}`, overflow: "hidden" }}>
         {protocols.map((p, i) => (
           <div key={p.name} style={{
             display: "flex",
@@ -1571,7 +1589,7 @@ function SecuritySection({ c }: { c: ColorSet }) {
             </div>
             <span style={{
               fontSize: 11, fontWeight: 700,
-              padding: "3px 8px", borderRadius: 6,
+              padding: "3px 8px", borderRadius: "var(--radius-sm)",
               background: p.active ? "#E6F4EA" : c.bgHover,
               color: p.active ? "#137333" : c.textSecondary,
               letterSpacing: 0.5,
@@ -1622,16 +1640,16 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
       <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
 
         {/* Toggle File/Folder */}
-        <div style={{ display: "flex", background: c.bgApp, padding: 4, borderRadius: 12, border: `1px solid ${c.border}` }}>
+        <div style={{ display: "flex", background: c.bgApp, padding: 4, borderRadius: "var(--radius-md)", border: `1px solid ${c.border}` }}>
            <button 
              onClick={() => { setIsFolder(false); setSelectedPath(null); }}
-             style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", background: !isFolder ? c.bgSurface : "transparent", color: !isFolder ? c.textPrimary : c.textSecondary, fontWeight: 600, cursor: "pointer", fontSize: 13 }}
+             style={{ flex: 1, padding: "8px", borderRadius: "var(--radius-sm)", border: "none", background: !isFolder ? c.bgSurface : "transparent", color: !isFolder ? c.textPrimary : c.textSecondary, fontWeight: 600, cursor: "pointer", fontSize: 13 }}
            >
              Single File
            </button>
            <button 
              onClick={() => { setIsFolder(true); setSelectedPath(null); }}
-             style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", background: isFolder ? c.bgSurface : "transparent", color: isFolder ? c.textPrimary : c.textSecondary, fontWeight: 600, cursor: "pointer", fontSize: 13 }}
+             style={{ flex: 1, padding: "8px", borderRadius: "var(--radius-sm)", border: "none", background: isFolder ? c.bgSurface : "transparent", color: isFolder ? c.textPrimary : c.textSecondary, fontWeight: 600, cursor: "pointer", fontSize: 13 }}
            >
              Folder (Archive)
            </button>
@@ -1641,13 +1659,13 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
         <div 
           onClick={handleSelect}
           style={{
-            border: `2px dashed ${selectedPath ? "#34A853" : c.border}`, borderRadius: 16,
+            border: `2px dashed ${selectedPath ? "#34A853" : c.border}`, borderRadius: "var(--radius-md)",
             padding: "30px 24px", display: "flex", flexDirection: "column",
             alignItems: "center", gap: 12, cursor: "pointer", textAlign: "center",
             background: selectedPath ? "rgba(52, 168, 83, 0.05)" : "transparent",
             transition: "all 0.2s",
           }}>
-          <div style={{ width: 56, height: 56, borderRadius: 16, background: selectedPath ? "#E6F4EA" : "#E8F0FE", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 56, height: 56, borderRadius: "var(--radius-md)", background: selectedPath ? "#E6F4EA" : "#E8F0FE", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {selectedPath ? <Check size={28} color="#34A853" /> : (isFolder ? <Archive size={28} color="#1A73E8" /> : <Upload size={28} color="#1A73E8" />)}
           </div>
           <div style={{ flex: 1 }}>
@@ -1697,7 +1715,7 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
                  placeholder="Enter password (write it down, it cannot be recovered!)"
                  value={password}
                  onChange={(e) => setPassword(e.target.value)}
-                 style={{ width: "100%", padding: "12px 40px 12px 40px", borderRadius: 10, background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
+                 style={{ width: "100%", padding: "12px 40px 12px 40px", borderRadius: "var(--radius-sm)", background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
                />
                <button
                  type="button"
@@ -1744,7 +1762,7 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
                 key={m.id}
                 onClick={() => setMode(m.id)}
                 style={{
-                  padding: "12px 14px", borderRadius: 10, textAlign: "left",
+                  padding: "12px 14px", borderRadius: "var(--radius-sm)", textAlign: "left",
                   background: mode === m.id ? "#E8F0FE" : "transparent",
                   border: `1.5px solid ${mode === m.id ? "#1A73E8" : c.border}`,
                   cursor: "pointer", transition: "all 0.15s",
@@ -1760,7 +1778,7 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
           disabled={!selectedPath}
           onClick={() => selectedPath && onUpload(selectedPath, mode, useCustomPassword ? password : "", isFolder)}
           style={{ 
-            width: "100%", padding: "13px 20px", borderRadius: 12, 
+            width: "100%", padding: "13px 20px", borderRadius: "var(--radius-md)", 
             background: !selectedPath ? c.border : "#1A73E8", 
             color: "white", border: "none", fontSize: 14, fontWeight: 500, 
             cursor: !selectedPath ? "not-allowed" : "pointer",
@@ -1783,7 +1801,7 @@ function NavItem({ item, active, onClick, c }: { item: { id: string; icon: any; 
       onClick={onClick}
       style={{
         display: "flex", alignItems: "center", gap: 14,
-        padding: "9px 16px", borderRadius: 24,
+        padding: "9px 16px", borderRadius: 12,
         background: active ? c.bgActive : "transparent",
         color: active ? c.textActive : c.textPrimary,
         fontSize: 14, fontWeight: active ? 600 : 400,
@@ -1823,7 +1841,7 @@ function ViewToggleBtn({ active, onClick, title, children, c }: { active: boolea
       onClick={onClick}
       title={title}
       style={{
-        width: 36, height: 36, borderRadius: 8,
+        width: 36, height: 36, borderRadius: "var(--radius-sm)",
         border: "none",
         background: active ? c.bgActive : "transparent",
         color: active ? c.iconActive : c.textSecondary,
@@ -1918,8 +1936,8 @@ function FileSkeleton({ viewMode, c }: { viewMode: ViewMode; c: ColorSet }) {
     );
   }
   return (
-    <div style={{ background: c.bgSurface, borderRadius: 16, border: `1px solid ${c.border}`, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-      <Skeleton width="100%" height={140} borderRadius={12} />
+    <div style={{ background: c.bgSurface, borderRadius: "var(--radius-md)", border: `1px solid ${c.border}`, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+      <Skeleton width="100%" height={140} borderRadius={"var(--radius-md)"} />
       <Skeleton width="80%" height={18} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Skeleton width="40%" height={12} />
@@ -1943,7 +1961,7 @@ function SplashScreen({ b, loading, c }: { b: boolean; loading: boolean; c: Colo
           <motion.div 
             animate={{ scale: [1, 1.1, 1], opacity: [0.8, 1, 0.8] }} 
             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            style={{ width: 80, height: 80, borderRadius: 24, background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24, boxShadow: "0 20px 40px rgba(26, 115, 232, 0.3)" }}
+            style={{ width: 80, height: 80, borderRadius: "var(--radius-xl)", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24, boxShadow: "0 20px 40px rgba(26, 115, 232, 0.3)" }}
           >
             <CloudLightning size={44} color="white" />
           </motion.div>

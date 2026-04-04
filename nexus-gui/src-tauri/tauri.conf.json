@@ -16,7 +16,7 @@
         "width": 1100,
         "height": 720,
         "decorations": false,
-        "transparent": false,
+        "transparent": true,
         "shadow": true,
         "maximizable": true
       }

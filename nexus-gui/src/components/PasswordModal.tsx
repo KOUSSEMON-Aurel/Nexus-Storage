@@ -88,7 +88,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
               zIndex: 301,
               background: bgColor,
               border: `1px solid ${borderColor}`,
-              borderRadius: 24,
+              borderRadius: "var(--radius-xl)",
               boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
               padding: 32,
               display: 'flex',
@@ -103,7 +103,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
                   style={{
                     width: 44,
                     height: 44,
-                    borderRadius: 12,
+                    borderRadius: "var(--radius-md)",
                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     display: 'flex',
                     alignItems: 'center',
@@ -169,7 +169,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
                   style={{
                     width: '100%',
                     padding: '12px 14px',
-                    borderRadius: 12,
+                    borderRadius: "var(--radius-sm)",
                     border: `1px solid ${error ? '#EA4335' : borderColor}`,
                     background: bgApp,
                     color: textColor,
@@ -192,7 +192,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
               {error && (
                 <div style={{
                   padding: '10px 12px',
-                  borderRadius: 8,
+                  borderRadius: "var(--radius-sm)",
                   background: '#EA433520',
                   border: '1px solid #EA433540',
                   color: '#EA4335',
@@ -216,7 +216,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
                   style={{
                     flex: 1,
                     padding: '12px',
-                    borderRadius: 12,
+                    borderRadius: "var(--radius-sm)",
                     border: `1px solid ${borderColor}`,
                     background: bgApp,
                     color: textColor,
@@ -235,7 +235,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
                   style={{
                     flex: 1,
                     padding: '12px',
-                    borderRadius: 12,
+                    borderRadius: "var(--radius-sm)",
                     border: 'none',
                     background: loading || !password ? '#667eea80' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     color: 'white',
@@ -253,7 +253,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({
             {/* Security Note */}
             <div style={{
               padding: '12px 14px',
-              borderRadius: 8,
+              borderRadius: "var(--radius-sm)",
               background: 'transparent',
               border: `1px dashed ${borderColor}`,
               fontSize: 12,
