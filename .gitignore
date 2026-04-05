@@ -38,3 +38,4 @@ client_secret.json
 # Documentation (audit & internal notes)
 *.md
 !README.md
+!TODO.md

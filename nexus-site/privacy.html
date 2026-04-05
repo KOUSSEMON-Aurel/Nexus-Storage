@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy — Nexus Storage</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="index.html" class="logo">
+                <img src="assets/logo.png" alt="Nexus Logo">
+                Nexus Storage
+            </a>
+            <nav>
+                <a href="index.html#features">Features</a>
+                <a href="index.html#how-it-works">How it works</a>
+                <a href="privacy.html" style="color: white;">Privacy</a>
+                <a href="terms.html">Terms</a>
+            </nav>
+        </header>
+
+        <section class="legal-content">
+            <h1>Privacy Policy</h1>
+            <p><strong>Effective Date:</strong> January 1, 2024</p>
+            <p>This Privacy Policy explains how Nexus Storage ("we," "us," or "our") collects, uses, and discloses information from users ("you") when you use the Nexus Storage application.</p>
+
+            <h2>1. Information Collection</h2>
+            <p>Nexus Storage is a decentralized archival tool. We collect minimum information to function:</p>
+            <ul>
+                <li><strong>Google Account Identifiers:</strong> We use OAuth 2.0 to authenticate your session. We only receive your unique Google ID (`sub`) to derive your encryption key locally.</li>
+                <li><strong>Application Data:</strong> We access your YouTube playlists and a specific file in your Google Drive (`nexus.db`) solely for storage and synchronization.</li>
+            </ul>
+
+            <h2>2. Use of Google User Data</h2>
+            <p>We strictly use the information received from Google APIs for the following purposes:</p>
+            <ul>
+                <li><strong>YouTube Upload:</strong> To upload encrypted binary data sharded as video frames to your private playlists.</li>
+                <li><strong>Google Drive Storage:</strong> To store and retrieve your decentralized file index (`nexus.db`) across your own devices.</li>
+            </ul>
+
+            <div class="alert">
+                <strong>Google API Limited Use Disclosure:</strong><br>
+                Nexus Storage's use and transfer to any other app of information received from Google APIs will adhere to 
+                <a href="https://developers.google.com/terms/api-services-user-data-policy#limited-use-requirements" style="color: var(--primary);">Google API Services User Data Policy</a>, including the Limited Use requirements.
+            </div>
+
+            <h2>3. Information Sharing</h2>
+            <p><strong>Nexus Storage does not share your data with third parties.</strong> Your encryption keys are derived locally and never leave your device. Google only sees encrypted "static" video noise when you upload files.</p>
+
+            <h2>4. Security</h2>
+            <p>Your files are protected by XChaCha20-Poly1305 (256-bit) authenticated encryption. We employ zero-knowledge architecture, meaning we have no access to your decrypted content or passwords.</p>
+
+            <h2>5. Changes to This Policy</h2>
+            <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.</p>
+
+            <h2>6. Contact Us</h2>
+            <p>If you have any questions about this Privacy Policy, please contact us at our <a href="https://github.com/KOUSSEMON-Aurel/Nexus-Storage" style="color: var(--primary);">GitHub Repository</a>.</p>
+        </section>
+
+        <footer>
+            <p>&copy; 2024 Nexus Storage Project. Open Source under MIT License.</p>
+            <div class="footer-links">
+                <a href="index.html">Home</a>
+                <a href="terms.html">Terms of Service</a>
+                <a href="https://github.com/KOUSSEMON-Aurel/Nexus-Storage">GitHub</a>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>
