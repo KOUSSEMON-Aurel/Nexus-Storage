@@ -68,7 +68,9 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev \
             patchelf \
-            jq
+            jq \
+            gcc \
+            libsqlite3-dev
 
       - name: Install jq (macos)
         if: matrix.platform == 'macos'
