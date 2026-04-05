@@ -4,7 +4,7 @@ import { Search, Plus, HardDrive, Shield, Clock, Star, Trash2,
   Grid3X3, List, FileText, FileImage, Archive, Lock,
   X, MoreVertical, Moon, Sun, CloudLightning, ChevronRight,
   Upload, Minus, Square, RefreshCw, Check, Settings,
-  Eye, EyeOff
+  Eye, EyeOff, Download
 } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -137,7 +137,10 @@ export default function Dashboard() {
     const saved = localStorage.getItem("nexus_theme");
     return saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches);
   });
-  const [selected, setSelected] = useState<NFile | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<NFile | null>(null); // Keep for DetailPanel context
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false); // Mobile toggle mode
   const [uploadOpen, setUploadOpen] = useState(false);
   const [downloadPasswordOpen, setDownloadPasswordOpen] = useState(false);
   const [pendingDownloadFile, setPendingDownloadFile] = useState<NFile | null>(null);
@@ -451,6 +454,31 @@ export default function Dashboard() {
     return () => clearTimeout(delay);
   }, [search]);
 
+  // ─── Keyboard Shortcuts ───────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeys = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      // Ctrl/Cmd + A (Select All)
+      if ((e.ctrlKey || e.metaKey) && e.key === "a") {
+        e.preventDefault();
+        const allIds = dbFiles.map(f => f.id);
+        setSelectedIds(new Set(allIds));
+        if (dbFiles.length > 0) setSelected(dbFiles[dbFiles.length - 1]);
+      }
+      
+      // Escape (Clear Selection)
+      if (e.key === "Escape") {
+        setSelectedIds(new Set());
+        setSelected(null);
+        setSelectionMode(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeys);
+    return () => window.removeEventListener("keydown", handleKeys);
+  }, [dbFiles]);
+
   const handleUploadClick = async (path: string, mode: string, password?: string, isFolder?: boolean) => {
     try {
       if (path) {
@@ -476,6 +504,91 @@ export default function Dashboard() {
       console.error("Upload error:", err);
       showToast(`Upload error: ${err.message || err}`, "error");
     }
+  };
+
+  const handleSelect = (e: React.MouseEvent | React.TouchEvent | null, file: NFile | null) => {
+    if (!file) {
+      setSelectedIds(new Set());
+      setSelected(null);
+      setLastSelectedId(null);
+      setSelectionMode(false);
+      return;
+    }
+
+    const mouseEvent = e as React.MouseEvent;
+    const isShift = mouseEvent?.shiftKey;
+    const isCtrl = mouseEvent?.ctrlKey || mouseEvent?.metaKey || selectionMode;
+
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      
+      if (isShift && lastSelectedId) {
+        // Range Selection
+        const currentIdx = dbFiles.findIndex(f => f.id === file.id);
+        const lastIdx = dbFiles.findIndex(f => f.id === lastSelectedId);
+        if (currentIdx !== -1 && lastIdx !== -1) {
+          const start = Math.min(currentIdx, lastIdx);
+          const end = Math.max(currentIdx, lastIdx);
+          for (let i = start; i <= end; i++) next.add(dbFiles[i].id);
+        }
+      } else if (isCtrl) {
+        // Toggle Selection
+        if (next.has(file.id)) next.delete(file.id);
+        else next.add(file.id);
+      } else {
+        // Single Selection
+        next.clear();
+        next.add(file.id);
+      }
+      return next;
+    });
+
+    setSelected(file);
+    setLastSelectedId(file.id);
+  };
+
+  const handleBulkAction = async (action: "delete" | "star" | "restore" | "permanent") => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    showToast(`Processing ${ids.length} items...`, "info");
+    
+    const results = await Promise.allSettled(ids.map(async id => {
+      const file = dbFiles.find(f => f.id === id);
+      if (!file) return;
+
+      let url = `${API_BASE}/files/${id}`;
+      let method = "DELETE";
+
+      if (action === "star") {
+        url = `${API_BASE}/files/${id}/star`;
+        method = "POST";
+        return fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ starred: !file.starred }) });
+      } else if (action === "restore") {
+        url = `${API_BASE}/files/${id}/restore`;
+        method = "POST";
+      } else if (action === "permanent") {
+        url = `${API_BASE}/files/${id}/permanent`;
+        method = "DELETE";
+      }
+
+      return fetch(url, { method });
+    }));
+
+    const succeeded = results.filter(r => r.status === "fulfilled" && (r.value as Response)?.ok).length;
+    const failed = ids.length - succeeded;
+
+    if (failed === 0) {
+      showToast(`✅ Successfully processed ${succeeded} items`, "success");
+    } else if (succeeded > 0) {
+      showToast(`⚠️ ${succeeded} succeeded, ${failed} failed`, "info");
+    } else {
+      showToast(`❌ Action failed for all ${ids.length} items`, "error");
+    }
+
+    await refreshFiles();
+    setSelectedIds(new Set());
+    setSelected(null);
   };
 
   const handleAction = async (action: "download" | "delete" | "star" | "restore" | "permanent" | "evict", file: NFile) => {
@@ -972,9 +1085,21 @@ export default function Dashboard() {
                           </div>
                         </>
                       ) : viewMode === "grid" ? (
-                        <FileGrid files={files} onSelect={setSelected} selected={selected!} c={c} dark={dark} />
+                        <FileGrid 
+                          files={files} 
+                          onSelect={handleSelect} 
+                          selectedIds={selectedIds} 
+                          c={c} 
+                          dark={dark} 
+                        />
                       ) : (
-                        <FileList files={files} onSelect={setSelected} selected={selected!} c={c} dark={dark} />
+                        <FileList 
+                          files={files} 
+                          onSelect={handleSelect} 
+                          selectedIds={selectedIds} 
+                          c={c} 
+                          dark={dark} 
+                        />
                       )}
                     </>
                   )}
@@ -984,7 +1109,7 @@ export default function Dashboard() {
 
             {/* Detail panel */}
             <AnimatePresence>
-              {selected && (
+              {(selectedIds.size > 0) && (
                 <motion.div
                   initial={{ width: 0, opacity: 0 }}
                   animate={{ width: 280, opacity: 1 }}
@@ -992,7 +1117,15 @@ export default function Dashboard() {
                   transition={{ duration: 0.2, ease: "easeInOut" }}
                   style={{ borderLeft: `1px solid ${c.border}`, overflow: "hidden", flexShrink: 0 }}
                 >
-                  <DetailPanel file={selected} onClose={() => setSelected(null)} onAction={handleAction} c={c} section={section} />
+                  <DetailPanel 
+                    file={selectedIds.size === 1 ? selected : null} 
+                    selectedIds={selectedIds}
+                    files={dbFiles}
+                    onClose={() => handleSelect(null, null)} 
+                    onAction={handleAction} 
+                    c={c} 
+                    section={section} 
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1000,6 +1133,15 @@ export default function Dashboard() {
         </main>
       </div>
     )}
+
+      {/* ━━━━ MULTI-SELECT TOOLBAR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <MultiSelectToolbar 
+        selectedIds={selectedIds} 
+        onAction={handleBulkAction} 
+        onClear={() => handleSelect(null, null)} 
+        c={c} 
+        dark={dark} 
+      />
 
       {/* ━━━━ UPLOAD MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <AnimatePresence>
@@ -1288,36 +1430,62 @@ function SignInView({ c }: { c: ColorSet }) {
 
 // ─── File Grid ────────────────────────────────────────────────────────────────
 
-function FileGrid({ files, onSelect, selected, c, dark }: { files: NFile[]; onSelect: (f: NFile | null) => void; selected: NFile | null; c: ColorSet; dark: boolean }) {
+function FileGrid({ files, onSelect, selectedIds, c, dark }: { files: NFile[]; onSelect: (e: React.MouseEvent | React.TouchEvent | null, f: NFile | null) => void; selectedIds: Set<string>; c: ColorSet; dark: boolean }) {
+  const hasSelection = selectedIds.size > 0;
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 20 }}>
       {files.map((f, i) => {
         const cfg = TYPE_CONFIG[f.type];
         const Ico = cfg.icon;
-        const isSelected = selected?.id === f.id;
+        const isSelected = selectedIds.has(f.id);
+
         return (
           <motion.div
             key={f.id}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03, duration: 0.15 }}
-            onClick={() => onSelect(isSelected ? null : f)}
+            onClick={(e) => onSelect(e, f)}
             title={f.name}
             style={{
+              position: "relative",
               borderRadius: 20,
-              border: `1px solid ${isSelected ? "#1A73E8" : c.border}`,
+              border: `2px solid ${isSelected ? "#1A73E8" : "transparent"}`,
+              outline: isSelected ? "none" : `1px solid ${c.border}`,
               background: isSelected ? (dark ? "#1A3456" : "#E8F0FE") : c.bgSurface,
               cursor: "pointer",
               overflow: "hidden",
-              transition: "border-color 0.15s, background 0.15s",
+              transition: "all 0.15s",
             }}
           >
+            {/* Checkbox Overlay */}
+            <div 
+              style={{
+                position: "absolute",
+                top: 10,
+                left: 10,
+                width: 22,
+                height: 22,
+                borderRadius: 6,
+                border: `2px solid ${isSelected ? "#1A73E8" : c.textSecondary + "40"}`,
+                background: isSelected ? "#1A73E8" : "rgba(255,255,255,0.8)",
+                display: isSelected || hasSelection ? "flex" : "none",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10,
+                transition: "all 0.1s"
+              }}
+            >
+              {isSelected && <Check size={14} color="white" strokeWidth={3} />}
+            </div>
+
             {/* Thumbnail area */}
             <div style={{ height: 100, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Ico size={40} color={cfg.color} strokeWidth={1.5} />
             </div>
             {/* Info area */}
-            <div style={{ padding: "10px 12px 12px", borderTop: `1px solid ${c.border}` }}>
+            <div style={{ padding: "10px 12px 12px", borderTop: isSelected ? "none" : `1px solid ${c.border}` }}>
               <p style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 4 }}>
                 {f.name}
               </p>
@@ -1336,7 +1504,9 @@ function FileGrid({ files, onSelect, selected, c, dark }: { files: NFile[]; onSe
 
 // ─── File List ────────────────────────────────────────────────────────────────
 
-function FileList({ files, onSelect, selected, c, dark }: { files: NFile[]; onSelect: (f: NFile | null) => void; selected: NFile | null; c: ColorSet; dark: boolean }) {
+function FileList({ files, onSelect, selectedIds, c, dark }: { files: NFile[]; onSelect: (e: React.MouseEvent | React.TouchEvent | null, f: NFile | null) => void; selectedIds: Set<string>; c: ColorSet; dark: boolean }) {
+  const hasSelection = selectedIds.size > 0;
+
   return (
     <div style={{ borderRadius: "var(--radius-md)", border: `1px solid ${c.border}`, overflow: "hidden" }}>
       {/* Header row */}
@@ -1348,11 +1518,13 @@ function FileList({ files, onSelect, selected, c, dark }: { files: NFile[]; onSe
       {files.map((f, i) => {
         const cfg = TYPE_CONFIG[f.type];
         const Ico = cfg.icon;
-        const isSelected = selected?.id === f.id;
+        const isSelected = selectedIds.has(f.id);
+        
         return (
           <div
             key={f.id}
-            onClick={() => onSelect(isSelected ? null : f)}
+            onClick={(e) => onSelect(e, f)}
+            className="file-row"
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 120px 160px 100px 40px",
@@ -1360,15 +1532,34 @@ function FileList({ files, onSelect, selected, c, dark }: { files: NFile[]; onSe
               height: 52,
               padding: "0 16px",
               background: isSelected ? (dark ? "#1A3456" : "#E8F0FE") : "transparent",
+              borderLeft: `4px solid ${isSelected ? "#1A73E8" : "transparent"}`,
               borderBottom: i < files.length - 1 ? `1px solid ${c.border}` : "none",
               cursor: "pointer",
-              transition: "background 0.1s",
+              transition: "all 0.1s",
             }}
             onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = c.bgHover; }}
             onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = isSelected ? (dark ? "#1A3456" : "#E8F0FE") : "transparent"; }}
           >
             {/* Name */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+              {/* Checkbox */}
+              <div 
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 4,
+                  border: `2px solid ${isSelected ? "#1A73E8" : c.textSecondary + "40"}`,
+                  background: isSelected ? "#1A73E8" : "transparent",
+                  display: isSelected || hasSelection ? "flex" : "none",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0
+                }}
+                className="list-checkbox"
+              >
+                {isSelected && <Check size={12} color="white" strokeWidth={3} />}
+              </div>
+
               <div style={{ width: 32, height: 32, borderRadius: "var(--radius-sm)", background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Ico size={16} color={cfg.color} />
               </div>
@@ -1395,9 +1586,69 @@ function FileList({ files, onSelect, selected, c, dark }: { files: NFile[]; onSe
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ file, onClose, onAction, c, section }: { file: NFile; onClose: () => void; onAction: (action: "download" | "delete" | "star" | "restore" | "permanent" | "evict", file: NFile) => void; c: ColorSet; section: Section }) {
+function DetailPanel({ 
+  file, 
+  selectedIds, 
+  files, 
+  onClose, 
+  onAction, 
+  c, 
+  section 
+}: { 
+  file: NFile | null; 
+  selectedIds: Set<string>; 
+  files: NFile[]; 
+  onClose: () => void; 
+  onAction: (action: "download" | "delete" | "star" | "restore" | "permanent" | "evict", file: NFile) => void; 
+  c: ColorSet; 
+  section: Section 
+}) {
+  const isMulti = selectedIds.size > 1;
+  const selectedFiles = files.filter(f => selectedIds.has(f.id));
+  
+  if (isMulti) {
+    const totalSizeRaw = selectedFiles.reduce((acc, f) => {
+      const match = f.size.match(/([\d.]+)\s*(KB|MB|GB|TB)/i);
+      if (!match) return acc;
+      const val = parseFloat(match[1]);
+      const unit = match[2].toUpperCase();
+      const mult: Record<string, number> = { KB: 1e3, MB: 1e6, GB: 1e9, TB: 1e12 };
+      return acc + (val * (mult[unit] || 1));
+    }, 0);
+    
+    return (
+      <div style={{ width: 280, height: "100%", display: "flex", flexDirection: "column", padding: 20, overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5 }}>Selection Summary</span>
+          <button onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", color: c.textSecondary, padding: 4, borderRadius: 8 }}>
+            <X size={18} />
+          </button>
+        </div>
+        
+        <div style={{ background: c.bgApp, borderRadius: 20, padding: 20, textAlign: "center", marginBottom: 20, border: `1px solid ${c.border}` }}>
+          <Grid3X3 size={40} color="#1A73E8" style={{ marginBottom: 12, opacity: 0.8 }} />
+          <p style={{ fontSize: 24, fontWeight: 700, color: c.textPrimary, margin: 0 }}>{selectedIds.size}</p>
+          <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>Items Selected</p>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, borderTop: `1px solid ${c.border}`, paddingTop: 16 }}>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>TOTAL SIZE</p>
+            <p style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{formatSize(totalSizeRaw)}</p>
+          </div>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>SHARING</p>
+            <p style={{ fontSize: 13, color: c.textPrimary }}>Private · Zero Knowledge</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!file) return null;
   const cfg = TYPE_CONFIG[file.type];
   const Ico = cfg.icon;
+  
   return (
     <div style={{ width: 280, height: "100%", display: "flex", flexDirection: "column", padding: 20, overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -1975,5 +2226,108 @@ function SplashScreen({ b, loading, c }: { b: boolean; loading: boolean; c: Colo
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+// ─── Multi-Select Toolbar ───────────────────────────────────────────────────
+
+function MultiSelectToolbar({ 
+  selectedIds, 
+  onAction, 
+  onClear, 
+  c, 
+  dark 
+}: { 
+  selectedIds: Set<string>; 
+  onAction: (action: "delete" | "star" | "restore" | "permanent") => void; 
+  onClear: () => void;
+  c: ColorSet; 
+  dark: boolean 
+}) {
+  const count = selectedIds.size;
+  if (count === 0) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ y: 100, opacity: 0, x: "-50%" }}
+        animate={{ y: 0, opacity: 1, x: "-50%" }}
+        exit={{ y: 100, opacity: 0, x: "-50%" }}
+        style={{
+          position: "fixed",
+          bottom: 32,
+          left: "50%",
+          height: 64,
+          background: dark ? "#323232" : "white",
+          borderRadius: 32,
+          boxShadow: "0 10px 40px rgba(0,0,0,0.25)",
+          padding: "0 8px 0 24px",
+          display: "flex",
+          alignItems: "center",
+          gap: 24,
+          zIndex: 1000,
+          border: `1px solid ${c.border}`,
+          minWidth: 460
+        }}
+      >
+        <span style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary }}>
+          <span style={{ color: "#1A73E8" }}>{count}</span> selected
+        </span>
+
+        <div style={{ width: 1, height: 24, background: c.border }} />
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <ToolbarButton icon={<Star size={18} />} label="Star" onClick={() => onAction("star")} c={c} />
+          <ToolbarButton icon={<Download size={18} />} label="Download" onClick={() => {}} c={c} />
+          <ToolbarButton icon={<Trash2 size={18} />} label="Trash" onClick={() => onAction("delete")} c={c} danger />
+        </div>
+
+        <button 
+          onClick={onClear}
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            color: c.textSecondary,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginLeft: "auto"
+          }}
+        >
+          <X size={20} />
+        </button>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function ToolbarButton({ icon, label, onClick, c, danger }: { icon: any; label: string; onClick: () => void; c: ColorSet; danger?: boolean }) {
+  return (
+    <button 
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 16px",
+        borderRadius: "var(--radius-md)",
+        border: "none",
+        background: "transparent",
+        color: danger ? "#EA4335" : c.textPrimary,
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 500,
+        transition: "all 0.1s"
+      }}
+      onMouseEnter={e => (e.currentTarget.style.background = c.bgHover)}
+      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }

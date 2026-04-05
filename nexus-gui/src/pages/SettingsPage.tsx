@@ -9,9 +9,11 @@ import {
   Shield,
   Key,
   Trash2,
-  Clock
+  Clock,
+  MousePointer2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { openUrl } from '@tauri-apps/plugin-opener';
 
 // ─── Color Palettes (Matching Dashboard) ─────────────────────────────────────
 
@@ -55,7 +57,7 @@ interface SettingsPageProps {
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'encryption' | 'trash' | 'about'>('encryption');
+  const [activeTab, setActiveTab] = useState<'encryption' | 'trash' | 'selection' | 'about'>('encryption');
   const [dark, setDark] = useState(document.documentElement.classList.contains('dark'));
   const [trashRetentionDays, setTrashRetentionDays] = useState(30);
 
@@ -72,6 +74,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
 
   const navItems = [
     { id: 'encryption', label: 'Encryption & Security', icon: Shield },
+    { id: 'selection', label: 'Selection & Interaction', icon: MousePointer2 },
     { id: 'trash', label: 'Trash & Storage', icon: Trash2 },
     { id: 'about', label: 'About Nexus', icon: Info },
   ];
@@ -172,6 +175,55 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
           position: "relative"
         }}>
           <AnimatePresence mode="wait">
+            {activeTab === 'selection' && (
+              <motion.div 
+                key="selection"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                style={{ maxWidth: 640 }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: "var(--radius-md)", background: "#1A73E815", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <MousePointer2 size={24} color="#1A73E8" />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: 20, fontWeight: 600, color: c.textPrimary, margin: 0 }}>Selection & Interaction</h2>
+                    <p style={{ fontSize: 14, color: c.textSecondary, margin: "4px 0 0 0" }}>Configure how you manage multiple files</p>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                  <section style={{ background: c.bgApp, padding: 20, borderRadius: 20, border: `1px solid ${c.border}` }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <RefreshCw size={18} color={c.textSecondary} />
+                        <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, margin: 0 }}>Persistent Checkboxes</h3>
+                      </div>
+                      <div style={{ width: 40, height: 20, borderRadius: 10, background: "#34A853", position: "relative", cursor: "pointer" }}>
+                        <div style={{ width: 16, height: 16, borderRadius: "50%", background: "white", position: "absolute", right: 2, top: 2 }} />
+                      </div>
+                    </div>
+                    <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Always show selection checkboxes on items, even when nothing is selected.</p>
+                  </section>
+
+                  <section style={{ background: c.bgApp, padding: 20, borderRadius: 20, border: `1px solid ${c.border}` }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, marginBottom: 16 }}>Interaction Mode</h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div style={{ padding: 16, borderRadius: 12, background: c.bgSurface, border: `2px solid #1A73E8`, cursor: "pointer" }}>
+                        <p style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary, margin: "0 0 4px 0" }}>Desktop (Default)</p>
+                        <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>Standard Ctrl/Shift shortcuts</p>
+                      </div>
+                      <div style={{ padding: 16, borderRadius: 12, background: c.bgSurface, border: `1px solid ${c.border}`, cursor: "pointer", opacity: 0.7 }}>
+                        <p style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary, margin: "0 0 4px 0" }}>Selection Mode</p>
+                        <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>Long-press to enter toggle mode</p>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </motion.div>
+            )}
             {activeTab === 'encryption' && (
               <motion.div 
                 key="encryption"
@@ -340,7 +392,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                     <RefreshCw size={44} color="white" />
                   </div>
                   <h2 style={{ fontSize: 28, fontWeight: 700, color: c.textPrimary, margin: "0 0 8px 0" }}>Nexus Storage</h2>
-                  <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>v2.2.0 "Stellar Archival"</p>
+                  <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>v4.0.0 "Nova Galactic"</p>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
@@ -377,9 +429,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                       <span style={{ fontSize: 14, fontWeight: 500 }}>Open Source Project</span>
                     </div>
                     <a 
-                      href="https://github.com/KOUSSEMON-Aurel/Nexus-Storage" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        openUrl("https://github.com/KOUSSEMON-Aurel/Nexus-Storage");
+                      }}
                       style={{ 
                         fontSize: 14, 
                         color: "#1A73E8", 
