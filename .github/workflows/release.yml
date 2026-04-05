@@ -44,7 +44,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -75,7 +75,8 @@ jobs:
             patchelf \
             jq \
             gcc \
-            libsqlite3-dev
+            libsqlite3-dev \
+            libfuse2
 
       - name: Install jq (macos)
         if: matrix.platform == 'macos'
@@ -166,13 +167,6 @@ jobs:
           # quand les credentials OAuth seront configurés
           echo '{}' > nexus-gui/src-tauri/bin/client_secret.json
 
-      # ─── ÉTAPE 6 : Patch tauri.conf.json (Linux : deb seulement) ─────────
-      - name: Disable AppImage on Linux (use jq, not sed)
-        if: matrix.platform == 'linux'
-        run: |
-          jq '.bundle.targets = ["deb"]' \
-            nexus-gui/src-tauri/tauri.conf.json > /tmp/tauri.conf.tmp
-          mv /tmp/tauri.conf.tmp nexus-gui/src-tauri/tauri.conf.json
 
       # ─── ÉTAPE 7 : Build Tauri + Release ──────────────────────────────────
       - name: Install frontend dependencies
