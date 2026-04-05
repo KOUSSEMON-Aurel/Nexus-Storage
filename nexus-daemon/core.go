@@ -1,7 +1,8 @@
 package main
 
 /*
-#cgo LDFLAGS: ${SRCDIR}/libnexus_core.a -lm -ldl -lpthread
+#cgo LDFLAGS: ${SRCDIR}/libnexus_core.a -lm -lpthread
+#cgo linux LDFLAGS: -ldl
 #cgo CFLAGS: -I${SRCDIR}/../nexus-core/include
 #include <stdlib.h>
 #include "nexus_core.h"

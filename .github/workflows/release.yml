@@ -20,10 +20,10 @@ jobs:
 
           - os: macos-latest
             platform: macos
-            daemon_rust_target: x86_64-apple-darwin
-            tauri_rust_target: x86_64-apple-darwin
-            ffmpeg_url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-darwin-x64
-            rclone_url: https://downloads.rclone.org/rclone-current-osx-amd64.zip
+            daemon_rust_target: aarch64-apple-darwin
+            tauri_rust_target: aarch64-apple-darwin
+            ffmpeg_url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-darwin-arm64
+            rclone_url: https://downloads.rclone.org/rclone-current-osx-arm64.zip
 
           - os: windows-latest
             platform: windows
@@ -48,6 +48,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+          cache-dependency-path: nexus-daemon/go.sum
 
       - name: Install Rust (both targets on Windows, single on others)
         uses: dtolnay/rust-toolchain@stable
