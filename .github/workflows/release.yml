@@ -1,0 +1,179 @@
+name: Release Nexus Storage
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux
+            daemon_rust_target: x86_64-unknown-linux-gnu
+            tauri_rust_target: x86_64-unknown-linux-gnu
+            ffmpeg_url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-linux-x64
+            rclone_url: https://downloads.rclone.org/rclone-current-linux-amd64.zip
+
+          - os: macos-latest
+            platform: macos
+            daemon_rust_target: x86_64-apple-darwin
+            tauri_rust_target: x86_64-apple-darwin
+            ffmpeg_url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-darwin-x64
+            rclone_url: https://downloads.rclone.org/rclone-current-osx-amd64.zip
+
+          - os: windows-latest
+            platform: windows
+            # GNU pour le daemon (CGO/MinGW), MSVC pour Tauri
+            daemon_rust_target: x86_64-pc-windows-gnu
+            tauri_rust_target: x86_64-pc-windows-msvc
+            ffmpeg_url: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/ffmpeg-win32-x64
+            rclone_url: https://downloads.rclone.org/rclone-current-windows-amd64.zip
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install Rust (both targets on Windows, single on others)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >-
+            ${{ matrix.daemon_rust_target }}
+            ${{ matrix.platform == 'windows' && ',' || '' }}
+            ${{ matrix.platform == 'windows' && matrix.tauri_rust_target || '' }}
+
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.0-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            jq
+
+      - name: Install jq (macos)
+        if: matrix.platform == 'macos'
+        run: brew install jq
+
+      - name: Install jq (Windows)
+        if: matrix.platform == 'windows'
+        run: choco install jq -y
+        shell: powershell
+
+      # ─── ÉTAPE 1 : Compiler Nexus Core (Rust → .a) pour le daemon ─────────
+      - name: Build Nexus Core (static lib for daemon)
+        run: cargo build --package nexus-core --release --target ${{ matrix.daemon_rust_target }}
+
+      - name: Copy static lib to nexus-daemon
+        shell: bash
+        run: |
+          mkdir -p nexus-daemon
+          cp "target/${{ matrix.daemon_rust_target }}/release/libnexus_core.a" nexus-daemon/libnexus_core.a
+
+      # ─── ÉTAPE 2 : Compiler le Daemon Go ──────────────────────────────────
+      - name: Build Go Daemon (Linux/macOS)
+        if: matrix.platform != 'windows'
+        working-directory: ./nexus-daemon
+        env:
+          CGO_ENABLED: '1'
+        run: go build -tags fts5 -o nexus-daemon .
+
+      - name: Build Go Daemon (Windows via MinGW)
+        if: matrix.platform == 'windows'
+        working-directory: ./nexus-daemon
+        env:
+          CGO_ENABLED: '1'
+          CC: x86_64-w64-mingw32-gcc
+          GOOS: windows
+          GOARCH: amd64
+        run: go build -tags fts5 -o nexus-daemon.exe .
+        shell: bash
+
+      # ─── ÉTAPE 3 : Télécharger FFmpeg & Rclone ────────────────────────────
+      - name: Download FFmpeg
+        shell: bash
+        run: |
+          mkdir -p nexus-gui/src-tauri/bin
+          TRIPLE="${{ matrix.tauri_rust_target }}"
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            curl -L "${{ matrix.ffmpeg_url }}" -o "nexus-gui/src-tauri/bin/ffmpeg-${TRIPLE}.exe"
+          else
+            curl -L "${{ matrix.ffmpeg_url }}" -o "nexus-gui/src-tauri/bin/ffmpeg-${TRIPLE}"
+            chmod +x "nexus-gui/src-tauri/bin/ffmpeg-${TRIPLE}"
+          fi
+
+      - name: Download Rclone
+        shell: bash
+        run: |
+          TRIPLE="${{ matrix.tauri_rust_target }}"
+          curl -L "${{ matrix.rclone_url }}" -o rclone.zip
+          unzip -j rclone.zip "*/rclone*" -d rclone_tmp
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            cp rclone_tmp/rclone.exe "nexus-gui/src-tauri/bin/rclone-${TRIPLE}.exe"
+          else
+            cp rclone_tmp/rclone "nexus-gui/src-tauri/bin/rclone-${TRIPLE}"
+            chmod +x "nexus-gui/src-tauri/bin/rclone-${TRIPLE}"
+          fi
+
+      # ─── ÉTAPE 4 : Injecter le Daemon compilé ─────────────────────────────
+      - name: Inject daemon sidecar
+        shell: bash
+        run: |
+          TRIPLE="${{ matrix.tauri_rust_target }}"
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            cp nexus-daemon/nexus-daemon.exe "nexus-gui/src-tauri/bin/nexus-daemon-${TRIPLE}.exe"
+          else
+            cp nexus-daemon/nexus-daemon "nexus-gui/src-tauri/bin/nexus-daemon-${TRIPLE}"
+          fi
+
+      # ─── ÉTAPE 5 : client_secret.json (vide pour CI) ──────────────────────
+      - name: Generate placeholder client_secret.json
+        shell: bash
+        run: |
+          # Remplacer par : echo '${{ secrets.GOOGLE_CLIENT_SECRET }}' > ...
+          # quand les credentials OAuth seront configurés
+          echo '{}' > nexus-gui/src-tauri/bin/client_secret.json
+
+      # ─── ÉTAPE 6 : Patch tauri.conf.json (Linux : deb seulement) ─────────
+      - name: Disable AppImage on Linux (use jq, not sed)
+        if: matrix.platform == 'linux'
+        run: |
+          jq '.bundle.targets = ["deb"]' \
+            nexus-gui/src-tauri/tauri.conf.json > /tmp/tauri.conf.tmp
+          mv /tmp/tauri.conf.tmp nexus-gui/src-tauri/tauri.conf.json
+
+      # ─── ÉTAPE 7 : Build Tauri + Release ──────────────────────────────────
+      - name: Install frontend dependencies
+        working-directory: ./nexus-gui
+        run: npm install
+
+      - name: Build and release with Tauri Action
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: './nexus-gui'
+          args: '--target ${{ matrix.tauri_rust_target }}'
+          tagName: app-v__VERSION__
+          releaseName: 'Nexus Storage v__VERSION__'
+          releaseBody: 'Release automatique cross-platform.'
+          releaseDraft: true
+          prerelease: false
