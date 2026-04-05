@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::os::raw::c_uchar;
 
 #[link(name = "nexus_core", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     fn nexus_generate_recovery_salt(
         out_ptr: *mut *mut c_uchar,
         out_len: *mut usize,
