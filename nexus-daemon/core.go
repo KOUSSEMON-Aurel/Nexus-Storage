@@ -4,9 +4,6 @@ package main
 #cgo LDFLAGS: ${SRCDIR}/libnexus_core.a -lm -lpthread
 #cgo linux LDFLAGS: -ldl
 #cgo windows LDFLAGS: -lws2_32 -luserenv -lbcrypt -lntdll
-#cgo CFLAGS: -I${SRCDIR}/../nexus-core/include
-#include <stdlib.h>
-#include "nexus_core.h"
 */
 import "C"
 import (
