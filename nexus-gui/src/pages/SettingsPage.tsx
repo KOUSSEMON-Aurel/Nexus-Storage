@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { useSettings } from '../context/SettingsContext';
 
 // ─── Color Palettes (Matching Dashboard) ─────────────────────────────────────
 
@@ -58,17 +59,8 @@ interface SettingsPageProps {
 const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'encryption' | 'trash' | 'selection' | 'about'>('encryption');
-  const [dark, setDark] = useState(document.documentElement.classList.contains('dark'));
+  const { dark, persistentCheckboxes, setPersistentCheckboxes, interactionMode, setInteractionMode } = useSettings();
   const [trashRetentionDays, setTrashRetentionDays] = useState(30);
-
-  // Listen for dark mode changes
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setDark(document.documentElement.classList.contains('dark'));
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
 
   const c = dark ? DARK : LIGHT;
 
@@ -201,8 +193,23 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                         <RefreshCw size={18} color={c.textSecondary} />
                         <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, margin: 0 }}>Persistent Checkboxes</h3>
                       </div>
-                      <div style={{ width: 40, height: 20, borderRadius: 10, background: "#34A853", position: "relative", cursor: "pointer" }}>
-                        <div style={{ width: 16, height: 16, borderRadius: "50%", background: "white", position: "absolute", right: 2, top: 2 }} />
+                      <div 
+                        onClick={() => setPersistentCheckboxes(!persistentCheckboxes)}
+                        style={{ 
+                          width: 40, 
+                          height: 20, 
+                          borderRadius: 10, 
+                          background: persistentCheckboxes ? "#34A853" : c.border, 
+                          position: "relative", 
+                          cursor: "pointer",
+                          transition: "background 0.2s"
+                        }}
+                      >
+                        <motion.div 
+                          animate={{ x: persistentCheckboxes ? 22 : 2 }}
+                          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                          style={{ width: 16, height: 16, borderRadius: "50%", background: "white", position: "absolute", top: 2 }} 
+                        />
                       </div>
                     </div>
                     <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>Always show selection checkboxes on items, even when nothing is selected.</p>
@@ -211,14 +218,68 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                   <section style={{ background: c.bgApp, padding: 20, borderRadius: 20, border: `1px solid ${c.border}` }}>
                     <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, marginBottom: 16 }}>Interaction Mode</h3>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <div style={{ padding: 16, borderRadius: 12, background: c.bgSurface, border: `2px solid #1A73E8`, cursor: "pointer" }}>
-                        <p style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary, margin: "0 0 4px 0" }}>Desktop (Default)</p>
+                      <div 
+                        onClick={() => setInteractionMode('desktop')}
+                        style={{ 
+                          padding: 16, 
+                          borderRadius: 12, 
+                          background: c.bgSurface, 
+                          border: `2px solid ${interactionMode === 'desktop' ? "#1A73E8" : "transparent"}`, 
+                          outline: interactionMode === 'desktop' ? "none" : `1px solid ${c.border}`,
+                          cursor: "pointer",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        <p style={{ fontSize: 14, fontWeight: 600, color: interactionMode === 'desktop' ? "#1A73E8" : c.textPrimary, margin: "0 0 4px 0" }}>Desktop (Default)</p>
                         <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>Standard Ctrl/Shift shortcuts</p>
                       </div>
-                      <div style={{ padding: 16, borderRadius: 12, background: c.bgSurface, border: `1px solid ${c.border}`, cursor: "pointer", opacity: 0.7 }}>
-                        <p style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary, margin: "0 0 4px 0" }}>Selection Mode</p>
+                      <div 
+                        onClick={() => setInteractionMode('selection')}
+                        style={{ 
+                          padding: 16, 
+                          borderRadius: 12, 
+                          background: c.bgSurface, 
+                          border: `2px solid ${interactionMode === 'selection' ? "#1A73E8" : "transparent"}`, 
+                          outline: interactionMode === 'selection' ? "none" : `1px solid ${c.border}`,
+                          cursor: "pointer",
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        <p style={{ fontSize: 14, fontWeight: 600, color: interactionMode === 'selection' ? "#1A73E8" : c.textPrimary, margin: "0 0 4px 0" }}>Selection Mode</p>
                         <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>Long-press to enter toggle mode</p>
                       </div>
+                    </div>
+                  </section>
+
+                  {/* Keyboard Shortcuts Documentation */}
+                  <section style={{ marginTop: 8 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, marginBottom: 16 }}>Keyboard Shortcuts</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {[
+                        { key: "Ctrl + A", desc: "Select all files in current view" },
+                        { key: "Escape", desc: "Clear selection & exit selection mode" },
+                        { key: "Ctrl + Click", desc: "Toggle selection for a specific item" },
+                        { key: "Shift + Click", desc: "Select a range of files" },
+                        { key: "Enter", desc: "Confirm / Submit password modals" },
+                        { key: "Empty Click", desc: "Click empty space to clear selection" },
+                      ].map((item, i) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: c.bgApp, borderRadius: 10, border: `1px solid ${c.border}` }}>
+                          <span style={{ fontSize: 13, color: c.textSecondary }}>{item.desc}</span>
+                          <kbd style={{ 
+                            padding: "2px 6px", 
+                            background: c.bgSurface, 
+                            border: `1px solid ${c.border}`, 
+                            borderRadius: 4, 
+                            fontSize: 11, 
+                            fontFamily: "monospace", 
+                            fontWeight: 600,
+                            color: c.textPrimary,
+                            boxShadow: `0 2px 0 ${c.border}`
+                          }}>
+                            {item.key}
+                          </kbd>
+                        </div>
+                      ))}
                     </div>
                   </section>
                 </div>

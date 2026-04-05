@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage';
 import RecoveryPage from './pages/RecoveryPage';
 import Dashboard from './Dashboard';
 import SettingsPage from './pages/SettingsPage';
+import { SettingsProvider } from './context/SettingsContext';
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -47,32 +48,34 @@ const App: React.FC = () => {
   }
 
   return (
-    <Router>
-      <Routes>
-        {/* Authentication Routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/recovery" element={<RecoveryPage />} />
+    <SettingsProvider>
+      <Router>
+        <Routes>
+          {/* Authentication Routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/recovery" element={<RecoveryPage />} />
 
-        {/* Default Dashboard Route - go directly to dashboard */}
-        <Route
-          path="/dashboard"
-          element={<Dashboard />}
-        />
-        <Route
-          path="/settings"
-          element={<SettingsPage />}
-        />
+          {/* Default Dashboard Route - go directly to dashboard */}
+          <Route
+            path="/dashboard"
+            element={<Dashboard />}
+          />
+          <Route
+            path="/settings"
+            element={<SettingsPage />}
+          />
 
-        {/* Default Route - redirect to dashboard */}
-        <Route
-          path="/"
-          element={<Navigate to="/dashboard" replace />}
-        />
+          {/* Default Route - redirect to dashboard */}
+          <Route
+            path="/"
+            element={<Navigate to="/dashboard" replace />}
+          />
 
-        {/* Catch all - redirect to home */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+          {/* Catch all - redirect to home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </SettingsProvider>
   );
 };
 

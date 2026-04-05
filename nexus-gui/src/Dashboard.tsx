@@ -10,6 +10,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useNavigate } from "react-router-dom";
 import PasswordModal from "./components/PasswordModal";
+import { useSettings } from "./context/SettingsContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -130,13 +131,11 @@ const TYPE_CONFIG = {
 // ─── App ─────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  const { dark, setDark, persistentCheckboxes, interactionMode } = useSettings();
   const [section, setSection] = useState<Section>("my-drive");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [search, setSearch] = useState("");
-  const [dark, setDark] = useState(() => {
-    const saved = localStorage.getItem("nexus_theme");
-    return saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  });
+  
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<NFile | null>(null); // Keep for DetailPanel context
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
@@ -256,10 +255,7 @@ export default function Dashboard() {
   };
 
   // ─── Theme Sync ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-    localStorage.setItem("nexus_theme", dark ? "dark" : "light");
-  }, [dark]);
+  // (Theme sync is now handled globally by SettingsProvider)
 
   // ─── LSN REAL-TIME UPDATES (Server-Sent Events) ──────────────────────────
   // Subscribe to DB change notifications and refresh files instantly
@@ -517,7 +513,7 @@ export default function Dashboard() {
 
     const mouseEvent = e as React.MouseEvent;
     const isShift = mouseEvent?.shiftKey;
-    const isCtrl = mouseEvent?.ctrlKey || mouseEvent?.metaKey || selectionMode;
+    const isCtrl = mouseEvent?.ctrlKey || mouseEvent?.metaKey || selectionMode || interactionMode === 'selection';
 
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -827,7 +823,7 @@ export default function Dashboard() {
 
         {/* Actions on the right */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <IconBtn onClick={() => setDark(d => !d)} title="Toggle theme" dark={dark}>
+          <IconBtn onClick={() => setDark(!dark)} title="Toggle theme" dark={dark}>
             {dark ? <Sun size={20} /> : <Moon size={20} />}
           </IconBtn>
           {/* Avatar */}
@@ -1091,6 +1087,7 @@ export default function Dashboard() {
                           selectedIds={selectedIds} 
                           c={c} 
                           dark={dark} 
+                          persistentCheckboxes={persistentCheckboxes}
                         />
                       ) : (
                         <FileList 
@@ -1099,6 +1096,7 @@ export default function Dashboard() {
                           selectedIds={selectedIds} 
                           c={c} 
                           dark={dark} 
+                          persistentCheckboxes={persistentCheckboxes}
                         />
                       )}
                     </>
@@ -1430,8 +1428,8 @@ function SignInView({ c }: { c: ColorSet }) {
 
 // ─── File Grid ────────────────────────────────────────────────────────────────
 
-function FileGrid({ files, onSelect, selectedIds, c, dark }: { files: NFile[]; onSelect: (e: React.MouseEvent | React.TouchEvent | null, f: NFile | null) => void; selectedIds: Set<string>; c: ColorSet; dark: boolean }) {
-  const hasSelection = selectedIds.size > 0;
+function FileGrid({ files, onSelect, selectedIds, c, dark, persistentCheckboxes }: { files: NFile[]; onSelect: (e: React.MouseEvent | React.TouchEvent | null, f: NFile | null) => void; selectedIds: Set<string>; c: ColorSet; dark: boolean; persistentCheckboxes: boolean }) {
+  const hasSelection = selectedIds.size > 0 || persistentCheckboxes;
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 20 }}>
@@ -1504,8 +1502,8 @@ function FileGrid({ files, onSelect, selectedIds, c, dark }: { files: NFile[]; o
 
 // ─── File List ────────────────────────────────────────────────────────────────
 
-function FileList({ files, onSelect, selectedIds, c, dark }: { files: NFile[]; onSelect: (e: React.MouseEvent | React.TouchEvent | null, f: NFile | null) => void; selectedIds: Set<string>; c: ColorSet; dark: boolean }) {
-  const hasSelection = selectedIds.size > 0;
+function FileList({ files, onSelect, selectedIds, c, dark, persistentCheckboxes }: { files: NFile[]; onSelect: (e: React.MouseEvent | React.TouchEvent | null, f: NFile | null) => void; selectedIds: Set<string>; c: ColorSet; dark: boolean; persistentCheckboxes: boolean }) {
+  const hasSelection = selectedIds.size > 0 || persistentCheckboxes;
 
   return (
     <div style={{ borderRadius: "var(--radius-md)", border: `1px solid ${c.border}`, overflow: "hidden" }}>
