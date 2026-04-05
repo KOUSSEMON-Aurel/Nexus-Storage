@@ -44,7 +44,7 @@ unsafe fn alloc_bytes(data: Vec<u8>, out_ptr: *mut *mut c_uchar, out_len: *mut u
 // --------------------------
 
 /// Free a byte buffer previously allocated by the nexus-core library.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_free_bytes(ptr: *mut c_uchar, len: usize) {
     if ptr.is_null() {
         return;
@@ -61,7 +61,7 @@ pub unsafe extern "C" fn nexus_free_bytes(ptr: *mut c_uchar, len: usize) {
 /// Encrypt `in_len` bytes at `in_ptr` with `password`.
 /// On success: writes the output pointer to `*out_ptr`, its length to `*out_len`, returns 0.
 /// On failure: returns a negative error code.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_encrypt(
     in_ptr: *const c_uchar,
     in_len: usize,
@@ -84,7 +84,7 @@ pub unsafe extern "C" fn nexus_encrypt(
 }
 
 /// Decrypt `in_len` bytes at `in_ptr` with `password`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_decrypt(
     in_ptr: *const c_uchar,
     in_len: usize,
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn nexus_decrypt(
 
 /// Compress `in_len` bytes. Pass `level = 0` for auto-detection.
 ///   0 = auto, 1 = lz4, 2 = zstd, 3 = lzma, 4 = store
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_compress(
     in_ptr: *const c_uchar,
     in_len: usize,
@@ -136,7 +136,7 @@ pub unsafe extern "C" fn nexus_compress(
 }
 
 /// Decompress bytes previously compressed by `nexus_compress`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_decompress(
     in_ptr: *const c_uchar,
     in_len: usize,
@@ -160,7 +160,7 @@ pub unsafe extern "C" fn nexus_decompress(
 /// Compute the SHA-256 fingerprint of `in_len` bytes and write it as a
 /// null-terminated hex string to `out_hex` (must be at least 65 bytes).
 /// Returns 0 on success.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_sha256_hex(
     in_ptr: *const c_uchar,
     in_len: usize,
@@ -186,7 +186,7 @@ pub unsafe extern "C" fn nexus_sha256_hex(
 /// Encode `in_len` bytes into PNG frames in `output_dir`.
 /// mode: 0=Tank, 1=Density
 /// Returns the number of frames written (positive) or a negative error code.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_encode_to_frames(
     in_ptr: *const c_uchar,
     in_len: usize,
@@ -226,7 +226,7 @@ pub unsafe extern "C" fn nexus_encode_to_frames(
 /// Decode a payload from a folder of PNG frames.
 /// On success: writes the output pointer to `*out_ptr`, its length to `*out_len`, returns 0.
 /// On failure: returns a negative error code.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_decode_from_frames(
     frame_dir: *const c_char,
     mode: c_int,
@@ -268,7 +268,7 @@ pub unsafe extern "C" fn nexus_decode_from_frames(
 
 /// Generate a cryptographically random 32-byte file key.
 /// Caller must free the returned bytes with nexus_free_bytes.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_generate_file_key(
     out_ptr: *mut *mut c_uchar,
     out_len: *mut usize,
@@ -281,7 +281,7 @@ pub unsafe extern "C" fn nexus_generate_file_key(
 }
 
 /// Encrypt `in_len` bytes using a raw 32-byte file key (no password derivation).
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_encrypt_with_key(
     in_ptr: *const c_uchar,
     in_len: usize,
@@ -305,7 +305,7 @@ pub unsafe extern "C" fn nexus_encrypt_with_key(
 }
 
 /// Decrypt a blob produced by nexus_encrypt_with_key.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_decrypt_with_key(
     in_ptr: *const c_uchar,
     in_len: usize,
@@ -334,7 +334,7 @@ pub unsafe extern "C" fn nexus_decrypt_with_key(
 
 /// Generate a cryptographically random 16-byte recovery salt.
 /// Caller must free the result with nexus_free_bytes.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_generate_recovery_salt(
     out_ptr: *mut *mut c_uchar,
     out_len: *mut usize,
@@ -358,7 +358,7 @@ pub unsafe extern "C" fn nexus_generate_recovery_salt(
 /// 
 /// # Returns
 /// 0 = NEXUS_OK, otherwise error code
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn nexus_derive_master_key(
     password_ptr: *const c_char,
     _password_len: usize,
