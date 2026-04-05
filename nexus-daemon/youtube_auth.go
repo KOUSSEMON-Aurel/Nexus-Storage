@@ -59,9 +59,9 @@ func NewYouTubeManager() *YouTubeManager {
 		return m // Return unauthenticated manager, never nil
 	}
 
-	// Pro Scope: YoutubeScope + Monitoring for real-time quota + Drive for manifest + OpenID for user identity
+	// Pro Scope: YoutubeForceSslScope for playlist management + Monitoring for real-time quota + Drive for manifest + OpenID for user identity
 	config, err := google.ConfigFromJSON(b, 
-		youtube.YoutubeScope, 
+		"https://www.googleapis.com/auth/youtube.force-ssl", 
 		"https://www.googleapis.com/auth/monitoring.read",
 		drive.DriveFileScope,
 		"openid",  // ← REQUIRED for id_token (contains 'sub' claim)
