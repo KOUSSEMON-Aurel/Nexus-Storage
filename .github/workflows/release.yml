@@ -88,11 +88,12 @@ jobs:
       - name: Build Nexus Core (static lib for daemon)
         run: cargo build --package nexus-core --release --target ${{ matrix.daemon_rust_target }}
 
-      - name: Copy static lib to nexus-daemon
+      - name: Copy static lib and header to nexus-daemon
         shell: bash
         run: |
           mkdir -p nexus-daemon
-          cp "target/${{ matrix.daemon_rust_target }}/release/libnexus_core.a" nexus-daemon/libnexus_core.a
+          cp "target/${{ matrix.daemon_rust_target }}/release/libnexus_core.a" nexus-daemon/libnexus_core.a || cp "target/${{ matrix.daemon_rust_target }}/release/nexus_core.lib" nexus-daemon/libnexus_core.a
+          cp "nexus-core/include/nexus_core.h" nexus-daemon/nexus_core.h
 
       # ─── ÉTAPE 1b : Compiler nexus-core pour Tauri GUI (si cible différente) ─
       - name: Build Nexus Core for Tauri (macOS/Windows, different target)

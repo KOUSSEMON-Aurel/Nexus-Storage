@@ -1,6 +1,10 @@
 package main
 
 /*
+#include <stdlib.h>
+#include <stdint.h>
+#include "nexus_core.h"
+
 #cgo LDFLAGS: ${SRCDIR}/libnexus_core.a -lm -lpthread
 #cgo linux LDFLAGS: -ldl
 #cgo windows LDFLAGS: -lws2_32 -luserenv -lbcrypt -lntdll

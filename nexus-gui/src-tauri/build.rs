@@ -25,8 +25,8 @@ fn main() {
     } else if native_path.join("libnexus_core.a").exists() || native_path.join("nexus_core.lib").exists() {
         println!("cargo:rustc-link-search=native={}", native_path.display());
     } else {
-        // Fallback : laisser Cargo chercher via le workspace
-        println!("cargo:rustc-link-search=native={}", cross_path.display());
+        // Fallback: search in the target directory without architecture subfolder if not found
+        println!("cargo:rustc-link-search=native={}", native_path.display());
     }
 
     println!("cargo:rustc-link-lib=static=nexus_core");
