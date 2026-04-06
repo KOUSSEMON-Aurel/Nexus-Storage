@@ -55,6 +55,7 @@ echo "🦀 Compilation Nexus Core..."
 cargo build --package nexus-core
 
 cp target/debug/libnexus_core.a nexus-daemon/
+cp nexus-core/include/nexus_core.h nexus-daemon/
 rm -f nexus-daemon/libnexus_core.so nexus-gui/src-tauri/bin/libnexus_core.so
 
 # =========================
