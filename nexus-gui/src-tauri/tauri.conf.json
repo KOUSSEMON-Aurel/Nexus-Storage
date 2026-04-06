@@ -13,10 +13,10 @@
     "windows": [
       {
         "label": "main",
-        "title": "NexusStorage",
+        "title": "",
         "width": 1100,
         "height": 720,
-        "decorations": true,
+        "decorations": false,
         "transparent": false,
         "shadow": true,
         "maximizable": true

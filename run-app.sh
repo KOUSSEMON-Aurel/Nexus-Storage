@@ -43,9 +43,16 @@ sleep 1
 # Config credentials (Sync si nécessaire)
 # =========================
 mkdir -p "$NEXUS_CONFIG_DIR"
+BIN_DEST_RESOURCES="nexus-gui/src-tauri/bin"
+mkdir -p "$BIN_DEST_RESOURCES"
+
 if [ -f "$CLIENT_SECRET_REPO" ]; then
     echo "🔄 Synchronisation des credentials vers $NEXUS_CONFIG_DIR..."
     cp "$CLIENT_SECRET_REPO" "$CLIENT_SECRET_CONFIG"
+    cp "$CLIENT_SECRET_REPO" "$BIN_DEST_RESOURCES/client_secret.json"
+elif [ -f "$CLIENT_SECRET_CONFIG" ]; then
+    echo "🔄 Utilisation des credentials de la config pour Tauri..."
+    cp "$CLIENT_SECRET_CONFIG" "$BIN_DEST_RESOURCES/client_secret.json"
 fi
 
 # =========================
@@ -70,6 +77,17 @@ TRIPLE=$(rustc -vV | sed -n 's|host: ||p')
 BIN_DEST="nexus-gui/src-tauri/bin"
 mkdir -p "$BIN_DEST"
 cp nexus-daemon/nexus-daemon "$BIN_DEST/nexus-daemon-$TRIPLE"
+
+# Copie des sidecars ffmpeg et rclone depuis le système
+FFMPEG_PATH=$(command -v ffmpeg)
+if [ -n "$FFMPEG_PATH" ]; then
+    cp "$FFMPEG_PATH" "$BIN_DEST/ffmpeg-$TRIPLE"
+fi
+
+RCLONE_PATH=$(command -v rclone)
+if [ -n "$RCLONE_PATH" ]; then
+    cp "$RCLONE_PATH" "$BIN_DEST/rclone-$TRIPLE"
+fi
 
 # =========================
 # Vérif dépendances

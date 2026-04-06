@@ -752,7 +752,8 @@ export default function Dashboard() {
           flexDirection: "column", 
           overflow: "hidden",
           boxShadow: "0 0 40px rgba(0,0,0,0.15)",
-          border: `1px solid ${c.border}`
+          border: `1px solid ${c.border}`,
+          borderRadius: 0
         }}
       >
       
