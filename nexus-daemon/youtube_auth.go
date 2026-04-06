@@ -646,7 +646,9 @@ func openBrowser(url string) {
 		}
 		cmd.Env = cleanEnv
 	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+		// cmd /c start "" <url> is more robust than rundll32 for opening URLs
+		// The empty string "" is required as the window title placeholder for "start"
+		cmd = exec.Command("cmd", "/c", "start", "", url)
 	case "darwin":
 		cmd = exec.Command("open", url)
 	default:

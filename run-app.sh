@@ -22,8 +22,13 @@ fi
 # =========================
 # Vérification credentials
 # =========================
-if [ ! -f "nexus-daemon/client_secret.json" ]; then
-    echo "❌ ERREUR: Fichier nexus-daemon/client_secret.json introuvable."
+NEXUS_CONFIG_DIR="$HOME/.config/nexus-storage"
+CLIENT_SECRET_REPO="nexus-daemon/client_secret.json"
+CLIENT_SECRET_CONFIG="$NEXUS_CONFIG_DIR/client_secret.json"
+
+if [ ! -f "$CLIENT_SECRET_REPO" ] && [ ! -f "$CLIENT_SECRET_CONFIG" ]; then
+    echo "❌ ERREUR: Fichier client_secret.json introuvable."
+    echo "💡 Il doit être présent dans $CLIENT_SECRET_REPO ou $CLIENT_SECRET_CONFIG"
     echo "💡 Télécharge-le depuis Google Cloud Console"
     exit 1
 fi
@@ -35,11 +40,13 @@ pkill -f nexus-daemon 2>/dev/null || true
 sleep 1
 
 # =========================
-# Config credentials
+# Config credentials (Sync si nécessaire)
 # =========================
-NEXUS_CONFIG_DIR="$HOME/.config/nexus-storage"
 mkdir -p "$NEXUS_CONFIG_DIR"
-cp "nexus-daemon/client_secret.json" "$NEXUS_CONFIG_DIR/client_secret.json"
+if [ -f "$CLIENT_SECRET_REPO" ]; then
+    echo "🔄 Synchronisation des credentials vers $NEXUS_CONFIG_DIR..."
+    cp "$CLIENT_SECRET_REPO" "$CLIENT_SECRET_CONFIG"
+fi
 
 # =========================
 # Build Rust

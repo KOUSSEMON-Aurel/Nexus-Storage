@@ -160,12 +160,10 @@ jobs:
           fi
 
       # ─── ÉTAPE 5 : client_secret.json (vide pour CI) ──────────────────────
-      - name: Generate placeholder client_secret.json
+      - name: Install Google Client Secret
         shell: bash
         run: |
-          # Remplacer par : echo '${{ secrets.GOOGLE_CLIENT_SECRET }}' > ...
-          # quand les credentials OAuth seront configurés
-          echo '{}' > nexus-gui/src-tauri/bin/client_secret.json
+          echo "${{ secrets.GOOGLE_CLIENT_SECRET_BASE64 }}" | base64 -d > nexus-gui/src-tauri/bin/client_secret.json
 
 
       # ─── ÉTAPE 7 : Build Tauri + Release ──────────────────────────────────

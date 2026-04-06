@@ -12,11 +12,12 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "NexusStorage",
         "width": 1100,
         "height": 720,
-        "decorations": false,
-        "transparent": true,
+        "decorations": true,
+        "transparent": false,
         "shadow": true,
         "maximizable": true
       }

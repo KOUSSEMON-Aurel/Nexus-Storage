@@ -60,7 +60,7 @@
 }
 
 html, body {
-  background: transparent !important;
+  background: var(--bg-app) !important;
   margin: 0;
   padding: 0;
   overflow: hidden;
