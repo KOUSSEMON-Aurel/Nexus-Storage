@@ -1,6 +1,6 @@
 [package]
 name = "nexus-gui"
-version = "5.2.6"
+version = "5.2.7"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2024"
