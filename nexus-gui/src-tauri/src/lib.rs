@@ -13,9 +13,21 @@ use tauri_plugin_shell::ShellExt;
 pub fn run() {
     #[cfg(target_os = "linux")]
     unsafe {
+        // 1. Force X11 backend (avoids Wayland/EGL crashes)
         std::env::set_var("GDK_BACKEND", "x11");
+        
+        // 2. Disable Sandbox (Modern WebKitGTK requires this in many AppImage/Container setups)
+        std::env::set_var("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1");
+        
+        // 3. Force Software Rendering (Bypasses unstable GPU drivers)
+        std::env::set_var("LIBGL_ALWAYS_SOFTWARE", "1");
+        std::env::set_var("GALLIUM_DRIVER", "llvmpipe");
+        std::env::set_var("MESA_LOADER_DRIVER_OVERRIDE", "llvmpipe");
+        
+        // 4. Disable advanced rendering paths that trigger EGL initialization
+        std::env::set_var("WEBKIT_USE_GLX", "1");
+        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-        std::env::set_var("WEBKIT_FORCE_SANDBOX", "0");
     }
 
     tauri::Builder::default()

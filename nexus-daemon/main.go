@@ -37,10 +37,39 @@ func getHostTriple() string {
 	return fmt.Sprintf("%s-unknown-%s", arch, os)
 }
 
-// has checks if a command exists in the system PATH
+// findBinary attempts to find a binary in the PATH or next to the current executable
+func findBinary(name string) string {
+	// 1. Try system PATH
+	if p, err := exec.LookPath(name); err == nil {
+		return p
+	}
+
+	// 2. Try next to the current executable (useful for bundled sidecars)
+	if execPath, err := os.Executable(); err == nil {
+		dir := filepath.Dir(execPath)
+		target := filepath.Join(dir, name)
+		if runtime.GOOS == "windows" && !strings.HasSuffix(target, ".exe") {
+			target += ".exe"
+		}
+		if _, err := os.Stat(target); err == nil {
+			return target
+		}
+		
+		// 3. Try in a 'bin' subdirectory (Tauri structure)
+		target = filepath.Join(dir, "bin", name)
+		if runtime.GOOS == "windows" && !strings.HasSuffix(target, ".exe") {
+			target += ".exe"
+		}
+		if _, err := os.Stat(target); err == nil {
+			return target
+		}
+	}
+
+	return ""
+}
+
 func has(name string) bool {
-	_, err := exec.LookPath(name)
-	return err == nil
+	return findBinary(name) != ""
 }
 
 func main() {
@@ -383,7 +412,18 @@ func autoMountVirtualDisk() {
 		log.Printf("🪟 [SmartMount] Windows detected — probing FUSE provider...")
 		
 		driveLetter := "N:" 
-		if has("rclone") {
+			rclonePath := findBinary("rclone")
+			if rclonePath == "" {
+				log.Printf("❌ [SmartMount] Rclone binary not found.")
+				return
+			}
+
+			if !checkWinFsp() {
+				log.Printf("❌ [SmartMount] WinFsp not installed. Virtual disk requires WinFsp.")
+				log.Printf("💡 [SmartMount] Please install WinFsp from: https://winfsp.dev/")
+				return
+			}
+
 			log.Printf("🚀 [SmartMount] Attempting Rclone FUSE mount at %s", driveLetter)
 			exec.Command("taskkill", "/IM", "rclone*", "/F").Run()
 
@@ -396,11 +436,7 @@ func autoMountVirtualDisk() {
 				"--volname", "Nexus Storage",
 			}
 			
-			if !checkWinFsp() {
-				log.Printf("⚠️  [SmartMount] WinFsp not detected. Mount will likely fail. Install it from https://winfsp.dev/")
-			}
-			
-			cmd := exec.Command("rclone", args...)
+			cmd := exec.Command(rclonePath, args...)
 			cmd.Env = cleanEnv
 			if err := cmd.Start(); err == nil {
 				log.Printf("✅ [SmartMount] Rclone FUSE mount dispatched.")
