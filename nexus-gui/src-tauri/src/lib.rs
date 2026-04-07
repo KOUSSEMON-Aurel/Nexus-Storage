@@ -26,6 +26,7 @@ pub fn run() {
         
         // 4. Disable advanced rendering paths that trigger EGL initialization
         std::env::set_var("WEBKIT_USE_GLX", "1");
+        std::env::set_var("WEBKIT_HARDWARE_ACCELERATION_POLICY", "never");
         std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     }

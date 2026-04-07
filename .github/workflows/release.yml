@@ -175,6 +175,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # ─── FIX LINUX STABILITY ───
+          # On exclut les libs graphiques du bundle pour forcer l'usage des drivers du système hôte
+          EXCLUDE_LIBS: "libwayland-client.so.0;libwayland-server.so.0;libEGL.so.1;libGL.so.1;libgbm.so.1;libepoxy.so.0;libxcb.so.1;libX11.so.6"
+          # Désactive le sandbox et force le rendu logiciel pour le build si nécessaire
+          WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: 1
+          LIBGL_ALWAYS_SOFTWARE: 1
         with:
           projectPath: './nexus-gui'
           args: '--target ${{ matrix.tauri_rust_target }}'
