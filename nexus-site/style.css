@@ -53,9 +53,10 @@ header {
 }
 
 .logo img {
-  width: 40px;
   height: 40px;
-  border-radius: 10px;
+  width: auto;
+  border-radius: 6px;
+  object-fit: contain;
 }
 
 nav a {
