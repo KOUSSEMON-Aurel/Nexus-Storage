@@ -444,8 +444,7 @@ func autoMountVirtualDisk() {
 				exec.Command("explorer", driveLetter).Start()
 				return
 			}
-		}
-		log.Printf("❌ [SmartMount] System 'rclone' missing or WinFsp not installed.")
+		log.Printf("❌ [SmartMount] Rclone mount failed or WinFsp missing.")
 
 	// ─── macOS ───────────────────────────────────────────────────────────────
 	case "darwin":
