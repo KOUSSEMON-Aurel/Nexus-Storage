@@ -44,24 +44,32 @@ func findBinary(name string) string {
 		return p
 	}
 
-	// 2. Try next to the current executable (useful for bundled sidecars)
+	// 2. Try various paths relative to the current executable
 	if execPath, err := os.Executable(); err == nil {
 		dir := filepath.Dir(execPath)
-		target := filepath.Join(dir, name)
-		if runtime.GOOS == "windows" && !strings.HasSuffix(target, ".exe") {
-			target += ".exe"
-		}
-		if _, err := os.Stat(target); err == nil {
-			return target
-		}
+		triple := getHostTriple()
 		
-		// 3. Try in a 'bin' subdirectory (Tauri structure)
-		target = filepath.Join(dir, "bin", name)
-		if runtime.GOOS == "windows" && !strings.HasSuffix(target, ".exe") {
-			target += ".exe"
+		// Names to try: "rclone", "rclone.exe", "rclone-x86_64-pc-windows-msvc.exe"
+		candidates := []string{
+			name,
+			name + "-" + triple,
 		}
-		if _, err := os.Stat(target); err == nil {
-			return target
+
+		searchDirs := []string{dir, filepath.Join(dir, "bin"), filepath.Join(dir, "resources")}
+
+		for _, sDir := range searchDirs {
+			for _, c := range candidates {
+				target := filepath.Join(sDir, c)
+				if runtime.GOOS == "windows" && !strings.HasSuffix(target, ".exe") {
+					// try both .exe and naked
+					if _, err := os.Stat(target + ".exe"); err == nil {
+						return target + ".exe"
+					}
+				}
+				if _, err := os.Stat(target); err == nil {
+					return target
+				}
+			}
 		}
 	}
 
@@ -419,8 +427,13 @@ func autoMountVirtualDisk() {
 			}
 
 			if !checkWinFsp() {
-				log.Printf("❌ [SmartMount] WinFsp not installed. Virtual disk requires WinFsp.")
-				log.Printf("💡 [SmartMount] Please install WinFsp from: https://winfsp.dev/")
+				log.Printf("⚠️  [SmartMount] WinFsp missing. Attempting automatic installation...")
+				if err := installWinFsp(); err != nil {
+					log.Printf("❌ [SmartMount] Auto-install failed: %v", err)
+					log.Printf("💡 [SmartMount] Please install WinFsp manually: https://winfsp.dev/")
+					return
+				}
+				log.Printf("✅ [SmartMount] WinFsp installer launched. Please complete the setup and restart the app.")
 				return
 			}
 
@@ -484,6 +497,7 @@ func checkWinFsp() bool {
 	paths := []string{
 		os.Getenv("ProgramFiles") + "\\WinFsp\\bin\\launchctl-x64.exe",
 		os.Getenv("ProgramFiles(x86)") + "\\WinFsp\\bin\\launchctl-x86.exe",
+		"C:\\Program Files\\WinFsp\\bin\\launchctl-x64.exe", // Hardcoded fallback
 	}
 	for _, p := range paths {
 		if _, err := os.Stat(p); err == nil {
@@ -491,4 +505,22 @@ func checkWinFsp() bool {
 		}
 	}
 	return false
+}
+
+// installWinFsp downloads and launches the WinFsp MSI
+func installWinFsp() error {
+	msiURL := "https://github.com/winfsp/winfsp/releases/download/v2.1/winfsp-2.1.25156.msi"
+	msiPath := filepath.Join(os.TempDir(), "winfsp-install.msi")
+
+	log.Printf("📥 Downloading WinFsp installer...")
+	
+	// Use powershell to download (standard on all Windows)
+	dlCmd := fmt.Sprintf("Invoke-WebRequest -Uri '%s' -OutFile '%s'", msiURL, msiPath)
+	if err := exec.Command("powershell", "-Command", dlCmd).Run(); err != nil {
+		return fmt.Errorf("download failed: %w", err)
+	}
+
+	log.Printf("🚀 Launching WinFsp MSI...")
+	// Launch MSI silently or with UI (UI is better to avoid hidden failures)
+	return exec.Command("msiexec", "/i", msiPath).Start()
 }
