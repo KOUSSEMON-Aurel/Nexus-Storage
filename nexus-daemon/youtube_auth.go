@@ -122,6 +122,12 @@ func (m *YouTubeManager) TryLoadToken() bool {
 	m.googleSub = googleSub
 	m.mu.Unlock()
 
+	// Signal UI to refresh
+	select {
+	case AuthNotify <- true:
+	default:
+	}
+
 	// Async fetch channel info
 	go m.FetchChannelID()
 

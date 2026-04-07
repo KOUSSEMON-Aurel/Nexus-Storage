@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -54,6 +55,13 @@ func main() {
 		if info, err := os.Stat(f); err == nil && time.Since(info.ModTime()) > time.Hour {
 			os.RemoveAll(f)
 		}
+	}
+
+	// 0. Verify port 8081 is free
+	if ln, err := net.Listen("tcp", ":8081"); err != nil {
+		log.Fatalf("❌ Port 8081 is already in use. Please close any existing NexusStorage processes: %v", err)
+	} else {
+		ln.Close()
 	}
 
 	// 0. Verify ffmpeg (warning only when running from bundled sidecar)
@@ -382,8 +390,13 @@ func autoMountVirtualDisk() {
 				"mount", ":webdav:", driveLetter,
 				"--webdav-url", httpURL,
 				"--vfs-cache-mode", "full",
+				"--network-mode",
 				"--no-console",
 				"--volname", "Nexus Storage",
+			}
+			
+			if !checkWinFsp() {
+				log.Printf("⚠️  [SmartMount] WinFsp not detected. Mount will likely fail. Install it from https://winfsp.dev/")
 			}
 			
 			cmd := exec.Command("rclone", args...)
@@ -425,4 +438,21 @@ func autoMountVirtualDisk() {
 	}
 
 	log.Printf("✅ [SmartMount] Virtual disk mount dispatched.")
+}
+
+func checkWinFsp() bool {
+	if runtime.GOOS != "windows" {
+		return true
+	}
+	// Check for WinFsp installation in Program Files
+	paths := []string{
+		os.Getenv("ProgramFiles") + "\\WinFsp\\bin\\launchctl-x64.exe",
+		os.Getenv("ProgramFiles(x86)") + "\\WinFsp\\bin\\launchctl-x86.exe",
+	}
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			return true
+		}
+	}
+	return false
 }

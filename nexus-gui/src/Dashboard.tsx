@@ -277,6 +277,15 @@ export default function Dashboard() {
               reconnectTimeout = setTimeout(() => {
                 if (isAppReady) refreshFiles();
               }, 100);
+            } else if (data.type === "auth_update") {
+              // Immediate auth status refresh
+              console.log("🔔 Auth update received via SSE");
+              const fetchOpts: RequestInit = { cache: "no-store", headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" } };
+              fetch(`${API_BASE}/auth/status?_t=${Date.now()}`, fetchOpts).then(res => {
+                if (res.ok) return res.json();
+              }).then(authData => {
+                if (authData) setAuth(authData);
+              });
             }
           } catch (e) {
             // Ignore parse errors for SSE

@@ -30,6 +30,9 @@ type APIServer struct {
 	quotaCacheMu   sync.Mutex
 }
 
+// Global channel for auth updates
+var AuthNotify = make(chan bool, 1)
+
 func (s *APIServer) Start(port int) {
 	mux := http.NewServeMux()
 	mux.Handle("/vfs/", NewVFSHandler(s.db, s.queue))
@@ -965,6 +968,10 @@ func (s *APIServer) handleLSNWatch(w http.ResponseWriter, r *http.Request) {
 		case <-ctx.Done():
 			// Client disconnected
 			return
+		case <-AuthNotify:
+			// Auth status changed - notify client immediately
+			fmt.Fprintf(w, "data: {\"type\":\"auth_update\"}\n\n")
+			flusher.Flush()
 		case <-ticker.C:
 			// Check if LSN has changed
 			currentLSN, _ := s.db.GetLocalLSN()
