@@ -13,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 )
 
 // getHostTriple returns the Tauri-compatible host triple (e.g., x86_64-unknown-linux-gnu)

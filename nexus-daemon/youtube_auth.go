@@ -15,12 +15,13 @@ import (
 	"sync"
 	"time"
 
+	"io"
+
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
-	"io"
 )
 
 type YouTubeManager struct {
@@ -60,11 +61,11 @@ func NewYouTubeManager() *YouTubeManager {
 	}
 
 	// Pro Scope: YoutubeForceSslScope for playlist management + Monitoring for real-time quota + Drive for manifest + OpenID for user identity
-	config, err := google.ConfigFromJSON(b, 
-		"https://www.googleapis.com/auth/youtube.force-ssl", 
+	config, err := google.ConfigFromJSON(b,
+		"https://www.googleapis.com/auth/youtube.force-ssl",
 		"https://www.googleapis.com/auth/monitoring.read",
 		drive.DriveFileScope,
-		"openid",  // ← REQUIRED for id_token (contains 'sub' claim)
+		"openid", // ← REQUIRED for id_token (contains 'sub' claim)
 	)
 	if err != nil {
 		log.Printf("⚠️  YouTube: could not parse client_secret.json: %v", err)
@@ -104,7 +105,7 @@ func (m *YouTubeManager) TryLoadToken() bool {
 	if err == nil {
 		googleSub = string(subBytes)
 	}
-	
+
 	if googleSub != "" {
 		log.Printf("✅ Google sub loaded: %s (auto-encryption enabled)", googleSub[:8]+"...")
 	} else {
@@ -112,7 +113,7 @@ func (m *YouTubeManager) TryLoadToken() bool {
 		log.Printf("   Old token is incompatible. Removing token and forcing re-authentication...")
 		os.Remove(filepath.Join(getConfigDir(), "token.json"))
 		os.Remove(filepath.Join(getConfigDir(), "google-sub.txt"))
-		return false  // Token is invalid - do NOT mark as authenticated
+		return false // Token is invalid - do NOT mark as authenticated
 	}
 
 	m.mu.Lock()
@@ -175,7 +176,9 @@ func (m *YouTubeManager) GetGoogleSub() string {
 
 func (m *YouTubeManager) FetchChannelID() {
 	svc := m.GetService()
-	if svc == nil { return }
+	if svc == nil {
+		return
+	}
 
 	call := svc.Channels.List([]string{"id", "snippet"}).Mine(true)
 	resp, err := call.Do()
@@ -210,18 +213,22 @@ func (m *YouTubeManager) GetLiveQuota() (int, bool) {
 	}
 
 	client := config.Client(context.Background(), tok)
-	
+
 	// Extract project_id from client_secret
 	b, _ := os.ReadFile(filepath.Join(getConfigDir(), "client_secret.json"))
-	if len(b) == 0 { b, _ = os.ReadFile("client_secret.json") }
+	if len(b) == 0 {
+		b, _ = os.ReadFile("client_secret.json")
+	}
 	var secret struct {
-		Installed struct { ProjectID string `json:"project_id"` } `json:"installed"`
+		Installed struct {
+			ProjectID string `json:"project_id"`
+		} `json:"installed"`
 	}
 	json.Unmarshal(b, &secret)
 	projectID := secret.Installed.ProjectID
-	if projectID == "" { 
+	if projectID == "" {
 		log.Printf("⚠️  GetLiveQuota: project_id not found in client_secret.json")
-		return 0, false 
+		return 0, false
 	}
 
 	// Prepare time interval (current PT day)
@@ -235,7 +242,7 @@ func (m *YouTubeManager) GetLiveQuota() (int, bool) {
 	end := now.UTC()
 
 	filter := `metric.type="serviceruntime.googleapis.com/quota/rate/net_usage" AND resource.labels.service="youtube.googleapis.com"`
-	url := fmt.Sprintf("https://monitoring.googleapis.com/v3/projects/%s/timeSeries?filter=%s&interval.startTime=%s&interval.endTime=%s", 
+	url := fmt.Sprintf("https://monitoring.googleapis.com/v3/projects/%s/timeSeries?filter=%s&interval.startTime=%s&interval.endTime=%s",
 		projectID, strings.ReplaceAll(filter, " ", "%20"), start.Format(time.RFC3339), end.Format(time.RFC3339))
 
 	resp, err := client.Get(url)
@@ -252,7 +259,9 @@ func (m *YouTubeManager) GetLiveQuota() (int, bool) {
 	var monitorResp struct {
 		TimeSeries []struct {
 			Points []struct {
-				Value struct { Int64Value string `json:"int64Value"` } `json:"value"`
+				Value struct {
+					Int64Value string `json:"int64Value"`
+				} `json:"value"`
 			} `json:"points"`
 		} `json:"timeSeries"`
 	}
@@ -402,7 +411,7 @@ func (m *YouTubeManager) StartLoginServer() error {
 
 	srv := &http.Server{Addr: ":8080"}
 	handler := http.NewServeMux()
-	
+
 	handler.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		if code != "" {
@@ -411,7 +420,7 @@ func (m *YouTubeManager) StartLoginServer() error {
 				fmt.Fprintf(w, "Auth exchange failed: %v", err)
 				return
 			}
-			
+
 			// CRITICAL: Fetch user info with access_token to get Google 'sub' directly
 			// (oauth2-go doesn't automatically return id_token even with openid scope)
 			var googleSub string
@@ -427,14 +436,14 @@ func (m *YouTubeManager) StartLoginServer() error {
 					log.Printf("✅ Google sub fetched via UserInfo API: %s", id[:8]+"...")
 				}
 			}
-			
+
 			saveToken(filepath.Join(getConfigDir(), "token.json"), tok)
-			
+
 			// Save Google sub separately (oauth2-go can't serialize id_token properly)
 			if googleSub != "" {
 				os.WriteFile(filepath.Join(getConfigDir(), "google-sub.txt"), []byte(googleSub), 0600)
 			}
-			
+
 			m.TryLoadToken()
 
 			html := `

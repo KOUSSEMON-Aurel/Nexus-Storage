@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	_ "time/tzdata" // Bundle timezone data for Windows
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -273,7 +274,10 @@ func (d *Database) SearchFiles(query string) ([]FileRecord, error) {
 }
 
 func (d *Database) LogQuotaUsage(units int) {
-	pt, _ := time.LoadLocation("America/Los_Angeles")
+	pt, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		pt = time.UTC // Fallback to UTC if load fails
+	}
 	date := time.Now().In(pt).Format("2006-01-02")
 	d.db.Exec(`INSERT INTO quota_log (date, units) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET units = units + ?`, date, units, units)
 }
@@ -376,7 +380,10 @@ func (d *Database) MergeManifest(driveManifestPath string) error {
 
 
 func (d *Database) GetDailyQuota() int {
-	pt, _ := time.LoadLocation("America/Los_Angeles")
+	pt, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		pt = time.UTC // Fallback to UTC if load fails
+	}
 	date := time.Now().In(pt).Format("2006-01-02")
 	var units int
 	d.db.QueryRow(`SELECT units FROM quota_log WHERE date = ?`, date).Scan(&units)
