@@ -448,11 +448,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                 style={{ maxWidth: 640 }}
               >
                 <div style={{ textAlign: "center", padding: "20px 0 40px" }}>
-                  <div style={{ width: 80, height: 80, borderRadius: "var(--radius-xl)", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", boxShadow: "0 20px 40px rgba(26,115.2.5,0.2)" }}>
+                  <div style={{ width: 80, height: 80, borderRadius: "var(--radius-xl)", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", boxShadow: "0 20px 40px rgba(26,115.2.6,0.2)" }}>
                     <RefreshCw size={44} color="white" />
                   </div>
                   <h2 style={{ fontSize: 28, fontWeight: 700, color: c.textPrimary, margin: "0 0 8px 0" }}>Nexus Storage</h2>
-                  <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>v5.2.5 "Nova Galactic"</p>
+                  <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>v5.2.6 "Nova Galactic"</p>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
