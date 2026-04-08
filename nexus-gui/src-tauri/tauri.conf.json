@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "nexus-gui",
+  "productName": "nexus",
   "version": "5.3.0",
   "identifier": "com.aurel.nexus-gui",
   "build": {
