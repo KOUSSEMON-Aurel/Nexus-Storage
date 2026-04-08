@@ -171,32 +171,11 @@ jobs:
         working-directory: ./nexus-gui
         run: npm install
 
-      # ─── FIX LINUX STABILITY : hide libs before bundling ─────────────────
-      # EXCLUDE_LIBS est ignoré par linuxdeploy/Tauri → on renomme les .so
-      # directement sur le runner pour garantir leur absence du bundle AppImage.
-      - name: Hide graphics libs before bundling (Linux only)
-        if: matrix.platform == 'linux'
-        run: |
-          LIB_PATH="/usr/lib/x86_64-linux-gnu"
-          for lib in \
-            libwayland-client.so.0 \
-            libwayland-server.so.0 \
-            libwayland-cursor.so.0 \
-            libwayland-egl.so.1 \
-            libepoxy.so.0; do
-            if [ -f "$LIB_PATH/$lib" ]; then
-              sudo mv "$LIB_PATH/$lib" "$LIB_PATH/${lib}.bak"
-              echo "Hidden: $lib"
-            else
-              echo "Not found (skipped): $lib"
-            fi
-          done
-
       - name: Build and release with Tauri Action
+        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LINUXDEPLOY_IGNORE_LIBRARY_ERRORS: "1"
         with:
           projectPath: './nexus-gui'
           args: '--target ${{ matrix.tauri_rust_target }}'
@@ -206,18 +185,40 @@ jobs:
           releaseDraft: true
           prerelease: false
 
-      - name: Restore hidden graphics libs (Linux only)
-        if: ${{ matrix.platform == 'linux' && always() }}
+      - name: Post-process Linux AppImage (Fix system lib conflicts)
+        if: matrix.platform == 'linux'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          LIB_PATH="/usr/lib/x86_64-linux-gnu"
-          for lib in \
-            libwayland-client.so.0 \
-            libwayland-server.so.0 \
-            libwayland-cursor.so.0 \
-            libwayland-egl.so.1 \
-            libepoxy.so.0; do
-            if [ -f "$LIB_PATH/${lib}.bak" ]; then
-              sudo mv "$LIB_PATH/${lib}.bak" "$LIB_PATH/$lib"
-              echo "Restored: $lib"
-            fi
-          done
+          echo "Recherche de l'AppImage..."
+          APPIMAGE_PATH=$(find target/${{ matrix.tauri_rust_target }}/release/bundle/appimage/ -name "*.AppImage" | head -n 1)
+          if [ -z "$APPIMAGE_PATH" ]; then
+            echo "Aucune AppImage trouvée!"
+            exit 1
+          fi
+          APPIMAGE_NAME=$(basename "$APPIMAGE_PATH")
+          echo "AppImage: $APPIMAGE_NAME"
+
+          echo "Téléchargement appimagetool..."
+          curl -LO https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage --appimage-extract
+          mv squashfs-root appimagetool_extracted
+
+          echo "Extraction AppImage..."
+          chmod +x "$APPIMAGE_PATH"
+          "$APPIMAGE_PATH" --appimage-extract
+
+          echo "Suppression des librairies host..."
+          rm -f squashfs-root/usr/lib/libwayland-*.so*
+          rm -f squashfs-root/usr/lib/libepoxy.so*
+          rm -f squashfs-root/usr/lib/libEGL.so*
+          rm -f squashfs-root/usr/lib/libGL.so*
+          rm -f squashfs-root/usr/lib/libgbm.so*
+
+          echo "Re-packaging..."
+          ARCH=x86_64 ./appimagetool_extracted/AppRun squashfs-root "$APPIMAGE_NAME"
+
+          echo "Upload vers GitHub Release..."
+          TAG_NAME="app-v${{ steps.tauri.outputs.appVersion }}"
+          gh release upload "$TAG_NAME" "$APPIMAGE_NAME" --clobber

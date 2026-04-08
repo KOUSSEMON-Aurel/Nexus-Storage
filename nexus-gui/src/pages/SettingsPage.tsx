@@ -452,7 +452,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                     <RefreshCw size={44} color="white" />
                   </div>
                   <h2 style={{ fontSize: 28, fontWeight: 700, color: c.textPrimary, margin: "0 0 8px 0" }}>Nexus Storage</h2>
-                  <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>v5.3.0 "Nova Galactic"</p>
+                  <p style={{ fontSize: 16, color: c.textSecondary, margin: 0 }}>v5.3.1 "Nova Galactic"</p>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
