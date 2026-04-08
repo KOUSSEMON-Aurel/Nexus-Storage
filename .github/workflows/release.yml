@@ -176,10 +176,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # ─── FIX LINUX STABILITY ───
-          # Exclut les libs graphiques système du bundle AppImage.
-          # Forcer l'usage des drivers du système hôte évite le conflit EGL/Wayland.
-          # Les variables runtime (WEBKIT_DISABLE_DMABUF_RENDERER, etc.) sont gérées dans lib.rs.
-          EXCLUDE_LIBS: "libwayland-client.so.0;libwayland-server.so.0;libEGL.so.1;libGL.so.1;libgbm.so.1;libepoxy.so.0;libxcb.so.1;libX11.so.6"
+          # Exclut les libs graphiques système du bundle AppImage pour forcer l'usage des drivers du système hôte.
+          # On ajoute libwayland-cursor, libwayland-egl et libepoxy qui causaient encore des conflits.
+          EXCLUDE_LIBS: "libwayland-client.so.0;libwayland-server.so.0;libwayland-cursor.so.0;libwayland-egl.so.1;libEGL.so.1;libGL.so.1;libgbm.so.1;libepoxy.so.0;libxcb.so.1;libX11.so.6"
         with:
           projectPath: './nexus-gui'
           args: '--target ${{ matrix.tauri_rust_target }}'
