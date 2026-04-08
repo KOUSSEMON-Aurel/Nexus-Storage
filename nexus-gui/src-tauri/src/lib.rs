@@ -56,13 +56,37 @@ pub fn run() {
                     
                     #[cfg(target_os = "linux")]
                     {
-                        // Remove AppImage poisons by clearing and re-adding only clean variables
-                        // (Tauri's Command doesn't have env_remove yet)
-                        let poisons = ["APPDIR", "APPIMAGE", "LD_PRELOAD", "XDG_DATA_DIRS", "GDK_PIXBUF_MODULE_FILE"];
-                        let clean_vars: Vec<(String, String)> = std::env::vars()
+                        // Get APPDIR from environment if we are running in an AppImage
+                        let appdir = std::env::var("APPDIR").unwrap_or_default();
+                        
+                        // Comprehensive list of poisoned variables injected by AppImage tools (linuxdeploy, etc.)
+                        let poisons = [
+                            "GIO_EXTRA_MODULES", "GTK_PATH", "GTK_EXE_PREFIX", "GTK_DATA_PREFIX",
+                            "GTK_IM_MODULE_FILE", "GSETTINGS_SCHEMA_DIR", "PYTHONPATH", "PYTHONHOME",
+                            "GST_PLUGIN_SYSTEM_PATH", "GST_PLUGIN_SYSTEM_PATH_1_0", "QT_PLUGIN_PATH",
+                            "APPDIR", "APPIMAGE", "LD_PRELOAD"
+                        ];
+
+                        // Function to remove entries pointing into the AppImage bundle from colon-separated lists
+                        let sanitize_list = |val: &str, dir: &str| -> String {
+                            if dir.is_empty() { return val.to_string(); }
+                            val.split(':')
+                                .filter(|&p| !p.is_empty() && !p.contains(dir) && !p.contains("squashfs-root"))
+                                .collect::<Vec<_>>()
+                                .join(":")
+                        };
+
+                        // Filter out all poisoned variables and sanitize PATH/XDG_DATA_DIRS
+                        let mut clean_vars: Vec<(String, String)> = std::env::vars()
                             .filter(|(k, _)| !poisons.contains(&k.as_str()))
                             .collect();
-                        
+
+                        for (k, v) in clean_vars.iter_mut() {
+                            if k == "PATH" || k == "XDG_DATA_DIRS" {
+                                *v = sanitize_list(v, &appdir);
+                            }
+                        }
+
                         sidecar_cmd = sidecar_cmd.env_clear().envs(clean_vars);
                     }
 
