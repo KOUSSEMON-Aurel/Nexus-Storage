@@ -90,17 +90,6 @@ func main() {
 
 	apiPort = *port
 
-	// Exit if parent process dies (Standard for sidecars)
-	go func() {
-		for {
-			if os.Getppid() == 1 { // Parent is now init/systemd (orphaned)
-				log.Println("🛑 Parent process died. Shutting down daemon...")
-				os.Exit(0)
-			}
-			time.Sleep(2 * time.Second)
-		}
-	}()
-
 	fmt.Println("🚀 NexusStorage Daemon starting (FUSE Engine)...")
 
 	// 0. Clean up orphaned temp folders older than 1 hour to prevent disk leak
@@ -160,6 +149,19 @@ func main() {
 	// 6a. Initialize Sync Manager
 	syncMgr := NewSyncManager(db, ytManager, pm, *dbPath)
 	queue.SetSyncManager(syncMgr)
+
+	// Exit if parent process dies (Standard for sidecars)
+	// Now that db and syncMgr are initialized, we can safely detect parent death and cleanup
+	go func() {
+		for {
+			if os.Getppid() == 1 { // Parent is now init/systemd (orphaned)
+				log.Println("🛑 Parent process died. Shutting down daemon...")
+				handleShutdown(db, syncMgr)
+				os.Exit(0)
+			}
+			time.Sleep(2 * time.Second)
+		}
+	}()
 
 	// 6b. Auto-sync cloud manifest 10s after auth
 	go func() {
@@ -241,14 +243,24 @@ func main() {
 	fmt.Printf("✅ Daemon is running. FUSE Bridge active at :%d\n", *port)
 	<-sigChan
 
+	handleShutdown(db, syncMgr)
+}
+
+func handleShutdown(db *Database, syncMgr *SyncManager) {
 	fmt.Println("\n👋 Shutting down NexusStorage...")
 	
 	// Final Sync before exit: Use strict Push logic
-	log.Println("🔄 Performing strict final DB backup to Drive...")
-	if err := syncMgr.PushDBToDrive(); err != nil {
-		log.Printf("⚠️  Final backup failed: %v", err)
-	} else {
-		log.Printf("✅ Final backup completed.")
+	if syncMgr != nil {
+		log.Println("🔄 Performing strict final DB backup to Drive...")
+		if err := syncMgr.PushDBToDrive(); err != nil {
+			log.Printf("⚠️  Final backup failed: %v", err)
+		} else {
+			log.Printf("✅ Final backup completed.")
+		}
+	}
+	
+	if db != nil {
+		db.Close()
 	}
 	
 	unmountVirtualDisk()
