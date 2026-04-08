@@ -56,10 +56,14 @@ pub fn run() {
                     
                     #[cfg(target_os = "linux")]
                     {
-                        // Remove AppImage poisons
-                        for var in ["APPDIR", "APPIMAGE", "LD_PRELOAD", "XDG_DATA_DIRS", "GDK_PIXBUF_MODULE_FILE"] {
-                            sidecar_cmd = sidecar_cmd.env_remove(var);
-                        }
+                        // Remove AppImage poisons by clearing and re-adding only clean variables
+                        // (Tauri's Command doesn't have env_remove yet)
+                        let poisons = ["APPDIR", "APPIMAGE", "LD_PRELOAD", "XDG_DATA_DIRS", "GDK_PIXBUF_MODULE_FILE"];
+                        let clean_vars: Vec<(String, String)> = std::env::vars()
+                            .filter(|(k, _)| !poisons.contains(&k.as_str()))
+                            .collect();
+                        
+                        sidecar_cmd = sidecar_cmd.env_clear().envs(clean_vars);
                     }
 
                     match sidecar_cmd
