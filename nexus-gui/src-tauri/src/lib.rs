@@ -36,6 +36,18 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            // 0. Find an available port for the daemon
+            let daemon_port = std::net::TcpListener::bind("127.0.0.1:0")
+                .and_then(|listener| listener.local_addr())
+                .map(|addr| addr.port())
+                .unwrap_or(8081);
+            
+            println!("📡 Allocated port {} for nexus-daemon", daemon_port);
+
+            // Inject the port into the frontend
+            let init_script = format!("window.__DAEMON_PORT__ = {};", daemon_port);
+            let _ = app.get_webview_window("main").map(|w| w.eval(&init_script));
+
             let shell = app.shell();
             match shell.sidecar("nexus-daemon") {
                 Ok(sidecar) => {
@@ -93,6 +105,7 @@ pub fn run() {
                     match sidecar_cmd
                         .current_dir(bin_dir)
                         .env("LD_LIBRARY_PATH", ".")
+                        .args(["--port", &daemon_port.to_string()])
                         .spawn() {
                         Ok((mut rx, _child)) => {
                             println!("✅ Sidecar 'nexus-daemon' spawned successfully (env scrubbed)");

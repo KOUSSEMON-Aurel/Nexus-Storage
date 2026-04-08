@@ -38,7 +38,9 @@ interface NFile {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const API_BASE = "http://127.0.0.1:8081/api";
+// Retrieve dynamic port from Rust (injected via init script), fallback to 8081
+const DAEMON_PORT = (window as any).__DAEMON_PORT__ || 8081;
+const API_BASE = `http://127.0.0.1:${DAEMON_PORT}/api`;
 
 // Persistent session state to avoid re-showing splash screen when returning from Settings
 let hasInitializedSession = false;
@@ -164,6 +166,13 @@ export default function Dashboard() {
     callback: (password: string) => Promise<void>;
   } | null>(null);
 
+  // Disable right-click context menu for a more native feel
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => e.preventDefault();
+    document.addEventListener("contextmenu", handleContextMenu);
+    return () => document.removeEventListener("contextmenu", handleContextMenu);
+  }, []);
+
   const handleLogout = async () => {
     try {
       await fetch(`${API_BASE}/auth/logout`, { method: "POST" });
@@ -177,7 +186,7 @@ export default function Dashboard() {
 
   const handleMountDisk = async () => {
     try {
-      await fetch("http://127.0.0.1:8081/api/mount");
+      await fetch(`http://127.0.0.1:${DAEMON_PORT}/api/mount`);
       showToast("📡 Virtual Disk Mount requested...", "info");
       setTimeout(() => setIsMounted(true), 2000);
     } catch (e) {
@@ -187,7 +196,7 @@ export default function Dashboard() {
 
   const handleUnmountDisk = async () => {
     try {
-      await fetch("http://127.0.0.1:8081/api/unmount");
+      await fetch(`http://127.0.0.1:${DAEMON_PORT}/api/unmount`);
       showToast("🔌 Virtual Disk Unmounted", "info");
       setIsMounted(false);
     } catch (e) {

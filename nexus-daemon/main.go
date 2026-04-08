@@ -16,6 +16,8 @@ import (
 	_ "time/tzdata"
 )
 
+var apiPort = 8081
+
 // getHostTriple returns the Tauri-compatible host triple (e.g., x86_64-unknown-linux-gnu)
 func getHostTriple() string {
 	// Simple mapping for common platforms
@@ -83,7 +85,21 @@ func has(name string) bool {
 func main() {
 	configDir := getConfigDir()
 	dbPath := flag.String("db", filepath.Join(configDir, "nexus.db"), "Path to the SQLite database")
+	port := flag.Int("port", 8081, "Port to run the API server on")
 	flag.Parse()
+
+	apiPort = *port
+
+	// Exit if parent process dies (Standard for sidecars)
+	go func() {
+		for {
+			if os.Getppid() == 1 { // Parent is now init/systemd (orphaned)
+				log.Println("🛑 Parent process died. Shutting down daemon...")
+				os.Exit(0)
+			}
+			time.Sleep(2 * time.Second)
+		}
+	}()
 
 	fmt.Println("🚀 NexusStorage Daemon starting (FUSE Engine)...")
 
@@ -95,9 +111,9 @@ func main() {
 		}
 	}
 
-	// 0. Verify port 8081 is free
-	if ln, err := net.Listen("tcp", ":8081"); err != nil {
-		log.Fatalf("❌ Port 8081 is already in use. Please close any existing NexusStorage processes: %v", err)
+	// 0. Verify port is free
+	if ln, err := net.Listen("tcp", fmt.Sprintf(":%d", *port)); err != nil {
+		log.Fatalf("❌ Port %d is already in use. Please close any existing NexusStorage processes: %v", *port, err)
 	} else {
 		ln.Close()
 	}
@@ -207,7 +223,7 @@ func main() {
 	// 7. Start API & Internal VFS Server for GUI
 	api := &APIServer{db: db, queue: &queue, ytManager: ytManager, pm: pm, cache: cacheMgr, syncMgr: syncMgr, dbPath: *dbPath}
 
-	go api.Start(8081)
+	go api.Start(*port)
 
 	// 8. OPTIMIZATION #4: Daily trash cleanup scheduler
 	// Instead of cleaning trash on every startup (expensive operation),
@@ -222,7 +238,7 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	fmt.Println("✅ Daemon is running. FUSE Bridge active at :8081")
+	fmt.Printf("✅ Daemon is running. FUSE Bridge active at :%d\n", *port)
 	<-sigChan
 
 	fmt.Println("\n👋 Shutting down NexusStorage...")
@@ -345,11 +361,8 @@ func isVirtualDiskMounted() bool {
 // and chains through a sensible fallback stack.
 func autoMountVirtualDisk() {
 	mountPath := filepath.Join(os.Getenv("HOME"), "Nexus-Storage")
-	const (
-		httpURL   = "http://127.0.0.1:8081/vfs/"
-		davURL    = "dav://127.0.0.1:8081/vfs/"
-		vfsURL = "vfs://127.0.0.1:8081/vfs/"
-		mountDir  = "/mnt/nexus"
+	var (
+		httpURL   = fmt.Sprintf("http://127.0.0.1:%d/vfs/", apiPort)
 	)
 
 	// Clean env — Tauri injects LD_LIBRARY_PATH which breaks cold browser/file-manager launches
