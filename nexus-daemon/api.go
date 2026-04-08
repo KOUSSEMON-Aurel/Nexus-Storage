@@ -429,6 +429,7 @@ func (s *APIServer) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	go s.ytManager.StartLoginServer()
 	
 	url := s.ytManager.GetAuthURL()
+	go openBrowser(url)
 	
 	jsonOK(w, map[string]string{"status": "login_flow_started", "url": url})
 }
@@ -512,7 +513,8 @@ func (s *APIServer) handleStudio(w http.ResponseWriter, r *http.Request) {
 		url = fmt.Sprintf("https://studio.youtube.com/channel/%s/videos/upload?filter=%%5B%%5D&sort=%%7B%%22columnType%%22%%3A%%22date%%22%%2C%%22sortOrder%%22%%3A%%22DESCENDING%%22%%7D", channelID)
 	}
 	
-	jsonOK(w, map[string]string{"status": "url_returned", "url": url})
+	go openBrowser(url)
+	jsonOK(w, map[string]string{"status": "browser-launched", "url": url})
 }
 
 func (s *APIServer) handleSearch(w http.ResponseWriter, r *http.Request) {

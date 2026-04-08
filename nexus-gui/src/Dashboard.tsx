@@ -7,7 +7,6 @@ import { Search, Plus, HardDrive, Shield, Clock, Star, Trash2,
   Eye, EyeOff, Download
 } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useNavigate } from "react-router-dom";
 import PasswordModal from "./components/PasswordModal";
@@ -1306,11 +1305,7 @@ export default function Dashboard() {
                     <button 
                       onClick={async () => {
                         setAccountOpen(false);
-                        const res = await fetch(`${API_BASE}/studio`);
-                        if (res.ok) {
-                          const data = await res.json();
-                          if (data.url) await openUrl(data.url);
-                        }
+                        await fetch(`${API_BASE}/studio`);
                       }}
                       style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#FF000015", border: `1px solid #FF000030`, color: "#CC0000", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                     >
@@ -1392,11 +1387,8 @@ function SignInView({ c }: { c: ColorSet }) {
     try {
       const res = await fetch(`${API_BASE}/auth/login`, { method: "POST" });
       if (res.ok) {
-        const data = await res.json();
-        if (data.url) {
-          await openUrl(data.url);
-        }
-        console.log("Login flow started by frontend");
+        // Backend now handles securely launching the browser
+        console.log("Login flow started by backend");
       }
     } catch (e) {
       console.error(e);
