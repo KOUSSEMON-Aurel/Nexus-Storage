@@ -171,14 +171,32 @@ jobs:
         working-directory: ./nexus-gui
         run: npm install
 
+      # ─── FIX LINUX STABILITY : hide libs before bundling ─────────────────
+      # EXCLUDE_LIBS est ignoré par linuxdeploy/Tauri → on renomme les .so
+      # directement sur le runner pour garantir leur absence du bundle AppImage.
+      - name: Hide graphics libs before bundling (Linux only)
+        if: matrix.platform == 'linux'
+        run: |
+          LIB_PATH="/usr/lib/x86_64-linux-gnu"
+          for lib in \
+            libwayland-client.so.0 \
+            libwayland-server.so.0 \
+            libwayland-cursor.so.0 \
+            libwayland-egl.so.1 \
+            libepoxy.so.0; do
+            if [ -f "$LIB_PATH/$lib" ]; then
+              sudo mv "$LIB_PATH/$lib" "$LIB_PATH/${lib}.bak"
+              echo "Hidden: $lib"
+            else
+              echo "Not found (skipped): $lib"
+            fi
+          done
+
       - name: Build and release with Tauri Action
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # ─── FIX LINUX STABILITY ───
-          # Exclut les libs graphiques système du bundle AppImage pour forcer l'usage des drivers du système hôte.
-          # On ajoute libwayland-cursor, libwayland-egl et libepoxy qui causaient encore des conflits.
-          EXCLUDE_LIBS: "libwayland-client.so.0;libwayland-server.so.0;libwayland-cursor.so.0;libwayland-egl.so.1;libEGL.so.1;libGL.so.1;libgbm.so.1;libepoxy.so.0;libxcb.so.1;libX11.so.6"
+          LINUXDEPLOY_IGNORE_LIBRARY_ERRORS: "1"
         with:
           projectPath: './nexus-gui'
           args: '--target ${{ matrix.tauri_rust_target }}'
@@ -187,3 +205,19 @@ jobs:
           releaseBody: 'Release automatique cross-platform.'
           releaseDraft: true
           prerelease: false
+
+      - name: Restore hidden graphics libs (Linux only)
+        if: ${{ matrix.platform == 'linux' && always() }}
+        run: |
+          LIB_PATH="/usr/lib/x86_64-linux-gnu"
+          for lib in \
+            libwayland-client.so.0 \
+            libwayland-server.so.0 \
+            libwayland-cursor.so.0 \
+            libwayland-egl.so.1 \
+            libepoxy.so.0; do
+            if [ -f "$LIB_PATH/${lib}.bak" ]; then
+              sudo mv "$LIB_PATH/${lib}.bak" "$LIB_PATH/$lib"
+              echo "Restored: $lib"
+            fi
+          done
