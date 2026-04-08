@@ -50,12 +50,20 @@ pub fn run() {
                         });
 
                     // Set LD_LIBRARY_PATH and current_dir to let the daemon find its dependencies
-                    match sidecar
+                    // IMPORTANT: We scrub AppImage-polluted variables so that xdg-open works
+                    let mut sidecar_cmd = sidecar;
+                    
+                    // Remove AppImage poisons
+                    for var in ["APPDIR", "APPIMAGE", "LD_PRELOAD", "XDG_DATA_DIRS", "GDK_PIXBUF_MODULE_FILE"] {
+                        sidecar_cmd = sidecar_cmd.env_remove(var);
+                    }
+
+                    match sidecar_cmd
                         .current_dir(bin_dir)
                         .env("LD_LIBRARY_PATH", ".")
                         .spawn() {
                         Ok((mut rx, _child)) => {
-                            println!("✅ Sidecar 'nexus-daemon' spawned successfully");
+                            println!("✅ Sidecar 'nexus-daemon' spawned successfully (env scrubbed)");
                             tauri::async_runtime::spawn(async move {
                                 while let Some(event) = rx.recv().await {
                                     match event {
