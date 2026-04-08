@@ -51,11 +51,15 @@ pub fn run() {
 
                     // Set LD_LIBRARY_PATH and current_dir to let the daemon find its dependencies
                     // IMPORTANT: We scrub AppImage-polluted variables so that xdg-open works
+                    #[allow(unused_mut)]
                     let mut sidecar_cmd = sidecar;
                     
-                    // Remove AppImage poisons
-                    for var in ["APPDIR", "APPIMAGE", "LD_PRELOAD", "XDG_DATA_DIRS", "GDK_PIXBUF_MODULE_FILE"] {
-                        sidecar_cmd = sidecar_cmd.env_remove(var);
+                    #[cfg(target_os = "linux")]
+                    {
+                        // Remove AppImage poisons
+                        for var in ["APPDIR", "APPIMAGE", "LD_PRELOAD", "XDG_DATA_DIRS", "GDK_PIXBUF_MODULE_FILE"] {
+                            sidecar_cmd = sidecar_cmd.env_remove(var);
+                        }
                     }
 
                     match sidecar_cmd
