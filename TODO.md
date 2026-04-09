@@ -23,6 +23,29 @@ Basé sur mon analyse de l'architecture actuelle de **Nexus Storage** ("parasiti
 
 * **Recherche de contenu (OCR/NLP) :** Utiliser une bibliothèque locale légère pour indexer le texte à l'intérieur des images ou des PDF stockés, permettant de retrouver un document par son contenu et non juste par son nom.
 
+### 5. Automation et Infrastructure
+
+*   **Dockerization (Daemon) :** Créer un `Dockerfile` multi-stage pour packager le daemon (Rust core + Go API) dans une image légère. Automatiser le push vers le GitHub Container Registry (GHCR).
+*   **Support Flatpak :** Créer un manifeste Flatpak pour proposer une alternative robuste à l'AppImage sur Linux.
+*   **Pipeline CI/CD Étendu :** Automatiser la génération et l'upload des paquets `.deb` (Debian/Ubuntu) et `.rpm` (Fedora) via le workflow de release actuel.
+*   **Nightly Builds :** Mettre en place des builds automatiques chaque nuit sur la branche `develop` pour tester la stabilité avant les releases officielles.
+
+### 6. Camouflage Avancé (Anti-Spam)
+
+Afin d'éviter que les vidéos de données ne soient classées comme spam par YouTube, nous devons implémenter une combinaison de deux techniques de dissimulation robustes :
+
+*   **Cheval de Troie (Concaténation) [Méthode Principale] :** 
+    *   *Verdict* : ✅ Meilleure (Simple, fiable, zéro impact sur les données brutes).
+    *   *Concept* : Récupérer aléatoirement une introduction vidéo libre de droits (via l'API Pexels ou Pixabay) et la coller (FFmpeg `concat`) au tout début de la vidéo de bruit générée par Nexus.
+    *   *Intégration* : L'offset (durée de l'intro en secondes) est stocké dans la base de données. Au moment du décodage, le daemon ignore simplement cet offset avant de lire les pixels.
+*   **Camouflage Audio [Complémentaire] :**
+    *   *Verdict* : ✅ À combiner (pas une méthode standalone).
+    *   *Concept* : Joindre en permanence une piste audio inoffensive (Lo-fi hip hop libre de droits ou discussion générée aléatoirement) sur toute la longueur de la vidéo finale.
+    *   *Impact* : Augmente drastiquement le "Trust Score" de la vidéo pour les algorithmes aveugles de YouTube en simulant une vraie bande-son sans sacrifier la bande passante visuelle.
+
+### 7. Synchronisation
+*   **LAN Sync :** Implémenter une synchronisation directe via réseau local (Desktop ↔ Mobile) en complément de la synchronisation cloud via Drive.
+
 ---
 
 **Laquelle de ces pistes te semble la plus intéressante pour commencer ?** *(Le menu contextuel custom ou le Drag & Drop seraient des progressions logiques après nos dernières modifications sur la sélection).*
