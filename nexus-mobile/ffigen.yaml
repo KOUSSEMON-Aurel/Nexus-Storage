@@ -1,0 +1,19 @@
+# nexus-mobile/ffigen.yaml
+name: NexusCoreBindings
+description: Dart bindings for Nexus Storage core engine (Rust).
+output: 'lib/ffi/nexus_bindings.dart'
+headers:
+  entry-points:
+    - '../nexus-core/include/nexus_core.h'
+  include-directives:
+    - '../nexus-core/include/nexus_core.h'
+preamble: |
+  // ignore_for_file: always_specify_types
+  // ignore_for_file: camel_case_types
+  // ignore_for_file: non_constant_identifier_names
+compiler-opts:
+  - '-I/usr/lib/clang/22/include'
+  - '-I/usr/include'
+comments:
+  style: any
+  length: full
