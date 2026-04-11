@@ -19,7 +19,10 @@ class AppTheme {
         onSurface: AppColors.textPrimaryLight,
         primary: AppColors.primary,
         secondary: AppColors.secondary,
-        error: AppColors.error,
+        error: AppColors.errorLight, // Utiliser la couleur sémantique plus sombre
+        surfaceTint: Colors.white,
+      ).copyWith(
+        error: AppColors.errorLight,
       ),
       textTheme: textTheme.copyWith(
         displayLarge: textTheme.displayLarge?.copyWith(
@@ -58,6 +61,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          side: BorderSide(color: Colors.grey.withOpacity(0.1)), // Bordure subtile pour le light mode
         ),
       ),
       appBarTheme: const AppBarTheme(
@@ -67,15 +71,15 @@ class AppTheme {
         iconTheme: IconThemeData(color: AppColors.textPrimaryLight),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: AppColors.surfaceElevatedLight,
+        backgroundColor: AppColors.surfaceLight,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.surfaceElevatedLight,
-        contentTextStyle: const TextStyle(color: AppColors.textPrimaryLight),
+        backgroundColor: AppColors.textPrimaryLight,
+        contentTextStyle: const TextStyle(color: Colors.white),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         ),
@@ -101,7 +105,6 @@ class AppTheme {
         error: AppColors.error,
       ),
       
-      // Typography Scale (5 Rules)
       textTheme: textTheme.copyWith(
         displayLarge: textTheme.displayLarge?.copyWith(
           fontSize: 28,
@@ -135,7 +138,6 @@ class AppTheme {
         ),
       ),
 
-      // Component Themes
       cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,

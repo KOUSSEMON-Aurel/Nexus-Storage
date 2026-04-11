@@ -61,15 +61,18 @@ dependencies:
 
 flutter_native_splash:
   color: "#0D0F14"
-  android_12:
-    color: "#0D0F14"
-    icon_background_color: "#0D0F14"
+  image: assets/logo.png
   android: true
   ios: true
-  image: assets/logo.png
-  image_dark: assets/logo.png
-  background_image: null
-  fullscreen: false
+  
+  android_12:
+    color: "#0D0F14"
+    image: assets/logo.png
+    icon_background_color: "#0D0F14"
+
+  android_gravity: center
+  ios_content_mode: center
+  fullscreen: true
 
 
 dev_dependencies:

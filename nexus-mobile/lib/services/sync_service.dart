@@ -36,6 +36,8 @@ class SyncService {
       AppLogger.info('Starting sync push with token starting with ${token.substring(0, 10)}...');
 
       final folderId = await _getFolderId('Nexus-Recovery', token);
+      AppLogger.info('Folder ID for Nexus-Recovery: $folderId');
+
       final manifestBytes = await _downloadFileFromDrive('nexus-sync.json', token, folderId: folderId);
       int remoteLSN = 0;
       String remoteHash = '';
@@ -98,7 +100,7 @@ class SyncService {
       });
     } catch (e, s) {
       AppLogger.error('Sync push failed: $e', e, s);
-      final errMsg = e.toString().contains('\\n') ? e.toString().split('\\n').first : e.toString();
+      final errMsg = e.toString().contains('\n') ? e.toString().split('\n').first : e.toString();
       await _db.insertTask({
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'file_path': 'Database Push Error',
@@ -156,7 +158,7 @@ class SyncService {
       });
     } catch (e, s) {
       AppLogger.error('Sync pull failed: $e', e, s);
-      final errMsg = e.toString().contains('\\n') ? e.toString().split('\\n').first : e.toString();
+      final errMsg = e.toString().contains('\n') ? e.toString().split('\n').first : e.toString();
       await _db.insertTask({
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'file_path': 'Database Pull Error',
@@ -170,7 +172,7 @@ class SyncService {
 
   Future<String?> _getFolderId(String name, String token) async {
     final listResponse = await http.get(
-      Uri.parse('https://www.googleapis.com/drive/v3/files?q=name="$name" and mimeType="application/vnd.google-apps.folder" and trashed=false'),
+      Uri.parse('https://www.googleapis.com/drive/v3/files?q=${Uri.encodeComponent('name="$name" and mimeType="application/vnd.google-apps.folder" and trashed=false')}'),
       headers: {'Authorization': 'Bearer $token'},
     );
     
@@ -202,13 +204,15 @@ class SyncService {
     String query = 'name="$name" and trashed=false';
     if (folderId != null) query += ' and "$folderId" in parents';
 
+    AppLogger.info('Drive Upload: Searching for $name in folder $folderId');
     final listResponse = await http.get(
-      Uri.parse('https://www.googleapis.com/drive/v3/files?q=\${Uri.encodeComponent(query)}'),
+      Uri.parse('https://www.googleapis.com/drive/v3/files?q=${Uri.encodeComponent(query)}'),
       headers: {'Authorization': 'Bearer $token'},
     );
     
     if (listResponse.statusCode != 200) {
-      throw SyncException('Drive API Error (\${listResponse.statusCode}): \${listResponse.body}');
+      AppLogger.error('Drive List Error: ${listResponse.body}');
+      throw SyncException('Drive API Error (${listResponse.statusCode}): ${listResponse.body}');
     }
     
     final files = jsonDecode(listResponse.body)['files'] as List;
@@ -216,8 +220,9 @@ class SyncService {
     if (files.isNotEmpty) fileId = files.first['id'];
 
     if (fileId != null) {
+      AppLogger.info('Drive Upload: Updating existing file $fileId');
       final updateResponse = await http.patch(
-        Uri.parse('https://www.googleapis.com/upload/drive/v3/files/\$fileId?uploadType=media'),
+        Uri.parse('https://www.googleapis.com/upload/drive/v3/files/$fileId?uploadType=media'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': mimeType,
@@ -225,9 +230,11 @@ class SyncService {
         body: content,
       );
       if (updateResponse.statusCode != 200) {
-        throw SyncException('Drive Update Error (\${updateResponse.statusCode})');
+        AppLogger.error('Drive Update Error: ${updateResponse.body}');
+        throw SyncException('Drive Update Error (${updateResponse.statusCode})');
       }
     } else {
+      AppLogger.info('Drive Upload: Creating new file $name');
       final metadata = {
         'name': name,
         'mimeType': mimeType,
@@ -243,12 +250,14 @@ class SyncService {
       );
       
       if (createResponse.statusCode != 200) {
-        throw SyncException('Drive Create Error (\${createResponse.statusCode})');
+        AppLogger.error('Drive Create Error: ${createResponse.body}');
+        throw SyncException('Drive Create Error (${createResponse.statusCode})');
       }
       
       final newId = jsonDecode(createResponse.body)['id'];
+      AppLogger.info('Drive Upload: Uploading media for new file $newId');
       final uploadResponse = await http.patch(
-        Uri.parse('https://www.googleapis.com/upload/drive/v3/files/\$newId?uploadType=media'),
+        Uri.parse('https://www.googleapis.com/upload/drive/v3/files/$newId?uploadType=media'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': mimeType,
@@ -257,7 +266,8 @@ class SyncService {
       );
       
       if (uploadResponse.statusCode != 200) {
-        throw SyncException('Drive Media Upload Error (\${uploadResponse.statusCode})');
+        AppLogger.error('Drive Media Upload Error: ${uploadResponse.body}');
+        throw SyncException('Drive Media Upload Error (${uploadResponse.statusCode})');
       }
     }
   }
@@ -267,12 +277,12 @@ class SyncService {
     if (folderId != null) query += ' and "$folderId" in parents';
 
     final listResponse = await http.get(
-      Uri.parse('https://www.googleapis.com/drive/v3/files?q=\${Uri.encodeComponent(query)}'),
+      Uri.parse('https://www.googleapis.com/drive/v3/files?q=${Uri.encodeComponent(query)}'),
       headers: {'Authorization': 'Bearer $token'},
     );
     
     if (listResponse.statusCode != 200) {
-      throw SyncException('Drive List Error (\${listResponse.statusCode})');
+      throw SyncException('Drive List Error (${listResponse.statusCode})');
     }
     
     final files = jsonDecode(listResponse.body)['files'] as List;
@@ -280,12 +290,12 @@ class SyncService {
 
     final fileId = files.first['id'];
     final downloadResponse = await http.get(
-      Uri.parse('https://www.googleapis.com/drive/v3/files/\$fileId?alt=media'),
+      Uri.parse('https://www.googleapis.com/drive/v3/files/$fileId?alt=media'),
       headers: {'Authorization': 'Bearer $token'},
     );
     
     if (downloadResponse.statusCode != 200) {
-      throw SyncException('Drive Download Error (\${downloadResponse.statusCode})');
+      throw SyncException('Drive Download Error (${downloadResponse.statusCode})');
     }
 
     return downloadResponse.bodyBytes;

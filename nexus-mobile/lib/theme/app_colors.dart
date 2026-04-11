@@ -10,32 +10,38 @@ class AppColors {
   static const Color textSecondary = Color.fromRGBO(255, 255, 255, 0.45);
   static const Color textDisabled = Color.fromRGBO(255, 255, 255, 0.38);
 
-  // Light Theme
-  static const Color backgroundLight = Color(0xFFF8FAFC);
+  // Light Theme (Optimisé pour la visibilité)
+  static const Color backgroundLight = Color(0xFFEDF2F7); // Plus gris pour détacher les cartes
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceElevatedLight = Color(0xFFF1F5F9);
+  static const Color surfaceElevatedLight = Color(0xFFCBD5E0);
 
   static const Color textPrimaryLight = Color(0xFF0F172A);
-  static const Color textSecondaryLight = Color(0xFF64748B);
-  static const Color textDisabledLight = Color(0xFF94A3B8);
+  static const Color textSecondaryLight = Color(0xFF1E293B); // Très sombre pour contraste
+  static const Color textDisabledLight = Color(0xFF64748B);
   
   // Accents (Shared)
-  static const Color primary = Color(0xFF5B8DEF);
-  static const Color secondary = Color(0xFF7B6CF6);
-  static const Color accent = Color(0xFF00D4FF);
+  static const Color primary = Color(0xFF312E81); // Indigo très profond pour le Light
+  static const Color secondary = Color(0xFF5B21B6); // Violet profond
+  static const Color accent = Color(0xFF0891B2);
   
-  // Semantic
+  // Semantic Dark
   static const Color success = Color(0xFF4ADE80);
   static const Color error = Color(0xFFF87171);
   static const Color warning = Color(0xFFFBBF24);
   static const Color info = Color(0xFF38BDF8);
+
+  // Semantic Light (Très saturé pour visibilité maximale)
+  static const Color successLight = Color(0xFF166534);
+  static const Color errorLight = Color(0xFF991B1B); // Rouge Sang très foncé
+  static const Color warningLight = Color(0xFF92400E);
+  static const Color infoLight = Color(0xFF075985);
   
   // Glassmorphism defaults
   static const Color glassBackground = Color.fromRGBO(255, 255, 255, 0.08);
   static const Color glassBorder = Color.fromRGBO(255, 255, 255, 0.12);
 
-  static const Color glassBackgroundLight = Color.fromRGBO(15, 23, 42, 0.04);
-  static const Color glassBorderLight = Color.fromRGBO(15, 23, 42, 0.08);
+  static const Color glassBackgroundLight = Color.fromRGBO(15, 23, 42, 0.10);
+  static const Color glassBorderLight = Color.fromRGBO(15, 23, 42, 0.20);
 
   // Helper methods to get colors based on theme
   static Color getBackground(BuildContext context) => 
@@ -58,4 +64,10 @@ class AppColors {
 
   static Color getGlassBorder(BuildContext context) => 
       Theme.of(context).brightness == Brightness.dark ? glassBorder : glassBorderLight;
+
+  static Color getError(BuildContext context) => 
+      Theme.of(context).brightness == Brightness.dark ? error : errorLight;
+
+  static Color getSuccess(BuildContext context) => 
+      Theme.of(context).brightness == Brightness.dark ? success : successLight;
 }
