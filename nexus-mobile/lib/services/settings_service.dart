@@ -16,15 +16,15 @@ class SettingsService {
 
   Future<void> init() async {
     final theme = await _db.getKV('app_theme') ?? 'system';
-    final lang = await _db.getKV('app_language') ?? 'fr';
+    final lang = await _db.getKV('app_language') ?? 'auto';
     
-    themeMode.value = _parseTheme(theme);
+    themeMode.value = parseTheme(theme);
     language.value = lang;
   }
 
   Future<void> updateTheme(String theme) async {
     await _db.setKV('app_theme', theme);
-    themeMode.value = _parseTheme(theme);
+    themeMode.value = parseTheme(theme);
   }
 
   Future<void> updateLanguage(String lang) async {
@@ -32,7 +32,7 @@ class SettingsService {
     language.value = lang;
   }
 
-  ThemeMode _parseTheme(String theme) {
+  ThemeMode parseTheme(String theme) {
     switch (theme) {
       case 'light': return ThemeMode.light;
       case 'dark': return ThemeMode.dark;

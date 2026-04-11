@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.aurel.nexus_mobile"
+    namespace = "com.aurel.nexusStorage"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.aurel.nexus_mobile"
+        applicationId = "com.aurel.nexusStorage"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

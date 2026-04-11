@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
-import 'package:flutter/services.dart' as services;
-import '../services/database_service.dart';
-import '../services/settings_service.dart';
-import '../utils/l10n.dart';
-import '../models/file_record.dart';
+import 'package:flutter/services.dart';
+import 'package:nexus_mobile/services/database_service.dart';
+import 'package:nexus_mobile/services/settings_service.dart';
+import 'package:nexus_mobile/utils/l10n.dart';
+import 'package:nexus_mobile/models/file_record.dart';
+import 'package:nexus_mobile/services/auth_service.dart';
+import 'package:nexus_mobile/theme/app_colors.dart';
+import 'package:nexus_mobile/theme/app_spacing.dart';
+import 'package:nexus_mobile/ui/widgets/glass_card.dart';
+import 'package:nexus_mobile/ui/widgets/app_button.dart';
+import 'package:nexus_mobile/ui/widgets/skeleton_item.dart';
+import 'package:nexus_mobile/ui/settings_page.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -18,6 +25,11 @@ class _FilesPageState extends State<FilesPage> {
   final SettingsService _settings = SettingsService();
   List<FileRecord> _files = [];
   String _currentTab = 'my-drive';
+  bool _isLoading = true;
+
+  // Multi-select state
+  bool _isSelecting = false;
+  final Set<int> _selectedIds = {};
 
   final Map<String, String> _tabs = {
     'my-drive': 'my_drive',
@@ -33,162 +45,458 @@ class _FilesPageState extends State<FilesPage> {
   }
 
   Future<void> _refreshFiles() async {
+    setState(() => _isLoading = true);
+    // Simulate delay for smooth skeleton demonstration
+    await Future.delayed(const Duration(milliseconds: 600));
     final files = await _db.listFiles(category: _currentTab);
-    setState(() => _files = files);
+    if (mounted) {
+      setState(() {
+        _files = files;
+        _isLoading = false;
+        // Don't clear selection if we're just refreshing during bulk action, 
+        // but usually we exit selection mode after action.
+      });
+    }
   }
 
   void _onTabSelected(String tabKey) {
     setState(() {
       _currentTab = tabKey;
+      _isSelecting = false;
+      _selectedIds.clear();
     });
+    _refreshFiles();
+  }
+
+  void _toggleSelection(int id) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+        if (_selectedIds.isEmpty) _isSelecting = false;
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  void _startSelecting(int id) {
+    HapticFeedback.heavyImpact();
+    setState(() {
+      _isSelecting = true;
+      _selectedIds.add(id);
+    });
+  }
+
+  void _exitSelecting() {
+    setState(() {
+      _isSelecting = false;
+      _selectedIds.clear();
+    });
+  }
+
+  Future<void> _handleBulkAction(String action) async {
+    final ids = _selectedIds.toList();
+    _exitSelecting();
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      if (action == 'trash') {
+        for (var id in ids) await _db.softDelete(id);
+      } else if (action == 'delete') {
+        final db = await _db.database;
+        for (var id in ids) await db.delete('files', where: 'id = ?', whereArgs: [id]);
+      } else if (action == 'restore') {
+        final db = await _db.database;
+        for (var id in ids) await db.update('files', {'deleted_at': null}, where: 'id = ?', whereArgs: [id]);
+      } else if (action == 'star') {
+        // Toggle star for first item and apply to all? 
+        // Better: toggle based on first item
+        final first = _files.firstWhere((f) => f.id == ids.first);
+        final newStarred = !first.starred;
+        for (var id in ids) {
+          final file = _files.firstWhere((f) => f.id == id);
+          await _db.saveFile(file.copyWith(starred: newStarred));
+        }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+    
     _refreshFiles();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : const Color(0xFF1F2937);
-
-
-
     return ValueListenableBuilder<String>(
       valueListenable: _settings.language,
       builder: (context, lang, child) {
-        return Padding(
-          padding: const EdgeInsets.only(top: 16.0, left: 16.0, right: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-              // Title
-              Padding(
-                padding: const EdgeInsets.only(left: 8.0),
-                child: Text(
-                  L10n.get(_tabs[_currentTab] ?? 'nexus', lang),
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: textColor,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Horizontal Tabs
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
-                  children: _tabs.entries.map((entry) {
-                    final isSelected = _currentTab == entry.key;
-                    return GestureDetector(
-                      onTap: () => _onTabSelected(entry.key),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.only(right: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isSelected 
-                            ? (isDark ? const Color(0xFF6366F1) : const Color(0xFF1A73E8))
-                            : (isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected ? Colors.transparent : (isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05)),
-                          ),
-                        ),
-                        child: Text(
-                          L10n.get(entry.value, lang),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            color: isSelected 
-                              ? Colors.white 
-                              : (isDark ? Colors.white70 : Colors.black87),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // File List
-              Expanded(
-                child: _files.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.folder_open, size: 64, color: isDark ? Colors.white24 : Colors.black26),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No files found', // Can add L10n later if needed
-                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 18),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: EdgeInsets.only(bottom: 24 + MediaQuery.of(context).padding.bottom + 80), // Padding to clear FAB
-                        itemCount: _files.length,
-                        itemBuilder: (context, index) {
-                          final file = _files[index];
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.8),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
-                              ),
-                              boxShadow: [
-                                if (!isDark)
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.03),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  )
+        return PopScope(
+          canPop: !_isSelecting,
+          onPopInvoked: (didPop) {
+            if (!didPop && _isSelecting) _exitSelecting();
+          },
+          child: RefreshIndicator(
+            onRefresh: _refreshFiles,
+            backgroundColor: AppColors.surfaceElevated,
+            color: AppColors.primary,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      _buildAuthBanner(context),
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  L10n.get(_tabs[_currentTab] ?? 'nexus', lang).toUpperCase(),
+                                  style: Theme.of(context).textTheme.labelLarge,
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                Text(
+                                  _isSelecting ? '${_selectedIds.length} Selected' : 'Overview', 
+                                  style: Theme.of(context).textTheme.displayLarge
+                                ),
                               ],
                             ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  leading: Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: (isDark ? Colors.white : const Color(0xFF1A73E8)).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(Icons.insert_drive_file, color: isDark ? Colors.white : const Color(0xFF1A73E8)),
-                                  ),
-                                  title: Text(
-                                    file.path.split('/').last,
-                                    style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
-                                  ),
-                                  subtitle: Text(
-                                    '${(file.size / 1024 / 1024).toStringAsFixed(2)} MB  •  ${DateTime.parse(file.lastUpdate).toLocal().toString().substring(0, 16)}',
-                                    style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 12),
-                                  ),
-                                  trailing: IconButton(
-                                    icon: Icon(Icons.more_vert, color: isDark ? Colors.white54 : Colors.black54),
-                                    onPressed: () {},
-                                  ),
-                                ),
-                              ),
+                          ),
+                          if (_isSelecting)
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                              onPressed: _exitSelecting,
                             ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      _buildTabs(lang),
+                      if (_isSelecting) _buildSelectionActions(context, lang),
+                      const SizedBox(height: AppSpacing.xl),
+                    ]),
+                  ),
+                ),
+
+                if (_isLoading)
+                  const SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    sliver: SliverToBoxAdapter(child: FileSkeletonList()),
+                  )
+                else if (_files.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildEmptyState(),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final file = _files[index];
+                          return TweenAnimationBuilder<double>(
+                            duration: Duration(milliseconds: 350 + (index * 60)),
+                            tween: Tween(begin: 0.0, end: 1.0),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, child) => Transform.translate(
+                              offset: Offset(0, 24 * (1 - value)),
+                              child: Opacity(opacity: value, child: child),
+                            ),
+                            child: _buildFileItem(file, lang),
                           );
                         },
+                        childCount: _files.length,
                       ),
+                    ),
+                  ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 120)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSelectionActions(BuildContext context, String lang) {
+    final bool isTrash = _currentTab == 'trash';
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: GlassCard(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+        borderRadius: AppSpacing.radiusMd,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            if (!isTrash) ...[
+              IconButton(onPressed: () => _handleBulkAction('star'), icon: const Icon(Icons.star_border_rounded, color: AppColors.primary)),
+              IconButton(onPressed: () => _handleBulkAction('trash'), icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error)),
+            ] else ...[
+              IconButton(onPressed: () => _handleBulkAction('restore'), icon: const Icon(Icons.restore_page_rounded, color: AppColors.primary)),
+              IconButton(onPressed: () => _handleBulkAction('delete'), icon: const Icon(Icons.delete_forever_rounded, color: AppColors.error)),
+            ],
+            IconButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started for selected items')));
+                _exitSelecting();
+              }, 
+              icon: const Icon(Icons.download_rounded, color: AppColors.textPrimary)
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAuthBanner(BuildContext context) {
+    return StreamBuilder<GoogleSignInAccount?>(
+      stream: AuthService().userStream,
+      initialData: AuthService().currentUser,
+      builder: (context, snapshot) {
+        if (snapshot.hasData || AuthService().isAuthenticated) return const SizedBox.shrink();
+        
+        return GlassCard(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          borderRadius: AppSpacing.radiusMd,
+          borderOpacity: 0.2,
+          child: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+              const SizedBox(width: AppSpacing.md),
+              const Expanded(
+                child: Text(
+                  'Cloud features restricted. Connect to Google to sync your library.',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ),
+              AppButton(
+                label: 'Connect',
+                isFullWidth: false,
+                backgroundColor: AppColors.warning.withOpacity(0.2),
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
+                },
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildTabs(String lang) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: _tabs.entries.map((entry) {
+          final isSelected = _currentTab == entry.key;
+          return GestureDetector(
+            onTap: () => _onTabSelected(entry.key),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutCubic,
+              margin: const EdgeInsets.only(right: AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primary : AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                boxShadow: isSelected 
+                  ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 4))] 
+                  : null,
+              ),
+              child: Text(
+                L10n.get(entry.value, lang),
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildFileItem(FileRecord file, String lang) {
+    final bool isSelected = _selectedIds.contains(file.id);
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: GestureDetector(
+        onLongPress: () {
+          if (!_isSelecting) {
+            _startSelecting(file.id!);
+          }
+        },
+        onTap: () {
+          if (_isSelecting) {
+            _toggleSelection(file.id!);
+          } else {
+            _showFileOptions(file);
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : Colors.white.withOpacity(0.1),
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: GlassCard(
+            padding: EdgeInsets.zero,
+            borderRadius: AppSpacing.radiusMd,
+            borderOpacity: 0,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 6),
+              leading: isSelected 
+                ? Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 20),
+                  )
+                : Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    ),
+                    child: Icon(
+                      _getFileIcon(file.path),
+                      color: AppColors.primary,
+                    ),
+                  ),
+              title: Text(
+                file.path.split('/').last,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '${(file.size / 1024 / 1024).toStringAsFixed(2)} MB  •  ${file.lastUpdate.split('.')[0]}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+              trailing: _isSelecting ? null : IconButton(
+                icon: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.textSecondary),
+                onPressed: () => _showFileOptions(file),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _getFileIcon(String path) {
+    final ext = path.split('.').last.toLowerCase();
+    if (['mp4', 'mov', 'avi', 'mkv'].contains(ext)) return Icons.videocam_outlined;
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext)) return Icons.image_outlined;
+    if (['mp3', 'aac', 'flac', 'wav'].contains(ext)) return Icons.audio_file_outlined;
+    if (['pdf'].contains(ext)) return Icons.picture_as_pdf_outlined;
+    if (['zip', 'tar', 'gz', 'rar'].contains(ext)) return Icons.folder_zip_outlined;
+    return Icons.insert_drive_file_outlined;
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.cloud_off_rounded, size: 80, color: AppColors.surfaceElevated),
+          const SizedBox(height: AppSpacing.lg),
+          Text('No files found here', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.sm),
+          const Text('Upload some content or check other tabs.', style: TextStyle(color: AppColors.textSecondary)),
+        ],
+      ),
+    );
+  }
+
+  void _showFileOptions(FileRecord file) {
+    final bool isTrash = _currentTab == 'trash';
+    final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.lg;
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return GlassCard(
+          customBorderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+          padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, bottomPad),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(file.path.split('/').last, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: AppSpacing.md),
+              if (!isTrash) ...[
+                ListTile(
+                  leading: Icon(file.starred ? Icons.star_rounded : Icons.star_border_rounded, color: AppColors.primary),
+                  title: Text(file.starred ? 'Remove from Starred' : 'Add to Starred'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _db.saveFile(file.copyWith(starred: !file.starred));
+                    _refreshFiles();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.download_rounded, color: AppColors.primary),
+                  title: const Text('Download Offline'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started...')));
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                  title: const Text('Move to Trash'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _db.softDelete(file.id!);
+                    _refreshFiles();
+                  },
+                ),
+              ] else ...[
+                ListTile(
+                  leading: const Icon(Icons.restore_rounded, color: AppColors.primary),
+                  title: const Text('Restore File'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _db.database.then((db) => db.update('files', {'deleted_at': null}, where: 'id = ?', whereArgs: [file.id]));
+                    _refreshFiles();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_forever_rounded, color: AppColors.error),
+                  title: const Text('Delete Permanently'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _db.database.then((db) => db.delete('files', where: 'id = ?', whereArgs: [file.id]));
+                    _refreshFiles();
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      }
     );
   }
 }

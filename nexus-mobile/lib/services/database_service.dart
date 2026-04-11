@@ -246,7 +246,13 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getActiveTasks() async {
     final db = await database;
-    return await db.query('tasks', where: "status != 'completed'", orderBy: 'created_at DESC');
+    // Show all tasks, including completed ones, so the user has an activity history
+    return await db.query('tasks', orderBy: 'created_at DESC');
+  }
+
+  Future<void> clearCompletedTasks() async {
+    final db = await database;
+    await db.delete('tasks', where: "status = 'completed' or status LIKE 'Failed%'");
   }
 
   Future<List<Map<String, dynamic>>> getPendingTasks() async {
@@ -267,6 +273,12 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<int> getTotalFileCount() async {
+    final db = await database;
+    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM files WHERE deleted_at IS NULL'));
+    return count ?? 0;
   }
 
   Future<void> deleteTask(String id) async {

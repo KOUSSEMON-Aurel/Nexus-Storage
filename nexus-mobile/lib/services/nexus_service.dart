@@ -10,6 +10,9 @@ import '../ffi/nexus_loader.dart';
 import 'database_service.dart';
 import 'youtube_service.dart';
 import '../models/file_record.dart';
+import 'sync_service.dart';
+import 'logger_service.dart';
+import '../utils/exceptions.dart';
 
 class NexusService {
   final NexusCoreBindings _native = NexusLoader.bindings;
@@ -18,28 +21,35 @@ class NexusService {
 
   /// Encrypt and encode a file into frames, then upload.
   Future<void> encodeAndUpload(File inputFile, String password, {String? explicitTaskId}) async {
-    final bytes = await inputFile.readAsBytes();
-    final fileName = inputFile.path.split('/').last;
     final taskId = explicitTaskId ?? DateTime.now().millisecondsSinceEpoch.toString();
-
-    // 0. Register Task
-    await _db.insertTask({
-      'id': taskId,
-      'type': 1, // Upload
-      'file_path': inputFile.path,
-      'status': 'Encrypting...',
-      'progress': 0.1,
-      'created_at': DateTime.now().toIso8601String(),
-    });
-
-    if (await FlutterForegroundTask.isRunningService) {
-      FlutterForegroundTask.updateService(
-        notificationTitle: 'Nexus: Processing $fileName',
-        notificationText: 'Status: Encrypting...',
-      );
-    }
+    final fileName = inputFile.path.split('/').last;
 
     try {
+      if (!await inputFile.exists()) {
+        throw NexusException('Input file does not exist: $fileName');
+      }
+
+      final bytes = await inputFile.readAsBytes();
+
+      // 0. Register Task
+      await _db.insertTask({
+        'id': taskId,
+        'type': 1, // Upload
+        'file_path': inputFile.path,
+        'status': 'Encrypting...',
+        'progress': 0.1,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      if (await FlutterForegroundTask.isRunningService) {
+        FlutterForegroundTask.updateService(
+          notificationTitle: 'Nexus: Processing $fileName',
+          notificationText: 'Status: Encrypting...',
+        );
+      }
+
+      AppLogger.info('Starting encodeAndUpload for $fileName');
+
       // 1. Encrypt & Compress (Rust)
       final inPtr = malloc<Uint8>(bytes.length);
       inPtr.asTypedList(bytes.length).setAll(0, bytes);
@@ -48,9 +58,12 @@ class NexusService {
       final outLenPtr = malloc<Size>();
       final passPtr = password.toNativeUtf8().cast<Char>();
 
+      String? hash;
+      Directory? framesDir;
+
       try {
         int res = _native.nexus_encrypt(inPtr, bytes.length, passPtr, outPtrPtr, outLenPtr);
-        if (res != 0) throw Exception('Encryption failed: $res');
+        if (res != 0) throw NexusException('Encryption failed with code: $res');
 
         await _db.updateTaskProgress(taskId, 0.3, 'Encoding frames...');
         if (await FlutterForegroundTask.isRunningService) {
@@ -60,20 +73,30 @@ class NexusService {
         // Compute Hash
         final hashPtr = malloc<Char>(65);
         _native.nexus_sha256_hex(outPtrPtr.value, outLenPtr.value, hashPtr);
-        final hash = hashPtr.cast<Utf8>().toDartString();
+        hash = hashPtr.cast<Utf8>().toDartString();
         malloc.free(hashPtr);
 
         // 2. Encode to Frames (Rust)
         final tmpDir = await getTemporaryDirectory();
-        final framesDir = Directory('${tmpDir.path}/nexus-$taskId');
+        framesDir = Directory('${tmpDir.path}/nexus-$taskId');
         await framesDir.create();
 
         final framesDirPtr = framesDir.path.toNativeUtf8().cast<Char>();
-        // Using frame size 1280x720 (default in nexus_core)
         int frameCount = _native.nexus_encode_to_frames(outPtrPtr.value, outLenPtr.value, framesDirPtr, 0); 
         malloc.free(framesDirPtr);
         
-        if (frameCount <= 0) throw Exception('Encoding failed: $frameCount');
+        if (frameCount <= 0) throw NexusException('Encoding failed: frameCount=$frameCount');
+
+        // Pad to min 90 frames (3 seconds at 30fps) for YouTube stability
+        if (frameCount < 90) {
+          AppLogger.info('Padding video from $frameCount to 90 frames...');
+          final lastFrameFile = File('${framesDir.path}/frame_${frameCount.toString().padLeft(6, '0')}.png');
+          final lastFrameData = await lastFrameFile.readAsBytes();
+          for (int j = frameCount + 1; j <= 90; j++) {
+            final padFile = File('${framesDir.path}/frame_${j.toString().padLeft(6, '0')}.png');
+            await padFile.writeAsBytes(lastFrameData);
+          }
+        }
 
         await _db.updateTaskProgress(taskId, 0.5, 'Assembling video...');
         if (await FlutterForegroundTask.isRunningService) {
@@ -89,7 +112,7 @@ class NexusService {
 
         if (!ReturnCode.isSuccess(returnCode)) {
           final logs = await session.getAllLogsAsString();
-          throw Exception('FFmpeg failed: $logs');
+          throw NexusException('FFmpeg assembly failed: $logs');
         }
 
         await _db.updateTaskProgress(taskId, 0.7, 'Uploading to Cloud...');
@@ -103,12 +126,11 @@ class NexusService {
           title: 'Nexus Data: $hash',
           description: 'Secure Nexus Storage Object ($fileName)',
           onProgress: (p) {
-            // Upload is 30% of the total progress (0.7 to 1.0)
             _db.updateTaskProgress(taskId, 0.7 + (p * 0.3), 'Uploading... ${(p * 100).toInt()}%');
           },
         );
 
-        if (videoId == null) throw Exception('YouTube upload failed');
+        if (videoId == null) throw NexusException('YouTube upload returned null videoId');
 
         // 5. Finalize Record
         final record = FileRecord(
@@ -128,20 +150,27 @@ class NexusService {
         );
 
         await _db.saveFile(record);
-        await _db.updateTaskProgress(taskId, 1.0, 'Completed');
-        
-        // Cleanup
-        if (await framesDir.exists()) await framesDir.delete(recursive: true);
+        await _db.updateTaskProgress(taskId, 1.0, 'completed');
 
+        // Auto-Sync after successful upload
+        try {
+          await SyncService().pushDatabase();
+        } catch (syncError) {
+          AppLogger.warn('Auto-sync failed after upload: $syncError');
+        }
+        
       } finally {
         malloc.free(inPtr);
         malloc.free(outPtrPtr);
         malloc.free(outLenPtr);
         malloc.free(passPtr);
+        if (framesDir != null && await framesDir.exists()) {
+          await framesDir.delete(recursive: true);
+        }
       }
-    } catch (e) {
-      print('UPLOAD ERROR: $e');
-      await _db.updateTaskProgress(taskId, 0.0, 'Failed: $e');
+    } catch (e, s) {
+      AppLogger.error('UPLOAD ERROR for $fileName: $e', e, s);
+      await _db.updateTaskProgress(taskId, 0.0, 'Failed: ${e.toString().split('\n').first}');
       rethrow;
     }
   }

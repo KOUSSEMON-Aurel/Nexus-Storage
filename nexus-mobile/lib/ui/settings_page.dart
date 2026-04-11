@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' as services;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import '../services/auth_service.dart';
-import '../services/database_service.dart';
-import '../services/settings_service.dart';
-import '../services/sync_service.dart';
-import '../utils/l10n.dart';
+import 'package:nexus_mobile/services/auth_service.dart';
+import 'package:nexus_mobile/services/database_service.dart';
+import 'package:nexus_mobile/services/settings_service.dart';
+import 'package:nexus_mobile/services/sync_service.dart';
+import 'package:nexus_mobile/utils/l10n.dart';
+import 'package:nexus_mobile/theme/app_colors.dart';
+import 'package:nexus_mobile/theme/app_spacing.dart';
+import 'package:nexus_mobile/ui/widgets/glass_card.dart';
+import 'package:nexus_mobile/ui/widgets/app_button.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -31,329 +34,357 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _loadRetention() async {
-    final retention = double.tryParse(await _db.getKV('trash_retention') ?? '30') ?? 30;
-    setState(() => _trashRetention = retention);
+    final retentionValue = await _db.getKV('trash_retention');
+    if (mounted) {
+      setState(() => _trashRetention = double.tryParse(retentionValue ?? '30') ?? 30);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = AppColors.getTextPrimary(context);
+    final textSecondary = AppColors.getTextSecondary(context);
 
-    final systemStyle = services.SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      systemNavigationBarColor: isDark ? const Color(0xFF020617) : const Color(0xFFF8FAFC),
-      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-      systemNavigationBarDividerColor: Colors.transparent,
-    );
-
-    return AnnotatedRegion<services.SystemUiOverlayStyle>(
-      value: systemStyle,
-      child: ValueListenableBuilder<String>(
-        valueListenable: _settings.language,
-        builder: (context, lang, child) {
-          return Scaffold(
-            appBar: AppBar(
-              title: Text(L10n.get('settings', lang), style: const TextStyle(fontWeight: FontWeight.w700)),
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              centerTitle: true,
+    return ValueListenableBuilder<String>(
+      valueListenable: _settings.language,
+      builder: (context, lang, child) {
+        return Scaffold(
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back_rounded, color: textPrimary),
+              onPressed: () => Navigator.pop(context),
             ),
-            extendBodyBehindAppBar: true,
-            body: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: isDark 
-                    ? [const Color(0xFF0F172A), const Color(0xFF020617)]
-                    : [const Color(0xFFF1F5F9), const Color(0xFFF8FAFC)],
+            title: Text(L10n.get('settings', lang), style: TextStyle(color: textPrimary)),
+            centerTitle: true,
+          ),
+          body: Stack(
+            children: [
+              // Subtle background gradient
+              Container(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.5),
+                    radius: 1.2,
+                    colors: [
+                      isDark ? const Color(0xFF1A1D23) : const Color(0xFFE2E8F0),
+                      AppColors.getBackground(context),
+                    ],
+                  ),
                 ),
               ),
-              child: SafeArea(
+              
+              SafeArea(
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  physics: const BouncingScrollPhysics(),
                   children: [
                     _buildSectionHeader(L10n.get('account', lang)),
-                    StreamBuilder<GoogleSignInAccount?>(
-                      stream: _auth.userStream,
-                      initialData: null,
-                      builder: (context, snapshot) {
-                        final user = _auth.isAuthenticated ? _auth.userName : snapshot.data?.displayName;
-                        final photoUrl = _auth.isAuthenticated ? _auth.userPhotoUrl : snapshot.data?.photoUrl;
-                        final isConnected = _auth.isAuthenticated || snapshot.hasData;
-
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: cardColor,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              if (!isDark)
-                                BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              if (isConnected && photoUrl != null)
-                                CircleAvatar(
-                                  radius: 28,
-                                  backgroundImage: NetworkImage(photoUrl),
-                                )
-                              else
-                                Icon(Icons.account_circle, size: 56, color: isConnected ? const Color(0xFF1A73E8) : Colors.grey),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      isConnected ? (user ?? 'Connected') : 'Google Account',
-                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                                    ),
-                                    Text(
-                                      isConnected ? 'Safe Archival Enabled' : 'Not connected',
-                                      style: TextStyle(color: isConnected ? Colors.green : Colors.grey, fontSize: 13, fontWeight: FontWeight.w500),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              ElevatedButton(
-                                onPressed: _isLoading ? null : () async {
-                                  setState(() => _isLoading = true);
-                                  try {
-                                    if (isConnected) {
-                                      await _auth.logout();
-                                    } else {
-                                      final res = await _auth.login();
-                                      if (res == null && mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Sign-in failed: ${_auth.lastError ?? "Unknown error"}')),
-                                        );
-                                      }
-                                    }
-                                  } finally {
-                                    if (mounted) setState(() => _isLoading = false);
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: isConnected ? Colors.red.withOpacity(0.1) : const Color(0xFF1A73E8),
-                                  foregroundColor: isConnected ? Colors.red : Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                child: _isLoading 
-                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : Text(isConnected ? L10n.get('logout', lang) : L10n.get('connect', lang)),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 24),
+                    _buildAccountCard(lang),
+                    const SizedBox(height: AppSpacing.xl),
 
                     _buildSectionHeader(L10n.get('display', lang)),
-                    _buildSettingTile(
-                      icon: Icons.palette_outlined,
-                      title: L10n.get('theme', lang),
-                      trailing: ValueListenableBuilder<ThemeMode>(
-                        valueListenable: _settings.themeMode,
-                        builder: (context, mode, _) {
-                          String label = 'SYSTEM';
-                          if (mode == ThemeMode.light) label = 'LIGHT';
-                          if (mode == ThemeMode.dark) label = 'DARK';
-                          return Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A73E8)));
-                        },
-                      ),
-                      onTap: () => _showThemeDialog(context),
-                      color: cardColor,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildSettingTile(
-                      icon: Icons.language_outlined,
-                      title: L10n.get('language', lang),
-                      trailing: Text(lang.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A73E8))),
-                      onTap: () => _showLanguageDialog(context),
-                      color: cardColor,
-                    ),
-                    const SizedBox(height: 24),
-
-                    _buildSectionHeader(L10n.get('interaction', lang)),
-                    _buildSettingTile(
-                      icon: Icons.check_box_outlined,
-                      title: L10n.get('persistent_checkboxes', lang),
-                      trailing: FutureBuilder<String?>(
-                        future: _db.getKV('persistent_checkboxes'),
-                        builder: (context, snapshot) {
-                          return Switch(
-                            value: snapshot.data == 'true',
-                            onChanged: (val) {
-                              _db.setKV('persistent_checkboxes', val.toString());
-                              setState(() {});
-                            },
-                            activeColor: const Color(0xFF1A73E8),
-                          );
-                        }
-                      ),
-                      color: cardColor,
-                    ),
-                    const SizedBox(height: 24),
+                    _buildDisplayOptions(lang),
+                    const SizedBox(height: AppSpacing.xl),
 
                     _buildSectionHeader(L10n.get('storage_trash', lang)),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(24)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(L10n.get('auto_empty', lang), style: const TextStyle(fontWeight: FontWeight.w600)),
-                              Text('${_trashRetention.round()} days', style: const TextStyle(color: Color(0xFF1A73E8), fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          Slider(
-                            value: _trashRetention,
-                            min: 1, max: 90,
-                            divisions: 89,
-                            activeColor: const Color(0xFF1A73E8),
-                            onChanged: (val) {
-                              setState(() => _trashRetention = val);
-                            },
-                            onChangeEnd: (val) {
-                              _db.setKV('trash_retention', val.round().toString());
-                            },
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.delete_sweep_outlined, size: 18),
-                              label: Text(L10n.get('empty_trash_now', lang)),
-                              onPressed: () => _confirmEmptyTrash(context, lang),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.red,
-                                side: BorderSide(color: Colors.red.withOpacity(0.3)),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildStorageCard(lang),
+                    const SizedBox(height: AppSpacing.xl),
+
                     _buildSectionHeader(L10n.get('database_sync', lang)),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(24)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.cloud_sync_outlined, color: Color(0xFF1A73E8)),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Google Drive Sync', style: TextStyle(fontWeight: FontWeight.w700)),
-                                    FutureBuilder<String?>(
-                                      future: _db.getKV('manifest_version'),
-                                      builder: (context, snapshot) => Text(
-                                        'Local LSN: ${snapshot.data ?? "0"}',
-                                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
-                                  label: const Text('Push'),
-                                  onPressed: () => _handleSyncAction('push'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1A73E8),
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.cloud_download_outlined, size: 18),
-                                  label: const Text('Pull'),
-                                  onPressed: () => _handleSyncAction('pull'),
-                                  style: OutlinedButton.styleFrom(
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                    _buildSyncCard(lang),
+                    const SizedBox(height: AppSpacing.xl),
 
                     _buildSectionHeader(L10n.get('security_privacy', lang)),
                     _buildInfoCard(
+                      context: context,
                       icon: Icons.lock_outline,
                       title: L10n.get('zk_encryption', lang),
                       description: L10n.get('zk_desc', lang),
-                      isDark: isDark,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.md),
                     _buildInfoCard(
+                      context: context,
                       icon: Icons.security_outlined,
                       title: L10n.get('camouflage_title', lang),
                       description: L10n.get('camouflage_desc', lang),
-                      isDark: isDark,
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: AppSpacing.xxl),
 
-                    Center(
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1A73E8),
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [BoxShadow(color: const Color(0xFF1A73E8).withOpacity(0.3), blurRadius: 10)]
-                            ),
-                            child: const Icon(Icons.refresh, color: Colors.white, size: 32),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text('Nexus Storage', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-                          const Text('v5.3.4 "Nova Galactic"', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                          const SizedBox(height: 24),
-                          TextButton.icon(
-                            icon: const Icon(Icons.code_outlined, size: 16),
-                            label: Text(L10n.get('view_on_github', lang)),
-                            onPressed: () => launchUrl(Uri.parse('https://github.com/KOUSSEMON-Aurel/Nexus-Storage')),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 40),
+                    _buildVersionInfo(lang),
+                    const SizedBox(height: AppSpacing.xxl),
                   ],
                 ),
               ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAccountCard(String lang) {
+    final textSecondary = AppColors.getTextSecondary(context);
+    
+    return StreamBuilder<GoogleSignInAccount?>(
+      stream: _auth.userStream,
+      builder: (context, snapshot) {
+        final isConnected = _auth.isAuthenticated || snapshot.hasData;
+        final photoUrl = _auth.isAuthenticated ? _auth.userPhotoUrl : snapshot.data?.photoUrl;
+        final name = _auth.isAuthenticated ? _auth.userName : snapshot.data?.displayName;
+
+        return GlassCard(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          borderRadius: AppSpacing.radiusLg,
+          child: Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 2),
+                ),
+                child: CircleAvatar(
+                  radius: 28,
+                  backgroundColor: AppColors.getSurfaceElevated(context),
+                  backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                  child: photoUrl == null ? Icon(Icons.person_rounded, color: textSecondary, size: 32) : null,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isConnected ? (name ?? 'Connected') : 'Google Account',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      isConnected ? 'Cloud Sync Active' : 'Offline access only',
+                      style: TextStyle(
+                        color: isConnected ? AppColors.success : textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              AppButton(
+                label: isConnected ? 'Logout' : 'Connect',
+                isFullWidth: false,
+                isLoading: _isLoading,
+                backgroundColor: isConnected ? AppColors.error.withOpacity(0.1) : AppColors.primary,
+                onPressed: () async {
+                  setState(() => _isLoading = true);
+                  try {
+                    if (isConnected) {
+                      await _auth.logout();
+                    } else {
+                      await _auth.login();
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isLoading = false);
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDisplayOptions(String lang) {
+    final dividerColor = Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.black12;
+    
+    return GlassCard(
+      padding: EdgeInsets.zero,
+      borderRadius: AppSpacing.radiusLg,
+      child: Column(
+        children: [
+          _buildCompactTile(
+            icon: Icons.palette_outlined,
+            title: L10n.get('theme', lang),
+            trailing: ValueListenableBuilder<ThemeMode>(
+              valueListenable: _settings.themeMode,
+              builder: (context, mode, _) {
+                String label = mode.name.toUpperCase();
+                return Text(label, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold));
+              },
             ),
-          );
-        },
+            onTap: () => _showThemeDialog(context),
+          ),
+          Divider(height: 1, color: dividerColor),
+          _buildCompactTile(
+            icon: Icons.language_rounded,
+            title: L10n.get('language', lang),
+            trailing: Text(_settings.language.value.toUpperCase(), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            onTap: () => _showLanguageDialog(context),
+          ),
+          Divider(height: 1, color: dividerColor),
+          _buildCompactTile(
+            icon: Icons.check_box_outlined,
+            title: L10n.get('persistent_checkboxes', lang),
+            trailing: FutureBuilder<String?>(
+              future: _db.getKV('persistent_checkboxes'),
+              builder: (context, snapshot) {
+                return Switch(
+                  value: snapshot.data == 'true',
+                  onChanged: (val) {
+                    _db.setKV('persistent_checkboxes', val.toString());
+                    setState(() {});
+                  },
+                  activeColor: AppColors.primary,
+                );
+              }
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStorageCard(String lang) {
+    return GlassCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      borderRadius: AppSpacing.radiusLg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(L10n.get('auto_empty', lang), style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text('${_trashRetention.round()} days', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          Slider(
+            value: _trashRetention,
+            min: 1, max: 90,
+            activeColor: AppColors.primary,
+            inactiveColor: AppColors.getSurfaceElevated(context),
+            onChanged: (val) => setState(() => _trashRetention = val),
+            onChangeEnd: (val) => _db.setKV('trash_retention', val.round().toString()),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(
+            label: L10n.get('empty_trash_now', lang),
+            backgroundColor: AppColors.error.withOpacity(0.1),
+            onPressed: () => _confirmEmptyTrash(context, lang),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSyncCard(String lang) {
+    return GlassCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      borderRadius: AppSpacing.radiusLg,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.cloud_sync_rounded, color: AppColors.primary),
+              const SizedBox(width: AppSpacing.md),
+              const Expanded(
+                child: Text('Cloud Database Sync', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              FutureBuilder<String?>(
+                future: _db.getKV('manifest_version'),
+                builder: (context, snapshot) => Text(
+                  'LSN: ${snapshot.data ?? "0"}',
+                  style: TextStyle(fontSize: 10, color: AppColors.getTextSecondary(context)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: 'Push',
+                  isLoading: _isLoading,
+                  onPressed: () => _handleSyncAction('push'),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: AppButton(
+                  label: 'Pull',
+                  isLoading: _isLoading,
+                  backgroundColor: AppColors.getSurfaceElevated(context),
+                  onPressed: () => _handleSyncAction('pull'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactTile({required IconData icon, required String title, required Widget trailing, VoidCallback? onTap}) {
+    final textSecondary = AppColors.getTextSecondary(context);
+    return ListTile(
+      leading: Icon(icon, color: textSecondary, size: 22),
+      title: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+      trailing: trailing,
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildVersionInfo(String lang) {
+    return Center(
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            ),
+            child: const Icon(Icons.stars_rounded, color: AppColors.primary, size: 32),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Text('Nexus Storage', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+          Text('v5.4.0 Titanium', style: TextStyle(color: AppColors.getTextSecondary(context), fontSize: 13)),
+          const SizedBox(height: AppSpacing.lg),
+          TextButton.icon(
+            icon: const Icon(Icons.open_in_new_rounded, size: 16),
+            label: Text(L10n.get('view_on_github', lang)),
+            onPressed: () => launchUrl(Uri.parse('https://github.com/KOUSSEMON-Aurel/Nexus-Storage')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard({required BuildContext context, required IconData icon, required String title, required String description}) {
+    return GlassCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      borderRadius: AppSpacing.radiusMd,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColors.success, size: 20),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 4),
+                Text(description, style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context), height: 1.4)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -368,74 +399,48 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildSettingTile({required IconData icon, required String title, required Widget trailing, VoidCallback? onTap, required Color color}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
-        child: Row(
-          children: [
-            Icon(icon, size: 22, color: const Color(0xFF1A73E8)),
-            const SizedBox(width: 16),
-            Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
-            trailing,
-            if (onTap != null) const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoCard({required IconData icon, required String title, required String description, required bool isDark}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.02),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: Colors.green),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                const SizedBox(height: 4),
-                Text(description, style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.4)),
-              ],
-            ),
-          ),
-          const Icon(Icons.check_circle, size: 16, color: Colors.green),
-        ],
-      ),
-    );
-  }
-
   void _showThemeDialog(BuildContext context) {
-    showDialog(
+    final lang = _settings.language.value;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Theme'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['system', 'light', 'dark'].map((t) => ListTile(
-            title: Text(t.toUpperCase()),
-            leading: Radio<String>(
-              value: t,
-              groupValue: _settings.themeMode.value == ThemeMode.light ? 'light' : (_settings.themeMode.value == ThemeMode.dark ? 'dark' : 'system'),
-              onChanged: (val) {
-                _settings.updateTheme(val!);
-                Navigator.pop(context);
-              },
-            ),
-          )).toList(),
-        ),
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.lg;
+        return GlassCard(
+          customBorderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+          padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, bottomPad),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.black12, 
+                  borderRadius: BorderRadius.circular(2)
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(L10n.get('theme', lang), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: AppSpacing.md),
+              ...['system', 'light', 'dark'].map((t) => ListTile(
+                leading: Icon(
+                  t == 'system' ? Icons.brightness_auto_rounded : (t == 'light' ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
+                  color: AppColors.primary,
+                ),
+                title: Text(t.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w600)),
+                trailing: _settings.themeMode.value == _settings.parseTheme(t) ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
+                onTap: () {
+                  _settings.updateTheme(t);
+                  Navigator.pop(context);
+                },
+              )),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -478,25 +483,44 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _showLanguageDialog(BuildContext context) {
-    showDialog(
+    final lang = _settings.language.value;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Language'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['fr', 'en'].map((l) => ListTile(
-            title: Text(l == 'fr' ? 'Français' : 'English'),
-            leading: Radio<String>(
-              value: l,
-              groupValue: _settings.language.value,
-              onChanged: (val) {
-                _settings.updateLanguage(val!);
-                Navigator.pop(context);
-              },
-            ),
-          )).toList(),
-        ),
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.lg;
+        return GlassCard(
+          customBorderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+          padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, bottomPad),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.black12, 
+                  borderRadius: BorderRadius.circular(2)
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(L10n.get('language', lang), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: AppSpacing.md),
+              ...['auto', 'fr', 'en'].map((l) => ListTile(
+                leading: const Icon(Icons.language_rounded, color: AppColors.primary),
+                title: Text(l == 'auto' ? 'Auto (System)' : (l == 'fr' ? 'Français' : 'English'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                trailing: _settings.language.value == l ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
+                onTap: () {
+                  _settings.updateLanguage(l);
+                  Navigator.pop(context);
+                },
+              )),
+            ],
+          ),
+        );
+      },
     );
   }
 }

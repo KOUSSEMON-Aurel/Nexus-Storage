@@ -1,51 +1,82 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' as services;
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'dart:io';
 
-import 'services/database_service.dart';
-import 'services/worker_service.dart';
-import 'services/nexus_service.dart';
-import 'services/task_handler.dart';
-import 'ui/files_page.dart';
-import 'ui/tasks_page.dart';
-import 'ui/settings_page.dart';
-import 'ui/widgets/speed_dial_fab.dart';
-import 'services/settings_service.dart';
-import 'utils/l10n.dart';
+import 'package:nexus_mobile/services/database_service.dart';
+import 'package:nexus_mobile/services/worker_service.dart';
+import 'package:nexus_mobile/services/nexus_service.dart';
+import 'package:nexus_mobile/services/task_handler.dart';
+import 'package:nexus_mobile/ui/files_page.dart';
+import 'package:nexus_mobile/ui/tasks_page.dart';
+import 'package:nexus_mobile/ui/settings_page.dart';
+import 'package:nexus_mobile/ui/widgets/speed_dial_fab.dart';
+import 'package:nexus_mobile/services/settings_service.dart';
+import 'package:nexus_mobile/services/auth_service.dart';
+import 'package:nexus_mobile/services/logger_service.dart';
+import 'package:nexus_mobile/theme/app_theme.dart';
+import 'package:nexus_mobile/theme/app_colors.dart';
+import 'package:nexus_mobile/theme/app_spacing.dart';
+import 'package:nexus_mobile/utils/l10n.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:animations/animations.dart';
+import 'package:nexus_mobile/ui/widgets/glass_card.dart';
+import 'package:nexus_mobile/ui/widgets/app_button.dart';
 
 void main() async {
   try {
-    WidgetsFlutterBinding.ensureInitialized();
+    WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+    FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+    
+    AppLogger.info('Initializing Nexus Storage...');
     
     _initForegroundTask();
 
-    // Enable Full Screen / Edge-to-Edge
+    // System UI Configuration (Native Performance)
     services.SystemChrome.setSystemUIOverlayStyle(const services.SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarColor: AppColors.background,
+      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.light,
     ));
     await services.SystemChrome.setEnabledSystemUIMode(services.SystemUiMode.edgeToEdge);
+    await services.SystemChrome.setPreferredOrientations([services.DeviceOrientation.portraitUp]);
 
-    await _requestPermissions();
-    
-    final db = DatabaseService();
-    await db.database; 
-    
-    final settings = SettingsService();
-    await settings.init();
+    // Validation at startup (Rule 8)
+    await Future.wait([
+      _requestPermissions(),
+      DatabaseService().database,
+      SettingsService().init(),
+      AuthService().signInSilently(),
+    ]);
 
+    AppLogger.info('Startup validation successful.');
+    FlutterNativeSplash.remove();
     runApp(const NexusApp());
   } catch (error, stackTrace) {
-    print('CRITICAL STARTUP ERROR: $error');
-    print(stackTrace);
+    AppLogger.error('CRITICAL STARTUP ERROR', error, stackTrace);
+    FlutterNativeSplash.remove();
     runApp(MaterialApp(
+      theme: AppTheme.darkTheme,
       home: Scaffold(
-        body: Center(
-          child: SelectableText('Initialization Error: $error\n\n$stackTrace'),
+        body: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: AppColors.error, size: 64),
+              const SizedBox(height: AppSpacing.lg),
+              const Text('System Error', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const SizedBox(height: AppSpacing.md),
+              SelectableText(error.toString(), textAlign: TextAlign.center),
+              const SizedBox(height: AppSpacing.xl),
+              AppButton(label: 'Retry', onPressed: () => main()),
+            ],
+          ),
         ),
       ),
     ));
@@ -108,33 +139,33 @@ class NexusApp extends StatelessWidget {
               title: 'Nexus Storage',
               debugShowCheckedModeBanner: false,
               themeMode: mode,
-              theme: ThemeData(
-                brightness: Brightness.light,
-                scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-                colorScheme: ColorScheme.fromSeed(
-                  seedColor: const Color(0xFF1A73E8),
-                  brightness: Brightness.light,
-                ),
-                useMaterial3: true,
-                fontFamily: 'Roboto',
-              ),
-              darkTheme: ThemeData(
-                brightness: Brightness.dark,
-                scaffoldBackgroundColor: const Color(0xFF020617),
-                colorScheme: ColorScheme.fromSeed(
-                  seedColor: const Color(0xFF6366F1),
-                  primary: const Color(0xFF6366F1),
-                  surface: const Color(0xFF0F172A),
-                  brightness: Brightness.dark,
-                ),
-                useMaterial3: true,
-                fontFamily: 'Roboto',
-              ),
-              home: const MainScreen(),
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              home: const EntrancePage(),
             );
           },
         );
       },
+    );
+  }
+}
+
+class EntrancePage extends StatelessWidget {
+  const EntrancePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PageTransitionSwitcher(
+      duration: const Duration(milliseconds: 500),
+      transitionBuilder: (child, primaryAnimation, secondaryAnimation) {
+        return SharedAxisTransition(
+          animation: primaryAnimation,
+          secondaryAnimation: secondaryAnimation,
+          transitionType: SharedAxisTransitionType.horizontal,
+          child: child,
+        );
+      },
+      child: const MainScreen(),
     );
   }
 }
@@ -175,119 +206,144 @@ class _MainScreenState extends State<MainScreen> {
 
   void _showUploadPreview(BuildContext context, File file, String name, bool isDirectory) {
     String password = '';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final lang = SettingsService().language.value;
     
-    showDialog(
+    showGeneralDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Container(
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              )
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A73E8).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      isDirectory ? Icons.folder_outlined : Icons.insert_drive_file_outlined, 
-                      color: const Color(0xFF1A73E8), size: 32
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      barrierDismissible: true,
+      barrierLabel: 'UploadPreview',
+      pageBuilder: (context, anim1, anim2) => const SizedBox.shrink(),
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.9, end: 1.0).animate(anim1),
+            child: Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: GlassCard(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        const Text('Upload Preview', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-                        Text(name, style: TextStyle(color: Colors.grey[600], fontSize: 13, overflow: TextOverflow.ellipsis)),
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          ),
+                          child: Icon(
+                            isDirectory ? Icons.folder_outlined : Icons.insert_drive_file_outlined, 
+                            color: AppColors.primary, size: 28
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(L10n.get('upload', lang), style: Theme.of(context).textTheme.titleLarge),
+                              Text(name, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              const Text('Double Encryption (Optional)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-              const SizedBox(height: 12),
-              TextField(
-                obscureText: true,
-                onChanged: (v) => password = v,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                decoration: InputDecoration(
-                  hintText: 'Enter password for extra security',
-                  hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
-                  filled: true,
-                  fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                  prefixIcon: const Icon(Icons.lock_outline, size: 20, color: Color(0xFF1A73E8)),
+                    const SizedBox(height: AppSpacing.xl),
+                    Text('DOUBLE ENCRYPTION (OPTIONAL)', style: Theme.of(context).textTheme.labelLarge),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextField(
+                      obscureText: true,
+                      onChanged: (v) => password = v,
+                      decoration: InputDecoration(
+                        hintText: 'Passphrase for extra security',
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd), borderSide: BorderSide.none),
+                        prefixIcon: const Icon(Icons.lock_outline, size: 20, color: AppColors.primary),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          flex: 2,
+                          child: AppButton(
+                            label: 'Confirm',
+                            onPressed: () {
+                              if (!AuthService().isAuthenticated) {
+                                Navigator.pop(context);
+                                _showAuthRequiredDialog(context);
+                                return;
+                              }
+                              Navigator.pop(context);
+                              _startBackgroundUpload(file, name, password);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: Text('Cancel', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Starting upload: $name'),
-                            action: SnackBarAction(
-                              label: 'View Activity',
-                              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TasksPage())),
-                            ),
-                          ),
-                        );
-                        _startBackgroundUpload(file, name, password);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1A73E8),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 0,
-                      ),
-                      child: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.w800)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showAuthRequiredDialog(BuildContext context) {
+    final lang = SettingsService().language.value;
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.account_circle_outlined, color: AppColors.primary),
+            const SizedBox(width: AppSpacing.sm),
+            Text(L10n.get('auth_required', lang)),
+          ],
         ),
+        content: Text(L10n.get('please_connect_google', lang)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
+          AppButton(
+            label: 'Connect',
+            isFullWidth: false,
+            onPressed: () {
+              Navigator.pop(c);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
+            },
+          ),
+        ],
       ),
     );
   }
 
   Future<void> _startBackgroundUpload(File file, String name, String password) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
+    
+    // Save task data for background isolate BEFORE starting
+    await FlutterForegroundTask.saveData(key: 'upload_path', value: file.path);
+    await FlutterForegroundTask.saveData(key: 'upload_pwd', value: password);
+    await FlutterForegroundTask.saveData(key: 'upload_id', value: taskId);
+    
+    // Also pass the current access token to avoid silent sign in issues in background
+    final token = await AuthService().getAccessToken();
+    if (token != null) {
+      await FlutterForegroundTask.saveData(key: 'upload_token', value: token);
+    }
     
     // Start Service if not running
     if (!await FlutterForegroundTask.isRunningService) {
@@ -296,34 +352,48 @@ class _MainScreenState extends State<MainScreen> {
         notificationText: 'Preparing $name...',
         callback: startCallback,
       );
+    } else {
+      // If already running, we might need a way to notify the task handler of the new task
+      // But for now, restart/start logic is fine for single task
     }
-
-    // Save task data for background isolate
-    await FlutterForegroundTask.saveData(key: 'upload_path', value: file.path);
-    await FlutterForegroundTask.saveData(key: 'upload_pwd', value: password);
-    await FlutterForegroundTask.saveData(key: 'upload_id', value: taskId);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    
     return AnnotatedRegion<services.SystemUiOverlayStyle>(
       value: _getSystemUIStyle(context),
       child: Scaffold(
-        extendBodyBehindAppBar: true,
         body: Stack(
           children: [
-            Positioned.fill(
+            // Theme-aware background
+            Container(
+              color: AppColors.getBackground(context),
+            ),
+            
+            // Background Blobs for Glassmorphisme (Design Rule)
+            Positioned(
+              top: -100,
+              left: -100,
               child: Container(
+                width: 300,
+                height: 300,
                 decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: const Alignment(-1, -1),
-                    radius: 1.5,
-                    colors: isDark
-                        ? [const Color(0xFF1E1B4B), const Color(0xFF020617)]
-                        : [const Color(0xFFE0E7FF), const Color(0xFFF8FAFC)],
-                  ),
+                  shape: BoxShape.circle,
+                  color: AppColors.primary.withOpacity(isDark ? 0.15 : 0.08),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -50,
+              right: -50,
+              child: Container(
+                width: 250,
+                height: 250,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.secondary.withOpacity(isDark ? 0.1 : 0.05),
                 ),
               ),
             ),
@@ -356,20 +426,20 @@ class _MainScreenState extends State<MainScreen> {
                       } else if (action == L10n.get('activity', lang)) {
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const TasksPage()));
                       } else if (action == 'File') {
-                        FilePickerResult? result = await FilePicker.pickFiles();
-                        if (result != null && mounted) {
-                          File file = File(result.files.single.path!);
-                          _showUploadPreview(context, file, result.files.single.name, false);
-                        }
+                          FilePickerResult? result = await FilePicker.platform.pickFiles();
+                          if (result != null && mounted) {
+                            File file = File(result.files.single.path!);
+                            _showUploadPreview(context, file, result.files.single.name, false);
+                          }
                       } else if (action == 'Camera') {
-                        final ImagePicker picker = ImagePicker();
-                        final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+                        final ImagePicker imagePicker = ImagePicker();
+                        final XFile? photo = await imagePicker.pickImage(source: ImageSource.camera);
                         if (photo != null && mounted) {
                           File file = File(photo.path);
                           _showUploadPreview(context, file, file.path.split('/').last, false);
                         }
                       } else if (action == 'Folder') {
-                        String? path = await FilePicker.getDirectoryPath();
+                        String? path = await FilePicker.platform.getDirectoryPath();
                         if (path != null && mounted) {
                           File file = File(path);
                           _showUploadPreview(context, file, path.split('/').last, true);

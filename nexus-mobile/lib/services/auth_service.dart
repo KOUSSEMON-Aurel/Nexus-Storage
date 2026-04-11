@@ -15,9 +15,6 @@ class AuthService {
       }
       _userStreamController.add(account);
     });
-    
-    // Silence sign in on start
-    signInSilently();
   }
 
   // Classic constructor for 6.x.x
@@ -35,9 +32,14 @@ class AuthService {
   GoogleSignInAccount? _currentUser;
   String? _googleSub;
   String? _lastError;
+  String? _backgroundToken;
 
   final StreamController<GoogleSignInAccount?> _userStreamController = StreamController<GoogleSignInAccount?>.broadcast();
   Stream<GoogleSignInAccount?> get userStream => _userStreamController.stream;
+
+  void setBackgroundToken(String token) {
+    _backgroundToken = token;
+  }
 
   Future<GoogleSignInAccount?> signInSilently() async {
     try {
@@ -78,16 +80,19 @@ class AuthService {
     await _googleSignIn.signOut();
     _currentUser = null;
     _googleSub = null;
+    _backgroundToken = null;
     _userStreamController.add(null);
   }
 
   Future<String?> getAccessToken() async {
+    if (_backgroundToken != null) return _backgroundToken;
     if (_currentUser == null) return null;
     final auth = await _currentUser!.authentication;
     return auth.accessToken;
   }
 
-  bool get isAuthenticated => _currentUser != null;
+  bool get isAuthenticated => _currentUser != null || _backgroundToken != null;
+  GoogleSignInAccount? get currentUser => _currentUser;
   String? get googleSub => _googleSub;
   String? get userName => _currentUser?.displayName;
   String? get userPhotoUrl => _currentUser?.photoUrl;

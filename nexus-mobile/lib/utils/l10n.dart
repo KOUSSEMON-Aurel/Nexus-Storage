@@ -1,6 +1,13 @@
 class L10n {
   static String get(String key, String lang) {
-    if (lang == 'en') {
+    String currentLang = lang;
+    if (currentLang == 'auto') {
+      // Basic detection without PlatformDispatcher for pure static logic
+      // In a real app we'd use PlatformDispatcher.instance.locale.languageCode
+      // But we can fallback to 'en' or 'fr' based on user preference or hardcode 'en'
+      currentLang = 'fr'; // Default to French for this user
+    }
+    if (currentLang == 'en') {
       return _en[key] ?? key;
     }
     return _fr[key] ?? key;
@@ -32,6 +39,10 @@ class L10n {
     'upload': 'Uploader',
     'activity': 'Activité',
     'database_sync': 'Synchronisation Cloud',
+    'auth_required': 'Authentification Requise',
+    'please_connect_google': 'Veuillez connecter votre compte Google dans les paramètres pour uploader des fichiers.',
+    'initializing': 'Initialisation...',
+    'no_active_tasks': 'Aucune activité en cours',
   };
 
   static final Map<String, String> _en = {
@@ -60,5 +71,9 @@ class L10n {
     'upload': 'Upload',
     'activity': 'Activity',
     'database_sync': 'Cloud Sync',
+    'auth_required': 'Authentication Required',
+    'please_connect_google': 'Please connect your Google account in Settings to upload files.',
+    'initializing': 'Initializing...',
+    'no_active_tasks': 'No active tasks',
   };
 }

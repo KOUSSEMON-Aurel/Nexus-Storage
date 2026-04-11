@@ -75,6 +75,44 @@ class FileRecord {
       'mode': mode,
     };
   }
+
+  FileRecord copyWith({
+    int? id,
+    String? path,
+    String? videoId,
+    int? size,
+    String? hash,
+    String? key,
+    String? lastUpdate,
+    bool? starred,
+    String? deletedAt,
+    int? parentId,
+    String? sha256,
+    String? fileKey,
+    bool? isArchive,
+    bool? hasCustomPassword,
+    String? customPasswordHint,
+    String? mode,
+  }) {
+    return FileRecord(
+      id: id ?? this.id,
+      path: path ?? this.path,
+      videoId: videoId ?? this.videoId,
+      size: size ?? this.size,
+      hash: hash ?? this.hash,
+      key: key ?? this.key,
+      lastUpdate: lastUpdate ?? this.lastUpdate,
+      starred: starred ?? this.starred,
+      deletedAt: deletedAt ?? this.deletedAt,
+      parentId: parentId ?? this.parentId,
+      sha256: sha256 ?? this.sha256,
+      fileKey: fileKey ?? this.fileKey,
+      isArchive: isArchive ?? this.isArchive,
+      hasCustomPassword: hasCustomPassword ?? this.hasCustomPassword,
+      customPasswordHint: customPasswordHint ?? this.customPasswordHint,
+      mode: mode ?? this.mode,
+    );
+  }
 }
 
 class FolderRecord {
