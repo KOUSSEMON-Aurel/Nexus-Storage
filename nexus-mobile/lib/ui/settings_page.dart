@@ -408,7 +408,7 @@ class _SettingsPageState extends State<SettingsPage> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
-        final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.lg;
+        final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.xl;
         return GlassCard(
           customBorderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
           padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, bottomPad),
@@ -491,7 +491,7 @@ class _SettingsPageState extends State<SettingsPage> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
-        final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.lg;
+        final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.xl;
         return GlassCard(
           customBorderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
           padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, bottomPad),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:nexus_mobile/services/database_service.dart';
 import 'package:nexus_mobile/services/settings_service.dart';
 import 'package:nexus_mobile/utils/l10n.dart';
@@ -38,10 +39,19 @@ class _FilesPageState extends State<FilesPage> {
     'trash': 'trash'
   };
 
+  StreamSubscription<void>? _dbSubscription;
+
   @override
   void initState() {
     super.initState();
     _refreshFiles();
+    _dbSubscription = _db.onChange.listen((_) => _refreshFiles());
+  }
+
+  @override
+  void dispose() {
+    _dbSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _refreshFiles() async {
@@ -247,7 +257,7 @@ class _FilesPageState extends State<FilesPage> {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started for selected items')));
                 _exitSelecting();
               }, 
-              icon: const Icon(Icons.download_rounded, color: AppColors.textPrimary)
+              icon: const Icon(Icons.download_rounded, color: AppColors.primary)
             ),
           ],
         ),
@@ -426,10 +436,10 @@ class _FilesPageState extends State<FilesPage> {
 
   void _showFileOptions(FileRecord file) {
     final bool isTrash = _currentTab == 'trash';
-    final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.lg;
-    
-    showModalBottomSheet(
-      context: context,
+    // Rehausser le menu pour éviter la barre de navigation OS
+    final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.xl;
+
+    showModalBottomSheet(      context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {

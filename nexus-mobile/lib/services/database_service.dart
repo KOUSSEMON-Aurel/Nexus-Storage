@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'dart:async';
 import '../models/file_record.dart';
 
 class DatabaseService {
@@ -9,6 +10,12 @@ class DatabaseService {
 
   Database? _db;
   Future<Database>? _dbFuture;
+
+  // Stream pour le rafraîchissement automatique
+  final _changeController = StreamController<void>.broadcast();
+  Stream<void> get onChange => _changeController.stream;
+
+  void notifyChange() => _changeController.add(null);
 
   Future<String> getDatabasePath() async {
     return join(await getDatabasesPath(), 'nexus.db');
@@ -205,11 +212,13 @@ class DatabaseService {
 
   Future<int> saveFile(FileRecord file) async {
     final db = await database;
-    return await db.insert(
+    final res = await db.insert(
       'files',
       file.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    notifyChange();
+    return res;
   }
 
   Future<void> softDelete(int id) async {
@@ -220,6 +229,7 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+    notifyChange();
   }
 
   Future<void> setKV(String key, String value) async {
