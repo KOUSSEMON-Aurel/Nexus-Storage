@@ -65,14 +65,31 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               // Subtle background gradient
               Container(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: const Alignment(0, -0.5),
-                    radius: 1.2,
-                    colors: [
-                      isDark ? const Color(0xFF1A1D23) : const Color(0xFFE2E8F0),
-                      AppColors.getBackground(context),
-                    ],
+                color: AppColors.getBackground(context),
+              ),
+
+              // Harmonized Background Blobs (matching MainScreen)
+              Positioned(
+                top: -100,
+                right: -100,
+                child: Container(
+                  width: 300,
+                  height: 300,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary.withOpacity(isDark ? 0.12 : 0.05),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 100,
+                left: -50,
+                child: Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.secondary.withOpacity(isDark ? 0.08 : 0.03),
                   ),
                 ),
               ),

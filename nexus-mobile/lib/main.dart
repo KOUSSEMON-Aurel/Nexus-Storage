@@ -11,6 +11,7 @@ import 'package:nexus_mobile/services/database_service.dart';
 import 'package:nexus_mobile/services/worker_service.dart';
 import 'package:nexus_mobile/services/nexus_service.dart';
 import 'package:nexus_mobile/services/task_handler.dart';
+import 'package:nexus_mobile/models/file_record.dart';
 import 'package:nexus_mobile/ui/files_page.dart';
 import 'package:nexus_mobile/ui/tasks_page.dart';
 import 'package:nexus_mobile/ui/settings_page.dart';
@@ -190,7 +191,27 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onReceiveTaskData(dynamic data) {
-    // Handle data from background
+    if (data == 'refresh') {
+      AppLogger.info('UI: Refresh signal received from background task');
+      DatabaseService().notifyChange();
+    }
+  }
+
+  void _pushSmooth(Widget page) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => page,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SharedAxisTransition(
+            animation: animation,
+            secondaryAnimation: secondaryAnimation,
+            transitionType: SharedAxisTransitionType.scaled,
+            child: child,
+          );
+        },
+      ),
+    );
   }
 
   services.SystemUiOverlayStyle _getSystemUIStyle(BuildContext context) {
@@ -323,7 +344,7 @@ class _MainScreenState extends State<MainScreen> {
             isFullWidth: false,
             onPressed: () {
               Navigator.pop(c);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
+              _pushSmooth(const SettingsPage());
             },
           ),
         ],
@@ -334,27 +355,45 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _startBackgroundUpload(File file, String name, String password) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
     
-    // Save task data for background isolate BEFORE starting
-    await FlutterForegroundTask.saveData(key: 'upload_path', value: file.path);
-    await FlutterForegroundTask.saveData(key: 'upload_pwd', value: password);
-    await FlutterForegroundTask.saveData(key: 'upload_id', value: taskId);
+    await FlutterForegroundTask.saveData(key: 'type', value: 'upload');
+    await FlutterForegroundTask.saveData(key: 'path', value: file.path);
+    await FlutterForegroundTask.saveData(key: 'pwd', value: password);
+    await FlutterForegroundTask.saveData(key: 'id', value: taskId);
     
-    // Also pass the current access token to avoid silent sign in issues in background
     final token = await AuthService().getAccessToken();
     if (token != null) {
-      await FlutterForegroundTask.saveData(key: 'upload_token', value: token);
+      await FlutterForegroundTask.saveData(key: 'token', value: token);
     }
     
-    // Start Service if not running
     if (!await FlutterForegroundTask.isRunningService) {
       await FlutterForegroundTask.startService(
         notificationTitle: 'Nexus: Upload Starting',
         notificationText: 'Preparing $name...',
         callback: startCallback,
       );
-    } else {
-      // If already running, we might need a way to notify the task handler of the new task
-      // But for now, restart/start logic is fine for single task
+    }
+  }
+
+  Future<void> _startBackgroundDownload(FileRecord record) async {
+    final taskId = DateTime.now().millisecondsSinceEpoch.toString();
+    
+    await FlutterForegroundTask.saveData(key: 'type', value: 'download');
+    await FlutterForegroundTask.saveData(key: 'video_id', value: record.videoId);
+    await FlutterForegroundTask.saveData(key: 'file_name', value: record.path.split('/').last);
+    await FlutterForegroundTask.saveData(key: 'pwd', value: record.key);
+    await FlutterForegroundTask.saveData(key: 'id', value: taskId);
+    
+    final token = await AuthService().getAccessToken();
+    if (token != null) {
+      await FlutterForegroundTask.saveData(key: 'token', value: token);
+    }
+    
+    if (!await FlutterForegroundTask.isRunningService) {
+      await FlutterForegroundTask.startService(
+        notificationTitle: 'Nexus: Download Starting',
+        notificationText: 'Fetching from YouTube...',
+        callback: startCallback,
+      );
     }
   }
 
@@ -398,8 +437,8 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
             
-            const SafeArea(
-              child: FilesPage(),
+            SafeArea(
+              child: FilesPage(onDownload: _startBackgroundDownload),
             ),
 
             // Speed Dial FAB
@@ -422,9 +461,9 @@ class _MainScreenState extends State<MainScreen> {
                     },
                     onActionTap: (action) async {
                       if (action == L10n.get('settings', lang)) {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
+                        _pushSmooth(const SettingsPage());
                       } else if (action == L10n.get('activity', lang)) {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const TasksPage()));
+                        _pushSmooth(const TasksPage());
                       } else if (action == 'File') {
                           FilePickerResult? result = await FilePicker.platform.pickFiles();
                           if (result != null && mounted) {

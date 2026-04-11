@@ -19,17 +19,20 @@ class _TasksPageState extends State<TasksPage> {
   final DatabaseService _db = DatabaseService();
   List<Map<String, dynamic>> _tasks = [];
   Timer? _timer;
+  StreamSubscription<void>? _dbSubscription;
 
   @override
   void initState() {
     super.initState();
     _fetchTasks();
     _timer = Timer.periodic(const Duration(seconds: 2), (_) => _fetchTasks());
+    _dbSubscription = _db.onChange.listen((_) => _fetchTasks());
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _dbSubscription?.cancel();
     super.dispose();
   }
 
@@ -40,19 +43,34 @@ class _TasksPageState extends State<TasksPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: AppColors.getBackground(context),
       body: Stack(
         children: [
           // Background Blobs (Design Rule)
           Positioned(
             top: -100,
-            right: -100,
+            left: -100,
             child: Container(
               width: 300,
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.secondary.withOpacity(0.1),
+                color: AppColors.primary.withOpacity(isDark ? 0.15 : 0.08),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -50,
+            right: -50,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.secondary.withOpacity(isDark ? 0.1 : 0.05),
               ),
             ),
           ),

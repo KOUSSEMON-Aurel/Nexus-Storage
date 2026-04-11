@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../ffi/nexus_bindings.dart';
 import '../ffi/nexus_loader.dart';
 import 'database_service.dart';
@@ -172,6 +173,164 @@ class NexusService {
       AppLogger.error('UPLOAD ERROR for $fileName: $e', e, s);
       await _db.updateTaskProgress(taskId, 0.0, 'Failed: ${e.toString().split('\n').first}');
       rethrow;
+    }
+  }
+
+  /// Download from YouTube, extract frames, decode and decrypt.
+  Future<void> downloadAndDecrypt(FileRecord record, String password, {String? explicitTaskId}) async {
+    final taskId = explicitTaskId ?? DateTime.now().millisecondsSinceEpoch.toString();
+    final fileName = record.path.split('/').last;
+
+    try {
+      // 0. Register Task
+      await _db.insertTask({
+        'id': taskId,
+        'type': 2, // Download
+        'file_path': record.path,
+        'status': 'Starting download...',
+        'progress': 0.1,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      if (await FlutterForegroundTask.isRunningService) {
+        FlutterForegroundTask.updateService(
+          notificationTitle: 'Nexus: Downloading $fileName',
+          notificationText: 'Status: Downloading from YouTube...',
+        );
+      }
+
+      AppLogger.info('Starting downloadAndDecrypt for $fileName (ID: ${record.videoId})');
+
+      // 1. Download Video (YouTube)
+      final videoFile = await _youtube.downloadVideo(
+        record.videoId,
+        onProgress: (p) {
+          _db.updateTaskProgress(taskId, 0.1 + (p * 0.4), 'Downloading... ${(p * 100).toInt()}%');
+        },
+      );
+
+      if (videoFile == null) throw NexusException('YouTube download failed');
+
+      await _db.updateTaskProgress(taskId, 0.5, 'Extracting frames...');
+      if (await FlutterForegroundTask.isRunningService) {
+        FlutterForegroundTask.updateService(notificationText: 'Status: Extracting frames...');
+      }
+
+      final tmpDir = await getTemporaryDirectory();
+      final framesDir = Directory('${tmpDir.path}/nexus-dl-$taskId');
+      await framesDir.create();
+
+      try {
+        // 2. Extract Frames (FFmpeg)
+        // We use -vsync 0 to get all frames or -r 30 if we know it's 30fps
+        final ffmpegCommand = '-i ${videoFile.path} -vsync 0 ${framesDir.path}/frame_%06d.png';
+        
+        final session = await FFmpegKit.execute(ffmpegCommand);
+        final returnCode = await session.getReturnCode();
+
+        if (!ReturnCode.isSuccess(returnCode)) {
+          final logs = await session.getAllLogsAsString();
+          throw NexusException('FFmpeg extraction failed: $logs');
+        }
+
+        // Check if frames were actually extracted
+        final frames = framesDir.listSync().where((e) => e.path.endsWith('.png')).toList();
+        if (frames.isEmpty) {
+          throw NexusException('No frames extracted from video. Decoding aborted.');
+        }
+
+        await _db.updateTaskProgress(taskId, 0.7, 'Decoding data...');
+        if (await FlutterForegroundTask.isRunningService) {
+          FlutterForegroundTask.updateService(notificationText: 'Status: Decoding data...');
+        }
+
+        // 3. Decode Frames to Encrypted Data (Rust)
+        final outPtrPtr = malloc<Pointer<Uint8>>();
+        final outLenPtr = malloc<Size>();
+        final framesDirPtr = framesDir.path.toNativeUtf8().cast<Char>();
+
+        try {
+          // Mode 0 = Tank (standard for this project)
+          int decodeRes = _native.nexus_decode_from_frames(framesDirPtr, 0, outPtrPtr, outLenPtr);
+          malloc.free(framesDirPtr);
+
+          if (decodeRes != 0) throw NexusException('Decoding failed with code: $decodeRes');
+
+          await _db.updateTaskProgress(taskId, 0.8, 'Decrypting...');
+          if (await FlutterForegroundTask.isRunningService) {
+            FlutterForegroundTask.updateService(notificationText: 'Status: Decrypting...');
+          }
+
+          // 4. Decrypt (Rust)
+          final decryptedPtrPtr = malloc<Pointer<Uint8>>();
+          final decryptedLenPtr = malloc<Size>();
+          final passPtr = password.toNativeUtf8().cast<Char>();
+
+          try {
+            int decryptRes = _native.nexus_decrypt(outPtrPtr.value, outLenPtr.value, passPtr, decryptedPtrPtr, decryptedLenPtr);
+            malloc.free(passPtr);
+
+            if (decryptRes != 0) throw NexusException('Decryption failed with code: $decryptRes (Check password)');
+
+            await _db.updateTaskProgress(taskId, 0.9, 'Saving to Downloads...');
+            
+            // 5. Save to Downloads
+            final downloadsDir = await _getPublicDownloadsDirectory();
+            final outputFile = File('${downloadsDir.path}/$fileName');
+            
+            // Ensure unique name if exists
+            var finalFile = outputFile;
+            int counter = 1;
+            while (await finalFile.exists()) {
+              final nameParts = fileName.split('.');
+              final ext = nameParts.length > 1 ? '.${nameParts.removeLast()}' : '';
+              final baseName = nameParts.join('.');
+              finalFile = File('${downloadsDir.path}/$baseName ($counter)$ext');
+              counter++;
+            }
+
+            final data = decryptedPtrPtr.value.asTypedList(decryptedLenPtr.value);
+            await finalFile.writeAsBytes(data);
+
+            await _db.updateTaskProgress(taskId, 1.0, 'completed');
+            AppLogger.info('Download completed: ${finalFile.path}');
+
+          } finally {
+            _native.nexus_free_bytes(decryptedPtrPtr.value, decryptedLenPtr.value);
+            malloc.free(decryptedPtrPtr);
+            malloc.free(decryptedLenPtr);
+          }
+        } finally {
+          _native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
+          malloc.free(outPtrPtr);
+          malloc.free(outLenPtr);
+        }
+      } finally {
+        if (await framesDir.exists()) await framesDir.delete(recursive: true);
+        if (await videoFile.exists()) await videoFile.delete();
+        // Also cleanup the parent tmp directory if empty
+        try {
+          if (videoFile.parent.listSync().isEmpty) await videoFile.parent.delete();
+        } catch (_) {}
+      }
+    } catch (e, s) {
+      AppLogger.error('DOWNLOAD ERROR for $fileName: $e', e, s);
+      await _db.updateTaskProgress(taskId, 0.0, 'Failed: ${e.toString().split('\n').first}');
+      rethrow;
+    }
+  }
+
+  Future<Directory> _getPublicDownloadsDirectory() async {
+    if (Platform.isAndroid) {
+      if (!await Permission.manageExternalStorage.isGranted) {
+        await Permission.manageExternalStorage.request();
+      }
+      final dir = Directory('/storage/emulated/0/Download/NexusStorage');
+      if (!await dir.exists()) await dir.create(recursive: true);
+      return dir;
+    } else {
+      final dir = await getDownloadsDirectory();
+      return dir ?? await getApplicationDocumentsDirectory();
     }
   }
 }

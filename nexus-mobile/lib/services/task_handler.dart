@@ -1,74 +1,137 @@
 import 'dart:io';
 import 'dart:isolate';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'nexus_service.dart';
 import 'database_service.dart';
 import 'auth_service.dart';
+import '../models/file_record.dart';
 
 @pragma('vm:entry-point')
 void startCallback() {
-  FlutterForegroundTask.setTaskHandler(UploadTaskHandler());
+  FlutterForegroundTask.setTaskHandler(NexusTaskHandler());
 }
 
-class UploadTaskHandler extends TaskHandler {
+class NexusTaskHandler extends TaskHandler {
   SendPort? _sendPort;
+  final FlutterLocalNotificationsPlugin _localNotifs = FlutterLocalNotificationsPlugin();
+
+  Future<void> _initLocalNotifs() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/launcher_icon');
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
+    await _localNotifs.initialize(initializationSettings);
+  }
+
+  Future<void> _showFinalNotification(String title, String body, bool success) async {
+    await _initLocalNotifs();
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'nexus_final_channel',
+      'Nexus Task Finished',
+      channelDescription: 'Notifications for completed Nexus tasks',
+      importance: Importance.high,
+      priority: Priority.high,
+      showWhen: true,
+      // This is the key: not ongoing, so it's swipable
+      ongoing: false, 
+      autoCancel: true,
+    );
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+    
+    await _localNotifs.show(
+      DateTime.now().millisecond, // unique id
+      title,
+      body,
+      platformChannelSpecifics,
+    );
+  }
 
   @override
   void onRepeatEvent(DateTime timestamp, SendPort? sendPort) {
-    // Repeated events if interval is set
   }
 
   @override
   void onDestroy(DateTime timestamp, SendPort? sendPort) {
-    // Cleanup
   }
 
   @override
   void onStart(DateTime timestamp, SendPort? sendPort) async {
     _sendPort = sendPort;
+    _sendPort?.send('refresh');
 
-    // 1. Initialize background isolate state
     await AuthService().signInSilently();
     
-    final token = await FlutterForegroundTask.getData<String>(key: 'upload_token');
+    final token = await FlutterForegroundTask.getData<String>(key: 'token');
     if (token != null) {
       AuthService().setBackgroundToken(token);
     }
 
-    final taskId = await FlutterForegroundTask.getData<String>(key: 'upload_id');
-    final filePath = await FlutterForegroundTask.getData<String>(key: 'upload_path');
-    final password = await FlutterForegroundTask.getData<String>(key: 'upload_pwd') ?? '';
+    final type = await FlutterForegroundTask.getData<String>(key: 'type');
+    final taskId = await FlutterForegroundTask.getData<String>(key: 'id');
+    final password = await FlutterForegroundTask.getData<String>(key: 'pwd') ?? '';
 
-    print('BACKGROUND: onStart called. TaskID: $taskId, Path: $filePath');
-
-    if (filePath != null && taskId != null) {
-      try {
-        final nexus = NexusService();
-        print('BACKGROUND: Starting upload for $taskId');
-        await nexus.encodeAndUpload(File(filePath), password, explicitTaskId: taskId);
-        
-        print('BACKGROUND: Upload completed for $taskId');
-        FlutterForegroundTask.updateService(
-          notificationTitle: 'Nexus: Upload Complete',
-          notificationText: 'File uploaded successfully.',
-        );
-        // Wait briefly so user can see it completed, then stop so it becomes dismissible
-        Future.delayed(const Duration(seconds: 3), () {
-          FlutterForegroundTask.stopService();
-        });
-      } catch (e) {
-        print('BACKGROUND ERROR for $taskId: $e');
-        FlutterForegroundTask.updateService(
-          notificationTitle: 'Nexus: Upload Failed',
-          notificationText: 'Error: $e',
-        );
-        Future.delayed(const Duration(seconds: 3), () {
-          FlutterForegroundTask.stopService();
-        });
-      }
-    } else {
-      print('BACKGROUND: Missing data. taskId: $taskId, filePath: $filePath');
+    if (taskId == null) {
       FlutterForegroundTask.stopService();
+      return;
+    }
+
+    try {
+      final nexus = NexusService();
+      String finalTitle = 'Task Complete';
+      String finalBody = 'Your file is ready.';
+      
+      if (type == 'upload') {
+        final filePath = await FlutterForegroundTask.getData<String>(key: 'path');
+        if (filePath == null) throw Exception('Missing upload path');
+        
+        await nexus.encodeAndUpload(File(filePath), password, explicitTaskId: taskId);
+        finalTitle = '✅ Upload Complete';
+        finalBody = 'File secured on YouTube.';
+      } else if (type == 'download') {
+        final videoId = await FlutterForegroundTask.getData<String>(key: 'video_id');
+        final fileName = await FlutterForegroundTask.getData<String>(key: 'file_name');
+        
+        if (videoId == null || fileName == null) throw Exception('Missing download data');
+
+        final record = FileRecord(
+          id: 0,
+          path: fileName,
+          videoId: videoId,
+          size: 0,
+          hash: '',
+          key: password,
+          lastUpdate: '',
+          starred: false,
+          sha256: '',
+          fileKey: '',
+          isArchive: false,
+          hasCustomPassword: password.isNotEmpty,
+          customPasswordHint: '',
+          mode: 'base',
+        );
+
+        await nexus.downloadAndDecrypt(record, password, explicitTaskId: taskId);
+        finalTitle = '✅ Download Complete';
+        finalBody = 'Saved: /Download/NexusStorage/$fileName';
+      }
+
+      _sendPort?.send('refresh');
+      
+      // 1. Stop Foreground Service (removes non-swipable notif)
+      await FlutterForegroundTask.stopService();
+
+      // 2. Show Standard swipable notification
+      await _showFinalNotification(finalTitle, finalBody, true);
+
+    } catch (e) {
+      print('BACKGROUND ERROR: $e');
+      _sendPort?.send('refresh');
+      
+      await FlutterForegroundTask.stopService();
+      await _showFinalNotification('❌ Task Failed', e.toString().split('\n').first, false);
     }
   }
 }

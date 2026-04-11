@@ -12,10 +12,13 @@ import 'package:nexus_mobile/ui/widgets/glass_card.dart';
 import 'package:nexus_mobile/ui/widgets/app_button.dart';
 import 'package:nexus_mobile/ui/widgets/skeleton_item.dart';
 import 'package:nexus_mobile/ui/settings_page.dart';
+import 'package:nexus_mobile/services/nexus_service.dart';
+import 'package:nexus_mobile/services/logger_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class FilesPage extends StatefulWidget {
-  const FilesPage({super.key});
+  final Function(FileRecord)? onDownload;
+  const FilesPage({super.key, this.onDownload});
 
   @override
   State<FilesPage> createState() => _FilesPageState();
@@ -24,6 +27,7 @@ class FilesPage extends StatefulWidget {
 class _FilesPageState extends State<FilesPage> {
   final DatabaseService _db = DatabaseService();
   final SettingsService _settings = SettingsService();
+  final NexusService _nexus = NexusService();
   List<FileRecord> _files = [];
   String _currentTab = 'my-drive';
   bool _isLoading = true;
@@ -55,17 +59,22 @@ class _FilesPageState extends State<FilesPage> {
   }
 
   Future<void> _refreshFiles() async {
-    setState(() => _isLoading = true);
-    // Simulate delay for smooth skeleton demonstration
-    await Future.delayed(const Duration(milliseconds: 600));
-    final files = await _db.listFiles(category: _currentTab);
-    if (mounted) {
-      setState(() {
-        _files = files;
-        _isLoading = false;
-        // Don't clear selection if we're just refreshing during bulk action, 
-        // but usually we exit selection mode after action.
-      });
+    final isInitial = _files.isEmpty && _isLoading;
+    if (isInitial) {
+      setState(() => _isLoading = true);
+    }
+    
+    try {
+      final files = await _db.listFiles(category: _currentTab);
+      if (mounted) {
+        setState(() {
+          _files = files;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      AppLogger.error('Refresh files error: $e');
     }
   }
 
@@ -254,6 +263,14 @@ class _FilesPageState extends State<FilesPage> {
             ],
             IconButton(
               onPressed: () {
+                for (var id in _selectedIds) {
+                  final file = _files.firstWhere((f) => f.id == id);
+                  if (widget.onDownload != null) {
+                    widget.onDownload!(file);
+                  } else {
+                    _nexus.downloadAndDecrypt(file, file.key);
+                  }
+                }
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started for selected items')));
                 _exitSelecting();
               }, 
@@ -471,6 +488,11 @@ class _FilesPageState extends State<FilesPage> {
                   title: const Text('Download Offline'),
                   onTap: () {
                     Navigator.pop(context);
+                    if (widget.onDownload != null) {
+                      widget.onDownload!(file);
+                    } else {
+                      _nexus.downloadAndDecrypt(file, file.key);
+                    }
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started...')));
                   },
                 ),

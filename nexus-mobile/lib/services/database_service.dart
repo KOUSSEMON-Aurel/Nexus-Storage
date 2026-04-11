@@ -273,6 +273,7 @@ class DatabaseService {
   Future<void> insertTask(Map<String, dynamic> task) async {
     final db = await database;
     await db.insert('tasks', task, conflictAlgorithm: ConflictAlgorithm.replace);
+    notifyChange();
   }
 
   Future<void> updateTaskProgress(String id, double progress, String status) async {
@@ -283,6 +284,7 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+    notifyChange();
   }
 
   Future<int> getTotalFileCount() async {

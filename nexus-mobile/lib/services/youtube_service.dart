@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt_explode;
 import 'auth_service.dart';
 
 class YouTubeService {
@@ -9,6 +10,7 @@ class YouTubeService {
   YouTubeService._internal();
 
   final AuthService _auth = AuthService();
+  final yt_explode.YoutubeExplode _yt = yt_explode.YoutubeExplode();
 
   Future<String?> uploadVideo({
     required File videoFile,
@@ -96,5 +98,43 @@ class YouTubeService {
     );
 
     return response.statusCode == 204;
+  }
+
+  Future<File?> downloadVideo(String videoId, {Function(double)? onProgress}) async {
+    try {
+      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
+      final streamInfo = manifest.muxed.withHighestBitrate();
+      
+      if (streamInfo == null) return null;
+
+      final tmpDir = await Directory.systemTemp.createTemp('nexus-dl-');
+      final videoFile = File('${tmpDir.path}/$videoId.mp4');
+      
+      final stream = _yt.videos.streamsClient.get(streamInfo);
+      final fileStream = videoFile.openWrite();
+      
+      int totalBytes = streamInfo.size.totalBytes;
+      int downloadedBytes = 0;
+
+      await for (final data in stream) {
+        fileStream.add(data);
+        downloadedBytes += data.length;
+        if (onProgress != null) {
+          onProgress(downloadedBytes / totalBytes);
+        }
+      }
+
+      await fileStream.flush();
+      await fileStream.close();
+      
+      return videoFile;
+    } catch (e) {
+      print('YouTube Download Error: $e');
+      return null;
+    }
+  }
+
+  void dispose() {
+    _yt.close();
   }
 }
