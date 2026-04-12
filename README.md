@@ -41,6 +41,14 @@ Most cloud storage is either expensive, limited, or surveilled. Nexus takes a di
 
 Your files are encrypted before they leave your machine. YouTube sees static. You get your files back perfectly.
 
+### Recent Hardening & Improvements (v5.3.4)
+
+The project has recently undergone a major industrial-grade hardening phase:
+- **Unified Streaming Pipeline**: Integrated a stateful, memory-safe Rust framing layer that handles large data streams with minimal RAM overhead.
+- **FFI Modernization**: Rewritten C-ABI bridge with strict memory ownership models, preventing leaks in cross-language boundaries (Rust ↔ Go ↔ Dart).
+- **Adversarial Resilience**: Protection against bit-flip corruption and chunk reordering in the CDN via cryptographic sequential tagging.
+- **Nexus Mobile (Flutter 3.x)**: Full UI modernization, zero-warning static analysis, and industrial logging integration.
+
 ---
 
 ## Architecture
@@ -68,11 +76,12 @@ Nexus is a three-layer microservice stack. Each layer has a single, well-defined
 └──────────────────────┘   └─────────────────────────────┘
 ```
 
-| Component | Language | Role |
-|---|---|---|
-| **Nexus Core** | Rust | Encryption, FEC, chromatic encoding/decoding |
-| **Nexus Daemon** | Go | Orchestration, API, SQLite index, cloud sync |
-| **Nexus GUI** | Tauri + React | Desktop interface, real-time upload/download telemetry |
+| Component        | Language      | Role                                                                 |
+| ---------------- | ------------- | -------------------------------------------------------------------- |
+| **Nexus Core**   | Rust          | Encryption, FEC, chromatic encoding/decoding, **Stateful Streaming** |
+| **Nexus Daemon** | Go            | Orchestration, API, SQLite index, cloud sync, FUSE mount             |
+| **Nexus GUI**    | Tauri + React | Desktop interface, real-time upload/download telemetry               |
+| **Nexus Mobile** | Flutter       | Mobile application for Android & iOS (Modern 3.x API)                |
 
 ---
 
@@ -101,10 +110,10 @@ graph LR
 
 **Chromatic Encoding — Two Modes**
 
-| Mode | Resolution | Density | Use Case |
-|---|---|---|---|
-| **Base** | 720p | 1 bit per 4×4 block (black/white) | Maximum resilience to re-encoding |
-| **High** | 4K | 3 bits per 4×4 block (8 grey levels) | 3× data density, WebM source required |
+| Mode     | Resolution | Density                              | Use Case                              |
+| -------- | ---------- | ------------------------------------ | ------------------------------------- |
+| **Base** | 720p       | 1 bit per 4×4 block (black/white)    | Maximum resilience to re-encoding     |
+| **High** | 4K         | 3 bits per 4×4 block (8 grey levels) | 3× data density, WebM source required |
 
 In Base mode, each block is either pure black or pure white — immune to YouTube's aggressive compression. In High mode, the decoder reads 8 precise luminance levels to extract 3 bits per block, requiring the original 4K WebM stream retrieved by `yt-dlp`.
 
@@ -136,13 +145,13 @@ The `flags=neighbor` flag in ffmpeg extraction preserves exact pixel values — 
 
 Nexus assumes the backend is **hostile**. Google can see upload timestamps and file sizes, but nothing else. The security model is designed around this assumption.
 
-| Property | Implementation |
-|---|---|
-| **Zero-knowledge** | Filenames, folder structures, and metadata are stored only in the local SQLite index — never uploaded to Google |
-| **Content indistinguishability** | Each shard appears as random chromatic noise; automated content analysis cannot flag it |
-| **Per-shard encryption** | XChaCha20-Poly1305 with authenticated encryption — any tampering is detected |
-| **Forward Error Correction** | RaptorQ fountain codes allow full reconstruction even if YouTube drops frames during processing |
-| **Local index** | `nexus.db` is the sole source of truth for your file tree; it never touches YouTube |
+| Property                         | Implementation                                                                                                  |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Zero-knowledge**               | Filenames, folder structures, and metadata are stored only in the local SQLite index — never uploaded to Google |
+| **Content indistinguishability** | Each shard appears as random chromatic noise; automated content analysis cannot flag it                         |
+| **Per-shard encryption**         | XChaCha20-Poly1305 with authenticated encryption — any tampering is detected                                    |
+| **Forward Error Correction**     | RaptorQ fountain codes allow full reconstruction even if YouTube drops frames during processing                 |
+| **Local index**                  | `nexus.db` is the sole source of truth for your file tree; it never touches YouTube                             |
 
 ### Zero-Password Architecture
 
@@ -168,12 +177,12 @@ graph TD
 - **Override available** — Any file can be encrypted with a custom password instead; legacy files are unaffected
 - **No brute-force surface** — There is no password to attack
 
-| Threat | Status |
-|---|---|
-| Brute-force master password | Eliminated — no master password exists |
+| Threat                      | Status                                     |
+| --------------------------- | ------------------------------------------ |
+| Brute-force master password | Eliminated — no master password exists     |
 | Key interception in transit | Impossible — key never leaves local memory |
-| Google account compromise | Attacker sees encrypted video noise only |
-| Daemon compromise | `googleSub` never persisted to disk |
+| Google account compromise   | Attacker sees encrypted video noise only   |
+| Daemon compromise           | `googleSub` never persisted to disk        |
 
 ---
 
@@ -230,14 +239,14 @@ nexus.db-shm      (never pushed)
 
 ### Startup State Matrix
 
-| Local State | Remote Backup | Action |
-|---|---|---|
-| Corrupt | Exists | Force pull + restore |
-| Corrupt | Missing | Initialize fresh DB |
-| Empty (LSN = 0) | Exists | Pull |
-| Empty (LSN = 0) | Missing | Stay empty |
-| Healthy (LSN > 0) | Remote newer | Pull |
-| Healthy (LSN > 0) | Local newer or equal | Stay local |
+| Local State       | Remote Backup        | Action               |
+| ----------------- | -------------------- | -------------------- |
+| Corrupt           | Exists               | Force pull + restore |
+| Corrupt           | Missing              | Initialize fresh DB  |
+| Empty (LSN = 0)   | Exists               | Pull                 |
+| Empty (LSN = 0)   | Missing              | Stay empty           |
+| Healthy (LSN > 0) | Remote newer         | Pull                 |
+| Healthy (LSN > 0) | Local newer or equal | Stay local           |
 
 **Network resilience:** All Drive operations run with a 60s timeout and exponential backoff retry (up to 3 attempts: 1s, 2s, 4s delays). The daemon will never hang indefinitely on a network failure.
 
@@ -245,14 +254,14 @@ nexus.db-shm      (never pushed)
 
 ## Performance
 
-| Feature | Specification | Benefit |
-|---|---|---|
-| **File search** | SQLite FTS5 full-text | Sub-millisecond search across terabytes of indexed data |
-| **Virtual mount** | Rclone FUSE / WebDAV | Mount as a local drive (`D:`, `Z:`, `/mnt/nexus`) |
-| **Background sync** | Async worker queue | Uploads and downloads run without blocking the GUI |
-| **Thread safety** | Global mutex (CGO) | Concurrent access from GUI, CLI, and daemon is safe |
-| **Frame extraction** | ffmpeg `flags=neighbor` | Pixel-perfect High mode recovery |
-| **4K source** | yt-dlp WebM | Only WebM preserves full 4K grey levels from YouTube |
+| Feature              | Specification           | Benefit                                                 |
+| -------------------- | ----------------------- | ------------------------------------------------------- |
+| **File search**      | SQLite FTS5 full-text   | Sub-millisecond search across terabytes of indexed data |
+| **Virtual mount**    | Rclone FUSE / WebDAV    | Mount as a local drive (`D:`, `Z:`, `/mnt/nexus`)       |
+| **Background sync**  | Async worker queue      | Uploads and downloads run without blocking the GUI      |
+| **Thread safety**    | Global mutex (CGO)      | Concurrent access from GUI, CLI, and daemon is safe     |
+| **Frame extraction** | ffmpeg `flags=neighbor` | Pixel-perfect High mode recovery                        |
+| **4K source**        | yt-dlp WebM             | Only WebM preserves full 4K grey levels from YouTube    |
 
 ---
 
@@ -322,14 +331,14 @@ Nexus-Storage/
 
 ## Encoding Specification
 
-| Parameter | Base Mode | High Mode |
-|---|---|---|
-| Resolution | 1280×720 | 3840×2160 (4K) |
-| Block size | 4×4 pixels | 4×4 pixels |
-| Bits per block | 1 | 3 |
-| Encoding | Black / White | 8 grey levels |
-| Download format | Any | WebM 4K only |
-| YouTube resilience | Maximum | Requires source stream |
+| Parameter          | Base Mode     | High Mode              |
+| ------------------ | ------------- | ---------------------- |
+| Resolution         | 1280×720      | 3840×2160 (4K)         |
+| Block size         | 4×4 pixels    | 4×4 pixels             |
+| Bits per block     | 1             | 3                      |
+| Encoding           | Black / White | 8 grey levels          |
+| Download format    | Any           | WebM 4K only           |
+| YouTube resilience | Maximum       | Requires source stream |
 
 ---
 
