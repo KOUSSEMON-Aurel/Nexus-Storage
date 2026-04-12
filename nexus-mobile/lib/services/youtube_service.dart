@@ -104,7 +104,9 @@ class YouTubeService {
   Future<File?> downloadVideo(String videoId, {Function(double)? onProgress}) async {
     try {
       final manifest = await _yt.videos.streamsClient.getManifest(videoId);
-      final streamInfo = manifest.muxed.withHighestBitrate();
+      final streamInfo = manifest.videoOnly.isNotEmpty 
+          ? manifest.videoOnly.withHighestBitrate() 
+          : manifest.muxed.withHighestBitrate();
       
       // Removed redundant null-check as per analyzer
 

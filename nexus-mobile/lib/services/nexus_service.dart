@@ -11,6 +11,7 @@ import '../ffi/nexus_bindings.dart';
 import '../ffi/nexus_loader.dart';
 import 'database_service.dart';
 import 'youtube_service.dart';
+import 'sync_service.dart';
 import '../models/file_record.dart';
 import 'logger_service.dart';
 import '../utils/exceptions.dart';
@@ -176,6 +177,11 @@ class NexusService {
       );
 
       await _db.saveFile(record);
+      try {
+        await SyncService().pushDatabase();
+      } catch (e) {
+        AppLogger.warn('Auto-sync failed: $e');
+      }
       await _db.updateTaskProgress(taskId, 1.0, 'completed');
       AppLogger.info('Upload complete for $fileName');
     } catch (e, s) {
