@@ -2,8 +2,7 @@
 // TUI Authentication screen for V4 password-based login
 
 use ratatui::{
-    backend::Backend,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
@@ -62,7 +61,7 @@ impl AuthScreen {
 }
 
 pub fn draw_auth_screen(f: &mut Frame, auth: &AuthScreen, _daemon_url: &str) {
-    let size = f.size();
+    let size = f.area();
 
     let vertical = Layout::default()
         .direction(Direction::Vertical)

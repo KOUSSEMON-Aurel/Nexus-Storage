@@ -7,7 +7,23 @@ class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   
+  final List<String> _scopes = [
+    'openid',
+    'email',
+    'profile',
+    'https://www.googleapis.com/auth/youtube.force-ssl',
+    'https://www.googleapis.com/auth/monitoring.read',
+    'https://www.googleapis.com/auth/drive.file',
+  ];
+
+  // Using late final with explicit type
+  late final GoogleSignIn _googleSignIn;
+
   AuthService._internal() {
+    _googleSignIn = GoogleSignIn(
+      scopes: _scopes,
+    );
+    
     _googleSignIn.onCurrentUserChanged.listen((GoogleSignInAccount? account) {
       _currentUser = account;
       if (account != null) {
@@ -17,18 +33,6 @@ class AuthService {
       _userStreamController.add(account);
     });
   }
-
-  // Classic constructor for 6.x.x
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: [
-      'openid',
-      'email',
-      'profile',
-      'https://www.googleapis.com/auth/youtube.force-ssl',
-      'https://www.googleapis.com/auth/monitoring.read',
-      'https://www.googleapis.com/auth/drive.file',
-    ],
-  );
 
   GoogleSignInAccount? _currentUser;
   String? _googleSub;
@@ -60,6 +64,7 @@ class AuthService {
     try {
       _lastError = null;
       AppLogger.info('DEBUG: Starting Google Sign-In...');
+      
       final account = await _googleSignIn.signIn();
       
       if (account != null) {
@@ -88,8 +93,14 @@ class AuthService {
   Future<String?> getAccessToken() async {
     if (_backgroundToken != null) return _backgroundToken;
     if (_currentUser == null) return null;
-    final auth = await _currentUser!.authentication;
-    return auth.accessToken;
+    
+    try {
+      final GoogleSignInAuthentication auth = await _currentUser!.authentication;
+      return auth.accessToken;
+    } catch (e) {
+      AppLogger.error('DEBUG: GetAccessToken Error: $e');
+      return null;
+    }
   }
 
   bool get isAuthenticated => _currentUser != null || _backgroundToken != null;

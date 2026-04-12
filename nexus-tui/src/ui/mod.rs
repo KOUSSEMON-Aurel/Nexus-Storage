@@ -15,11 +15,12 @@ pub mod helpers;
 pub mod auth_ui;
 
 pub fn render(f: &mut Frame, app: &mut AppState) {
-    let area = f.size();
+    let area = f.area();
+
 
     // Handle authentication screen
     if app.mode == AppMode::Authentication {
-        let mut auth = crate::ui::auth_ui::AuthScreen::new();
+        let auth = crate::ui::auth_ui::AuthScreen::new();
         crate::ui::auth_ui::draw_auth_screen(f, &auth, "http://127.0.0.1:8080");
         return;
     }

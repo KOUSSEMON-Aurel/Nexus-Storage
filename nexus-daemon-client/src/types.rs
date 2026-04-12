@@ -1,5 +1,22 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SessionStartRequest {
+    pub master_key_hex: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct SessionStartResponse {
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct SessionEndResponse {
+    pub status: String,
+    pub message: String,
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct AuthStatus {

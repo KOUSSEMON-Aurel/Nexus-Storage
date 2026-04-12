@@ -21,7 +21,7 @@ pub struct SessionEndResponse {
     pub message: String,
 }
 
-pub async fn session_start(client: &Client, base_url: &str, master_key: &str) -> anyhow::Result<SessionStartResponse> {
+pub async fn (client: &Client, base_url: &str, master_key: &str) -> anyhow::Result<SessionStartResponse> {
     let req = SessionStartRequest {
         master_key_hex: master_key.to_string(),
     };

@@ -88,19 +88,13 @@ void _initForegroundTask() {
       channelDescription: 'Handles secure file uploads in background.',
       channelImportance: NotificationChannelImportance.LOW,
       priority: NotificationPriority.LOW,
-      iconData: const NotificationIconData(
-        resType: ResourceType.mipmap,
-        resPrefix: ResourcePrefix.ic,
-        name: 'launcher',
-      ),
     ),
     iosNotificationOptions: const IOSNotificationOptions(
       showNotification: true,
       playSound: false,
     ),
-    foregroundTaskOptions: const ForegroundTaskOptions(
-      interval: 5000,
-      isOnceEvent: false,
+    foregroundTaskOptions: ForegroundTaskOptions(
+      eventAction: ForegroundTaskEventAction.nothing(),
       autoRunOnBoot: true,
       allowWakeLock: true,
       allowWifiLock: true,
@@ -178,11 +172,12 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    FlutterForegroundTask.receivePort?.listen(_onReceiveTaskData);
+    FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
   }
 
   @override
   void dispose() {
+    FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
     super.dispose();
   }
 
@@ -365,6 +360,7 @@ class _MainScreenState extends State<MainScreen> {
       await FlutterForegroundTask.startService(
         notificationTitle: 'Nexus: Upload Starting',
         notificationText: 'Preparing $name...',
+        serviceTypes: [ForegroundServiceTypes.dataSync],
         callback: startCallback,
       );
     }
@@ -387,7 +383,8 @@ class _MainScreenState extends State<MainScreen> {
     if (!await FlutterForegroundTask.isRunningService) {
       await FlutterForegroundTask.startService(
         notificationTitle: 'Nexus: Download Starting',
-        notificationText: 'Fetching from YouTube...',
+        notificationText: 'Fetching ${record.path.split('/').last}...',
+        serviceTypes: [ForegroundServiceTypes.dataSync],
         callback: startCallback,
       );
     }
@@ -461,7 +458,7 @@ class _MainScreenState extends State<MainScreen> {
                       } else if (action == L10n.get('activity', lang)) {
                         _pushSmooth(const TasksPage());
                       } else if (action == 'File') {
-                          FilePickerResult? result = await FilePicker.platform.pickFiles();
+                          FilePickerResult? result = await FilePicker.pickFiles();
                           if (result != null && mounted) {
                             if (!context.mounted) return;
                             File file = File(result.files.single.path!);
@@ -476,7 +473,7 @@ class _MainScreenState extends State<MainScreen> {
                           _showUploadPreview(context, file, file.path.split('/').last, false);
                         }
                       } else if (action == 'Folder') {
-                        String? path = await FilePicker.platform.getDirectoryPath();
+                        String? path = await FilePicker.getDirectoryPath();
                         if (path != null && mounted) {
                           if (!context.mounted) return;
                           File file = File(path);

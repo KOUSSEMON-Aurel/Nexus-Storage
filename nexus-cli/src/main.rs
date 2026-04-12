@@ -75,7 +75,7 @@ async fn handle_auth(client: &NexusClient, cmd: &AuthCommands, json: bool) -> Re
         }
         AuthCommands::SessionEnd => {
             if !json { println!("{} Fermeture de la session...", style("🚪").bold()); }
-            // client.session_end().await?;
+            client.session_end().await?;
             if !json { println!("{} Session fermée.", style("✓").green()); }
         }
         AuthCommands::Logout => {

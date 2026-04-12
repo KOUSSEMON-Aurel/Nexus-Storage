@@ -223,4 +223,30 @@ impl NexusClient {
             Err(NexusError::ApiError(res.text().await.unwrap_or_default()))
         }
     }
+
+    pub async fn session_start(&self, master_key_hex: &str) -> Result<SessionStartResponse, NexusError> {
+        let req = SessionStartRequest {
+            master_key_hex: master_key_hex.to_string(),
+        };
+
+        let res = self.client.post(format!("{}/api/auth/session-start", self.base_url))
+            .json(&req).send().await?;
+
+        if res.status().is_success() {
+            Ok(res.json().await?)
+        } else {
+            Err(NexusError::ApiError(res.text().await.unwrap_or_default()))
+        }
+    }
+
+    pub async fn session_end(&self) -> Result<SessionEndResponse, NexusError> {
+        let res = self.client.post(format!("{}/api/auth/session-end", self.base_url))
+            .send().await?;
+
+        if res.status().is_success() {
+            Ok(res.json().await?)
+        } else {
+            Err(NexusError::ApiError(res.text().await.unwrap_or_default()))
+        }
+    }
 }

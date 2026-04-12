@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:isolate';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'nexus_service.dart';
@@ -13,54 +12,60 @@ void startCallback() {
 }
 
 class NexusTaskHandler extends TaskHandler {
-  SendPort? _sendPort;
   final FlutterLocalNotificationsPlugin _localNotifs = FlutterLocalNotificationsPlugin();
 
   Future<void> _initLocalNotifs() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/launcher_icon');
-    const InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
-    await _localNotifs.initialize(initializationSettings);
+    try {
+      const AndroidInitializationSettings initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/launcher_icon');
+      const InitializationSettings initializationSettings =
+          InitializationSettings(android: initializationSettingsAndroid);
+      await _localNotifs.initialize(settings: initializationSettings);
+    } catch (e) {
+      AppLogger.warn('Failed to init local notifications in background: $e');
+    }
   }
 
   Future<void> _showFinalNotification(String title, String body, bool success) async {
-    await _initLocalNotifs();
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'nexus_final_channel',
-      'Nexus Task Finished',
-      channelDescription: 'Notifications for completed Nexus tasks',
-      importance: Importance.high,
-      priority: Priority.high,
-      showWhen: true,
-      // This is the key: not ongoing, so it's swipable
-      ongoing: false, 
-      autoCancel: true,
-    );
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-    
-    await _localNotifs.show(
-      DateTime.now().millisecond, // unique id
-      title,
-      body,
-      platformChannelSpecifics,
-    );
+    try {
+      await _initLocalNotifs();
+      const AndroidNotificationDetails androidPlatformChannelSpecifics =
+          AndroidNotificationDetails(
+        'nexus_final_channel',
+        'Nexus Task Finished',
+        channelDescription: 'Notifications for completed Nexus tasks',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        ongoing: false, 
+        autoCancel: true,
+      );
+      const NotificationDetails platformChannelSpecifics =
+          NotificationDetails(android: androidPlatformChannelSpecifics);
+      
+      await _localNotifs.show(
+        id: DateTime.now().millisecond,
+        title: title,
+        body: body,
+        notificationDetails: platformChannelSpecifics,
+      );
+    } catch (e) {
+      AppLogger.error('Failed to show final notification: $e');
+    }
   }
 
   @override
-  void onRepeatEvent(DateTime timestamp, SendPort? sendPort) {
+  void onRepeatEvent(DateTime timestamp) {
   }
 
   @override
-  void onDestroy(DateTime timestamp, SendPort? sendPort) {
+  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
   }
 
   @override
-  void onStart(DateTime timestamp, SendPort? sendPort) async {
-    _sendPort = sendPort;
-    _sendPort?.send('refresh');
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
+    AppLogger.info('BACKGROUND TASK STARTING AT $timestamp');
+    FlutterForegroundTask.sendDataToMain('refresh');
 
     await AuthService().signInSilently();
     
@@ -118,7 +123,7 @@ class NexusTaskHandler extends TaskHandler {
         finalBody = 'Saved: /Download/NexusStorage/$fileName';
       }
 
-      _sendPort?.send('refresh');
+      FlutterForegroundTask.sendDataToMain('refresh');
       
       // 1. Stop Foreground Service (removes non-swipable notif)
       await FlutterForegroundTask.stopService();
@@ -128,7 +133,7 @@ class NexusTaskHandler extends TaskHandler {
 
     } catch (e) {
       AppLogger.error('BACKGROUND ERROR: $e');
-      _sendPort?.send('refresh');
+      FlutterForegroundTask.sendDataToMain('refresh');
       
       await FlutterForegroundTask.stopService();
       await _showFinalNotification('❌ Task Failed', e.toString().split('\n').first, false);
