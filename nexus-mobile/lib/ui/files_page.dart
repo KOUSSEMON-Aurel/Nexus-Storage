@@ -122,13 +122,19 @@ class _FilesPageState extends State<FilesPage> {
     
     try {
       if (action == 'trash') {
-        for (var id in ids) await _db.softDelete(id);
+        for (var id in ids) {
+          await _db.softDelete(id);
+        }
       } else if (action == 'delete') {
         final db = await _db.database;
-        for (var id in ids) await db.delete('files', where: 'id = ?', whereArgs: [id]);
+        for (var id in ids) {
+          await db.delete('files', where: 'id = ?', whereArgs: [id]);
+        }
       } else if (action == 'restore') {
         final db = await _db.database;
-        for (var id in ids) await db.update('files', {'deleted_at': null}, where: 'id = ?', whereArgs: [id]);
+        for (var id in ids) {
+          await db.update('files', {'deleted_at': null}, where: 'id = ?', whereArgs: [id]);
+        }
       } else if (action == 'star') {
         // Toggle star for first item and apply to all? 
         // Better: toggle based on first item
@@ -153,7 +159,7 @@ class _FilesPageState extends State<FilesPage> {
       builder: (context, lang, child) {
         return PopScope(
           canPop: !_isSelecting,
-          onPopInvoked: (didPop) {
+          onPopInvokedWithResult: (didPop, result) {
             if (!didPop && _isSelecting) _exitSelecting();
           },
           child: RefreshIndicator(
@@ -306,7 +312,7 @@ class _FilesPageState extends State<FilesPage> {
               AppButton(
                 label: 'Connect',
                 isFullWidth: false,
-                backgroundColor: AppColors.warning.withOpacity(0.2),
+                backgroundColor: AppColors.warning.withValues(alpha: 0.2),
                 onPressed: () {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
                 },
@@ -336,7 +342,7 @@ class _FilesPageState extends State<FilesPage> {
                 color: isSelected ? AppColors.primary : AppColors.surfaceElevated,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 boxShadow: isSelected 
-                  ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 4))] 
+                  ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 4))] 
                   : null,
               ),
               child: Text(
@@ -376,7 +382,7 @@ class _FilesPageState extends State<FilesPage> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
             border: Border.all(
-              color: isSelected ? AppColors.primary : Colors.white.withOpacity(0.1),
+              color: isSelected ? AppColors.primary : Colors.white.withValues(alpha: 0.1),
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -395,7 +401,7 @@ class _FilesPageState extends State<FilesPage> {
                 : Container(
                     padding: const EdgeInsets.all(AppSpacing.sm),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                     ),
                     child: Icon(

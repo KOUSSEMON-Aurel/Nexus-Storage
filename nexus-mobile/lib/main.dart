@@ -8,8 +8,6 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'dart:io';
 
 import 'package:nexus_mobile/services/database_service.dart';
-import 'package:nexus_mobile/services/worker_service.dart';
-import 'package:nexus_mobile/services/nexus_service.dart';
 import 'package:nexus_mobile/services/task_handler.dart';
 import 'package:nexus_mobile/models/file_record.dart';
 import 'package:nexus_mobile/ui/files_page.dart';
@@ -23,10 +21,12 @@ import 'package:nexus_mobile/theme/app_theme.dart';
 import 'package:nexus_mobile/theme/app_colors.dart';
 import 'package:nexus_mobile/theme/app_spacing.dart';
 import 'package:nexus_mobile/utils/l10n.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:animations/animations.dart';
 import 'package:nexus_mobile/ui/widgets/glass_card.dart';
 import 'package:nexus_mobile/ui/widgets/app_button.dart';
+
+import 'package:nexus_mobile/services/cleanup_service.dart';
+import 'package:nexus_mobile/core/thermal_monitor.dart';
 
 void main() async {
   try {
@@ -36,16 +36,9 @@ void main() async {
     AppLogger.info('Initializing Nexus Storage...');
     
     _initForegroundTask();
+    ThermalMonitor.start(); // Start thermal monitoring
 
-    // System UI Configuration (Native Performance)
-    services.SystemChrome.setSystemUIOverlayStyle(const services.SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      systemNavigationBarColor: AppColors.background,
-      systemNavigationBarIconBrightness: Brightness.light,
-      statusBarIconBrightness: Brightness.light,
-    ));
-    await services.SystemChrome.setEnabledSystemUIMode(services.SystemUiMode.edgeToEdge);
-    await services.SystemChrome.setPreferredOrientations([services.DeviceOrientation.portraitUp]);
+    // ... (rest of main code until Validation at startup)
 
     // Validation at startup (Rule 8)
     await Future.wait([
@@ -54,6 +47,9 @@ void main() async {
       SettingsService().init(),
       AuthService().signInSilently(),
     ]);
+
+    // Cleanup orphaned sessions
+    await CleanupService.performStartupCleanup();
 
     AppLogger.info('Startup validation successful.');
     FlutterNativeSplash.remove();
@@ -253,7 +249,7 @@ class _MainScreenState extends State<MainScreen> {
                         Container(
                           padding: const EdgeInsets.all(AppSpacing.sm),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: AppColors.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                           ),
                           child: Icon(
@@ -282,7 +278,7 @@ class _MainScreenState extends State<MainScreen> {
                       decoration: InputDecoration(
                         hintText: 'Passphrase for extra security',
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.05),
+                        fillColor: Colors.white.withValues(alpha: 0.05),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd), borderSide: BorderSide.none),
                         prefixIcon: const Icon(Icons.lock_outline, size: 20, color: AppColors.primary),
                       ),
@@ -420,7 +416,7 @@ class _MainScreenState extends State<MainScreen> {
                 height: 300,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primary.withOpacity(isDark ? 0.15 : 0.08),
+                  color: AppColors.primary.withValues(alpha: isDark ? 0.15 : 0.08),
                 ),
               ),
             ),
@@ -432,7 +428,7 @@ class _MainScreenState extends State<MainScreen> {
                 height: 250,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.secondary.withOpacity(isDark ? 0.1 : 0.05),
+                  color: AppColors.secondary.withValues(alpha: isDark ? 0.1 : 0.05),
                 ),
               ),
             ),
@@ -467,6 +463,7 @@ class _MainScreenState extends State<MainScreen> {
                       } else if (action == 'File') {
                           FilePickerResult? result = await FilePicker.platform.pickFiles();
                           if (result != null && mounted) {
+                            if (!context.mounted) return;
                             File file = File(result.files.single.path!);
                             _showUploadPreview(context, file, result.files.single.name, false);
                           }
@@ -474,12 +471,14 @@ class _MainScreenState extends State<MainScreen> {
                         final ImagePicker imagePicker = ImagePicker();
                         final XFile? photo = await imagePicker.pickImage(source: ImageSource.camera);
                         if (photo != null && mounted) {
+                          if (!context.mounted) return;
                           File file = File(photo.path);
                           _showUploadPreview(context, file, file.path.split('/').last, false);
                         }
                       } else if (action == 'Folder') {
                         String? path = await FilePicker.platform.getDirectoryPath();
                         if (path != null && mounted) {
+                          if (!context.mounted) return;
                           File file = File(path);
                           _showUploadPreview(context, file, path.split('/').last, true);
                         }

@@ -1,15 +1,12 @@
 import 'dart:async';
-import 'database_service.dart';
-import 'nexus_service.dart';
-import 'nexus_ffmpeg.dart';
 
 class WorkerService {
   static final WorkerService _instance = WorkerService._internal();
   factory WorkerService() => _instance;
   WorkerService._internal();
 
-  final DatabaseService _db = DatabaseService();
-  final NexusService _nexus = NexusService();
+  // final DatabaseService _db = DatabaseService();
+  // final NexusService _nexus = NexusService();
   
   bool _isRunning = false;
   Timer? _timer;
@@ -27,7 +24,7 @@ class WorkerService {
 
   Future<void> _processTasks() async {
     // 1. Fetch pending tasks from DB
-    final tasks = await _db.getPendingTasks(); // We'll need to implement this correctly in DB service
+    // final tasks = await _db.getPendingTasks(); 
     
     // 2. Process them one by one
     // For now, this is a placeholder for the full job queue logic

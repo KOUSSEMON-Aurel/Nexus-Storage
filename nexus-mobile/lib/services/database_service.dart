@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:async';
 import '../models/file_record.dart';
+import 'logger_service.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -177,7 +178,7 @@ class DatabaseService {
         END
       ''');
     } catch (e) {
-      print("⚠️ FTS5 not supported: $e");
+      AppLogger.warn("FTS5 not supported: $e");
     }
 
     // Default Values

@@ -58,6 +58,7 @@ dependencies:
   shimmer: ^3.0.0
   connectivity_plus: ^7.1.1
   logger: ^2.7.0
+  crypto: ^3.0.6
   flutter_native_splash: ^2.4.7
 
 flutter_native_splash:

@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'database_service.dart';
@@ -33,22 +32,18 @@ class SyncService {
         throw AuthException('Google connection required for sync.');
       }
 
-      AppLogger.info('Starting sync push with token starting with ${token.substring(0, 10)}...');
+      AppLogger.info('Starting sync push...');
 
       final folderId = await _getFolderId('Nexus-Recovery', token);
-      AppLogger.info('Folder ID for Nexus-Recovery: $folderId');
-
       final manifestBytes = await _downloadFileFromDrive('nexus-sync.json', token, folderId: folderId);
+      
       int remoteLSN = 0;
       String remoteHash = '';
       
       if (manifestBytes != null) {
-        AppLogger.info('Found existing remote manifest');
         final remoteManifest = jsonDecode(utf8.decode(manifestBytes));
         remoteLSN = remoteManifest['lsn'] as int;
         remoteHash = remoteManifest['hash_sha256'] as String;
-      } else {
-        AppLogger.info('No remote manifest found, will create new');
       }
 
       final localLSNStr = await _db.getKV('manifest_version') ?? '0';
@@ -60,11 +55,8 @@ class SyncService {
       final bytes = await dbFile.readAsBytes();
       final localHash = sha256.convert(bytes).toString();
 
-      AppLogger.info('Local DB: LSN $localLSN, Hash ${localHash.substring(0, 8)}');
-
       if (manifestBytes != null) {
         if (remoteLSN > localLSN) {
-          AppLogger.warn('Sync Conflict: Remote LSN ($remoteLSN) > Local LSN ($localLSN)');
           throw SyncException('Remote version ($remoteLSN) is newer. Pull required.', code: 'PULL_REQUIRED');
         }
         if (remoteLSN == localLSN && remoteHash == localHash) {
@@ -91,23 +83,8 @@ class SyncService {
       await _db.setKV('last_push_hash', localHash);
       
       AppLogger.info('✅ DB pushed to Drive (LSN $localLSN)');
-      await _db.insertTask({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'file_path': 'Database Push',
-        'status': 'completed',
-        'progress': 1.0,
-        'created_at': DateTime.now().toIso8601String()
-      });
     } catch (e, s) {
       AppLogger.error('Sync push failed: $e', e, s);
-      final errMsg = e.toString().contains('\n') ? e.toString().split('\n').first : e.toString();
-      await _db.insertTask({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'file_path': 'Database Push Error',
-        'status': 'Failed: $errMsg',
-        'progress': 1.0,
-        'created_at': DateTime.now().toIso8601String()
-      });
       rethrow;
     }
   }
@@ -118,7 +95,6 @@ class SyncService {
       final token = await _auth.getAccessToken();
       if (token == null) throw AuthException('Google connection required for sync.');
 
-      AppLogger.info('Starting sync pull...');
       final folderId = await _getFolderId('Nexus-Recovery', token);
       final manifestBytes = await _downloadFileFromDrive('nexus-sync.json', token, folderId: folderId);
       if (manifestBytes == null) return;
@@ -145,27 +121,9 @@ class SyncService {
         await _db.database;
         
         AppLogger.info('✅ DB successfully pulled (LSN $remoteLSN)');
-      } else {
-        AppLogger.info('Local DB is newer or equal. Pull skipped.');
       }
-      
-      await _db.insertTask({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'file_path': 'Database Pull',
-        'status': 'completed',
-        'progress': 1.0,
-        'created_at': DateTime.now().toIso8601String()
-      });
     } catch (e, s) {
       AppLogger.error('Sync pull failed: $e', e, s);
-      final errMsg = e.toString().contains('\n') ? e.toString().split('\n').first : e.toString();
-      await _db.insertTask({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'file_path': 'Database Pull Error',
-        'status': 'Failed: $errMsg',
-        'progress': 1.0,
-        'created_at': DateTime.now().toIso8601String()
-      });
       rethrow;
     }
   }
@@ -204,24 +162,17 @@ class SyncService {
     String query = 'name="$name" and trashed=false';
     if (folderId != null) query += ' and "$folderId" in parents';
 
-    AppLogger.info('Drive Upload: Searching for $name in folder $folderId');
     final listResponse = await http.get(
       Uri.parse('https://www.googleapis.com/drive/v3/files?q=${Uri.encodeComponent(query)}'),
       headers: {'Authorization': 'Bearer $token'},
     );
-    
-    if (listResponse.statusCode != 200) {
-      AppLogger.error('Drive List Error: ${listResponse.body}');
-      throw SyncException('Drive API Error (${listResponse.statusCode}): ${listResponse.body}');
-    }
     
     final files = jsonDecode(listResponse.body)['files'] as List;
     String? fileId;
     if (files.isNotEmpty) fileId = files.first['id'];
 
     if (fileId != null) {
-      AppLogger.info('Drive Upload: Updating existing file $fileId');
-      final updateResponse = await http.patch(
+      await http.patch(
         Uri.parse('https://www.googleapis.com/upload/drive/v3/files/$fileId?uploadType=media'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -229,12 +180,7 @@ class SyncService {
         },
         body: content,
       );
-      if (updateResponse.statusCode != 200) {
-        AppLogger.error('Drive Update Error: ${updateResponse.body}');
-        throw SyncException('Drive Update Error (${updateResponse.statusCode})');
-      }
     } else {
-      AppLogger.info('Drive Upload: Creating new file $name');
       final metadata = {
         'name': name,
         'mimeType': mimeType,
@@ -249,14 +195,8 @@ class SyncService {
         body: jsonEncode(metadata),
       );
       
-      if (createResponse.statusCode != 200) {
-        AppLogger.error('Drive Create Error: ${createResponse.body}');
-        throw SyncException('Drive Create Error (${createResponse.statusCode})');
-      }
-      
       final newId = jsonDecode(createResponse.body)['id'];
-      AppLogger.info('Drive Upload: Uploading media for new file $newId');
-      final uploadResponse = await http.patch(
+      await http.patch(
         Uri.parse('https://www.googleapis.com/upload/drive/v3/files/$newId?uploadType=media'),
         headers: {
           'Authorization': 'Bearer $token',
@@ -264,11 +204,6 @@ class SyncService {
         },
         body: content,
       );
-      
-      if (uploadResponse.statusCode != 200) {
-        AppLogger.error('Drive Media Upload Error: ${uploadResponse.body}');
-        throw SyncException('Drive Media Upload Error (${uploadResponse.statusCode})');
-      }
     }
   }
 
@@ -281,10 +216,6 @@ class SyncService {
       headers: {'Authorization': 'Bearer $token'},
     );
     
-    if (listResponse.statusCode != 200) {
-      throw SyncException('Drive List Error (${listResponse.statusCode})');
-    }
-    
     final files = jsonDecode(listResponse.body)['files'] as List;
     if (files.isEmpty) return null;
 
@@ -294,10 +225,6 @@ class SyncService {
       headers: {'Authorization': 'Bearer $token'},
     );
     
-    if (downloadResponse.statusCode != 200) {
-      throw SyncException('Drive Download Error (${downloadResponse.statusCode})');
-    }
-
     return downloadResponse.bodyBytes;
   }
 }

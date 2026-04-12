@@ -8,9 +8,7 @@ class NexusLoader {
   static NexusCoreBindings? _bindings;
 
   static NexusCoreBindings get bindings {
-    if (_bindings == null) {
-      _bindings = NexusCoreBindings(_loadLibrary());
-    }
+    _bindings ??= NexusCoreBindings(_loadLibrary());
     return _bindings!;
   }
 

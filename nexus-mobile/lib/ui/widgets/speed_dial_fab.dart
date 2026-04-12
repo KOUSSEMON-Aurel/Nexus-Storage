@@ -95,8 +95,8 @@ class _SpeedDialFabState extends State<SpeedDialFab>
                 filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4), // Reduced blur from 10
                 child: Container(
                   color: isDark
-                      ? Colors.black.withOpacity(0.40)
-                      : Colors.white.withOpacity(0.30),
+                      ? Colors.black.withValues(alpha: 0.40)
+                      : Colors.white.withValues(alpha: 0.30),
                 ),
               ),
             ),
@@ -227,7 +227,7 @@ class _AnimatedFab extends StatelessWidget {
       onPressed: onTap,
       child: AnimatedBuilder(
         animation: controller,
-        builder: (_, __) {
+        builder: (context, child) {
           if (isNestedOpen) {
             return const Icon(Icons.arrow_back, color: Colors.white, size: 28);
           }
@@ -278,18 +278,18 @@ class _MiniActionButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: isDark
-                ? Colors.black.withOpacity(0.65)
-                : Colors.white.withOpacity(0.85),
+                ? Colors.black.withValues(alpha: 0.65)
+                : Colors.white.withValues(alpha: 0.85),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
               color: isDark
-                  ? Colors.white.withOpacity(0.08)
-                  : Colors.black.withOpacity(0.04),
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.04),
             ),
             boxShadow: [
               if (!isDark)
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),

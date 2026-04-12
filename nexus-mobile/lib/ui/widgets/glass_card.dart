@@ -38,7 +38,7 @@ class GlassCard extends StatelessWidget {
         borderRadius: customBorderRadius ?? BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(isDark ? 0.05 : 0.02),
+            color: AppColors.primary.withValues(alpha: isDark ? 0.05 : 0.02),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -61,8 +61,8 @@ class GlassCard extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  borderColor.withOpacity(0.1),
-                  borderColor.withOpacity(0.01),
+                  borderColor.withValues(alpha: 0.1),
+                  borderColor.withValues(alpha: 0.01),
                 ],
               ),
             ),

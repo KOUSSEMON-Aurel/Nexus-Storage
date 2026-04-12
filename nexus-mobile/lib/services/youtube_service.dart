@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt_explode;
 import 'auth_service.dart';
+import 'logger_service.dart';
 
 class YouTubeService {
   static final YouTubeService _instance = YouTubeService._internal();
@@ -46,7 +47,7 @@ class YouTubeService {
     );
 
     if (response.statusCode != 200) {
-      print('Upload initialization failed: ${response.body}');
+      AppLogger.error('Upload initialization failed: ${response.body}');
       return null;
     }
 
@@ -83,7 +84,7 @@ class YouTubeService {
       final json = jsonDecode(uploadResponse.body);
       return json['id'];
     } else {
-      print('Upload failed: ${uploadResponse.body}');
+      AppLogger.error('Upload failed: ${uploadResponse.body}');
       return null;
     }
   }
@@ -105,7 +106,7 @@ class YouTubeService {
       final manifest = await _yt.videos.streamsClient.getManifest(videoId);
       final streamInfo = manifest.muxed.withHighestBitrate();
       
-      if (streamInfo == null) return null;
+      // Removed redundant null-check as per analyzer
 
       final tmpDir = await Directory.systemTemp.createTemp('nexus-dl-');
       final videoFile = File('${tmpDir.path}/$videoId.mp4');
@@ -129,7 +130,7 @@ class YouTubeService {
       
       return videoFile;
     } catch (e) {
-      print('YouTube Download Error: $e');
+      AppLogger.error('YouTube Download Error: $e');
       return null;
     }
   }

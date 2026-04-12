@@ -3,6 +3,7 @@ import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:path_provider/path_provider.dart';
 import 'nexus_service.dart';
+import 'logger_service.dart';
 
 extension NexusFFmpeg on NexusService {
   Future<File?> assembleVideo(Directory framesDir, {File? coverVideo}) async {
@@ -15,7 +16,7 @@ extension NexusFFmpeg on NexusService {
     final dataRc = await dataSession.getReturnCode();
 
     if (!ReturnCode.isSuccess(dataRc)) {
-      print('FFmpeg error (data): ${await dataSession.getOutput()}');
+      AppLogger.error('FFmpeg error (data): ${await dataSession.getOutput()}');
       return null;
     }
 
@@ -39,7 +40,7 @@ extension NexusFFmpeg on NexusService {
     if (ReturnCode.isSuccess(concatRc)) {
       return outputVideo;
     } else {
-      print('FFmpeg error (concat): ${await concatSession.getOutput()}');
+      AppLogger.error('FFmpeg error (concat): ${await concatSession.getOutput()}');
       return dataVideo; // Fallback to raw data video if concat fails
     }
   }

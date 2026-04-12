@@ -19,7 +19,7 @@ class SkeletonItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
       baseColor: AppColors.surfaceElevated,
-      highlightColor: AppColors.surfaceElevated.withOpacity(0.8),
+      highlightColor: AppColors.surfaceElevated.withValues(alpha: 0.8),
       period: const Duration(milliseconds: 1500),
       child: Container(
         width: width,

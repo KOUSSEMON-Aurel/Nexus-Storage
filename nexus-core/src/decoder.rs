@@ -55,6 +55,14 @@ pub fn decode_from_frames(frame_dir: &Path, mode: EncodingMode) -> NexusResult<V
     Ok(payload)
 }
 
+pub fn decode_frame(img: &ImageBuffer<Luma<u8>, Vec<u8>>, mode: EncodingMode) -> NexusResult<Vec<u8>> {
+    let threshold = 128; // Default robust midpoint, or we could pass it
+    match mode {
+        EncodingMode::Base => decode_base_image(img, threshold),
+        EncodingMode::High => decode_high_image(img),
+    }
+}
+
 fn read_calibration_threshold(path: &Path) -> NexusResult<u8> {
     let img = open(path).map_err(|e| NexusError::Decode(e.to_string()))?.into_luma8();
     let mut min_lum = 255u8;
@@ -69,6 +77,10 @@ fn read_calibration_threshold(path: &Path) -> NexusResult<u8> {
 
 fn read_base_frame(path: &Path, threshold: u8) -> NexusResult<Vec<u8>> {
     let img = open(path).map_err(|e| NexusError::Decode(e.to_string()))?.into_luma8();
+    decode_base_image(&img, threshold)
+}
+
+fn decode_base_image(img: &ImageBuffer<Luma<u8>, Vec<u8>>, threshold: u8) -> NexusResult<Vec<u8>> {
     let (img_w, img_h) = img.dimensions();
 
     // Log warning if resolution doesn't match expected, so we catch YouTube downgrades
@@ -96,6 +108,10 @@ fn read_base_frame(path: &Path, threshold: u8) -> NexusResult<Vec<u8>> {
 
 fn read_high_frame(path: &Path) -> NexusResult<Vec<u8>> {
     let img = open(path).map_err(|e| NexusError::Decode(e.to_string()))?.into_luma8();
+    decode_high_image(&img)
+}
+
+fn decode_high_image(img: &ImageBuffer<Luma<u8>, Vec<u8>>) -> NexusResult<Vec<u8>> {
     let (img_w, img_h) = img.dimensions();
 
     // Log warning if resolution doesn't match expected

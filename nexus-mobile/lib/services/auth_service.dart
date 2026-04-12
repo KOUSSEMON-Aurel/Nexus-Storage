@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'database_service.dart';
+import 'logger_service.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -50,7 +51,7 @@ class AuthService {
       }
       return _currentUser;
     } catch (e) {
-      print('DEBUG: Silent Sign-In Error: $e');
+      AppLogger.error('DEBUG: Silent Sign-In Error: $e');
       return null;
     }
   }
@@ -58,7 +59,7 @@ class AuthService {
   Future<GoogleSignInAccount?> login() async {
     try {
       _lastError = null;
-      print('DEBUG: Starting Google Sign-In...');
+      AppLogger.info('DEBUG: Starting Google Sign-In...');
       final account = await _googleSignIn.signIn();
       
       if (account != null) {
@@ -71,7 +72,7 @@ class AuthService {
       return account;
     } catch (error) {
       _lastError = error.toString();
-      print('DEBUG: Google Sign-In ERROR: $error');
+      AppLogger.error('DEBUG: Google Sign-In ERROR: $error');
       return null;
     }
   }

@@ -58,7 +58,7 @@ class _TasksPageState extends State<TasksPage> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primary.withOpacity(isDark ? 0.15 : 0.08),
+                color: AppColors.primary.withValues(alpha: isDark ? 0.15 : 0.08),
               ),
             ),
           ),
@@ -70,7 +70,7 @@ class _TasksPageState extends State<TasksPage> {
               height: 250,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.secondary.withOpacity(isDark ? 0.1 : 0.05),
+                color: AppColors.secondary.withValues(alpha: isDark ? 0.1 : 0.05),
               ),
             ),
           ),
@@ -157,7 +157,7 @@ class _TasksPageState extends State<TasksPage> {
                                     padding: const EdgeInsets.only(right: AppSpacing.lg),
                                     margin: const EdgeInsets.only(bottom: AppSpacing.md),
                                     decoration: BoxDecoration(
-                                      color: AppColors.error.withOpacity(0.2),
+                                      color: AppColors.error.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                     ),
                                     child: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
@@ -195,7 +195,7 @@ class _TasksPageState extends State<TasksPage> {
           AppButton(
             label: 'Clear All',
             isFullWidth: false,
-            backgroundColor: AppColors.error.withOpacity(0.8),
+            backgroundColor: AppColors.error.withValues(alpha: 0.8),
             onPressed: () async {
               Navigator.pop(c);
               await _db.clearCompletedTasks();
@@ -255,7 +255,7 @@ class _TasksPageState extends State<TasksPage> {
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 6,
-                backgroundColor: Colors.white.withOpacity(0.05),
+                backgroundColor: Colors.white.withValues(alpha: 0.05),
                 color: iconColor,
               ),
             ),

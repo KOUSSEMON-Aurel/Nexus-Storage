@@ -61,7 +61,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-          side: BorderSide(color: Colors.grey.withOpacity(0.1)), // Bordure subtile pour le light mode
+          side: BorderSide(color: Colors.grey.withValues(alpha: 0.1)), // Bordure subtile pour le light mode
         ),
       ),
       appBarTheme: const AppBarTheme(

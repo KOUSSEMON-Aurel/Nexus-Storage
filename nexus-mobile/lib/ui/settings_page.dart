@@ -44,7 +44,6 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textPrimary = AppColors.getTextPrimary(context);
-    final textSecondary = AppColors.getTextSecondary(context);
 
     return ValueListenableBuilder<String>(
       valueListenable: _settings.language,
@@ -77,7 +76,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   height: 300,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.primary.withOpacity(isDark ? 0.12 : 0.05),
+                    color: AppColors.primary.withValues(alpha: isDark ? 0.12 : 0.05),
                   ),
                 ),
               ),
@@ -89,7 +88,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   height: 200,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.secondary.withOpacity(isDark ? 0.08 : 0.03),
+                    color: AppColors.secondary.withValues(alpha: isDark ? 0.08 : 0.03),
                   ),
                 ),
               ),
@@ -161,7 +160,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 2),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 2),
                 ),
                 child: CircleAvatar(
                   radius: 28,
@@ -194,7 +193,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: isConnected ? 'Logout' : 'Connect',
                 isFullWidth: false,
                 isLoading: _isLoading,
-                backgroundColor: isConnected ? AppColors.error.withOpacity(0.1) : AppColors.primary,
+                backgroundColor: isConnected ? AppColors.error.withValues(alpha: 0.1) : AppColors.primary,
                 onPressed: () async {
                   setState(() => _isLoading = true);
                   try {
@@ -255,7 +254,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     _db.setKV('persistent_checkboxes', val.toString());
                     setState(() {});
                   },
-                  activeColor: AppColors.primary,
+                  activeThumbColor: AppColors.primary,
                 );
               }
             ),
@@ -290,7 +289,7 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: AppSpacing.sm),
           AppButton(
             label: L10n.get('empty_trash_now', lang),
-            backgroundColor: AppColors.error.withOpacity(0.1),
+            backgroundColor: AppColors.error.withValues(alpha: 0.1),
             onPressed: () => _confirmEmptyTrash(context, lang),
           ),
         ],
@@ -363,7 +362,7 @@ class _SettingsPageState extends State<SettingsPage> {
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
             ),
             child: const Icon(Icons.stars_rounded, color: AppColors.primary, size: 32),

@@ -14,17 +14,25 @@ import (
 	"strings"
 )
 
-// ArchiveFolder tars the contents of a folder into a byte slice.
+// ArchiveFolder tars the contents of a folder into a byte slice. (Legacy, use ArchiveFolderStream for large files)
 func ArchiveFolder(root string) ([]byte, error) {
 	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
+	if err := ArchiveFolderStream(root, &buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// ArchiveFolderStream tars the contents of a folder into an io.Writer.
+func ArchiveFolderStream(root string, out io.Writer) error {
+	tw := tar.NewWriter(out)
 
 	root = filepath.Clean(root)
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Create header
 		header, err := tar.FileInfoHeader(info, info.Name())
 		if err != nil {
@@ -60,19 +68,20 @@ func ArchiveFolder(root string) ([]byte, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if err := tw.Close(); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
+	return tw.Close()
 }
 
-// ExtractArchive untars a byte slice into a destination directory.
+// ExtractArchive untars a byte slice into a destination directory. (Legacy)
 func ExtractArchive(data []byte, dest string) error {
-	tr := tar.NewReader(bytes.NewReader(data))
+	return ExtractArchiveStream(bytes.NewReader(data), dest)
+}
+
+// ExtractArchiveStream untars data from an io.Reader into a destination directory.
+func ExtractArchiveStream(r io.Reader, dest string) error {
+	tr := tar.NewReader(r)
 
 	for {
 		header, err := tr.Next()

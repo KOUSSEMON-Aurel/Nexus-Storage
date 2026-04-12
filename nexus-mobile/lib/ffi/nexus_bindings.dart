@@ -427,7 +427,370 @@ class NexusCoreBindings {
           ffi.Pointer<ffi.Size>,
         )
       >();
+
+  /// --- Streaming API (Hardened) ---
+
+  /// Initialize an encryption stream context.
+  ffi.Pointer<StreamingContext> nexus_encrypt_stream_init(
+    ffi.Pointer<ffi.Uint8> key_ptr,
+    ffi.Pointer<ffi.Uint8> out_nonce_prefix,
+  ) {
+    return _nexus_encrypt_stream_init(key_ptr, out_nonce_prefix);
+  }
+
+  late final _nexus_encrypt_stream_initPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<StreamingContext> Function(
+        ffi.Pointer<ffi.Uint8>,
+        ffi.Pointer<ffi.Uint8>,
+      )
+    >
+  >('nexus_encrypt_stream_init');
+  late final _nexus_encrypt_stream_init = _nexus_encrypt_stream_initPtr
+      .asFunction<
+        ffi.Pointer<StreamingContext> Function(
+          ffi.Pointer<ffi.Uint8>,
+          ffi.Pointer<ffi.Uint8>,
+        )
+      >();
+
+  ffi.Pointer<StreamingContext> nexus_decrypt_stream_init(
+    ffi.Pointer<ffi.Uint8> key_ptr,
+    ffi.Pointer<ffi.Uint8> nonce_prefix_ptr,
+  ) {
+    return _nexus_decrypt_stream_init(key_ptr, nonce_prefix_ptr);
+  }
+
+  late final _nexus_decrypt_stream_initPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Pointer<StreamingContext> Function(
+        ffi.Pointer<ffi.Uint8>,
+        ffi.Pointer<ffi.Uint8>,
+      )
+    >
+  >('nexus_decrypt_stream_init');
+  late final _nexus_decrypt_stream_init = _nexus_decrypt_stream_initPtr
+      .asFunction<
+        ffi.Pointer<StreamingContext> Function(
+          ffi.Pointer<ffi.Uint8>,
+          ffi.Pointer<ffi.Uint8>,
+        )
+      >();
+
+  int nexus_encrypt_stream_update(
+    ffi.Pointer<StreamingContext> ctx_ptr,
+    ffi.Pointer<ffi.Uint8> in_ptr,
+    int in_len,
+    ffi.Pointer<ffi.Pointer<ffi.Uint8>> out_ptr,
+    ffi.Pointer<ffi.Size> out_len,
+  ) {
+    return _nexus_encrypt_stream_update(
+      ctx_ptr,
+      in_ptr,
+      in_len,
+      out_ptr,
+      out_len,
+    );
+  }
+
+  late final _nexus_encrypt_stream_updatePtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int32 Function(
+        ffi.Pointer<StreamingContext>,
+        ffi.Pointer<ffi.Uint8>,
+        ffi.Size,
+        ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+        ffi.Pointer<ffi.Size>,
+      )
+    >
+  >('nexus_encrypt_stream_update');
+  late final _nexus_encrypt_stream_update = _nexus_encrypt_stream_updatePtr
+      .asFunction<
+        int Function(
+          ffi.Pointer<StreamingContext>,
+          ffi.Pointer<ffi.Uint8>,
+          int,
+          ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+          ffi.Pointer<ffi.Size>,
+        )
+      >();
+
+  int nexus_decrypt_stream_update(
+    ffi.Pointer<StreamingContext> ctx_ptr,
+    ffi.Pointer<ffi.Uint8> in_ptr,
+    int in_len,
+    ffi.Pointer<ffi.Pointer<ffi.Uint8>> out_ptr,
+    ffi.Pointer<ffi.Size> out_len,
+  ) {
+    return _nexus_decrypt_stream_update(
+      ctx_ptr,
+      in_ptr,
+      in_len,
+      out_ptr,
+      out_len,
+    );
+  }
+
+  late final _nexus_decrypt_stream_updatePtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int32 Function(
+        ffi.Pointer<StreamingContext>,
+        ffi.Pointer<ffi.Uint8>,
+        ffi.Size,
+        ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+        ffi.Pointer<ffi.Size>,
+      )
+    >
+  >('nexus_decrypt_stream_update');
+  late final _nexus_decrypt_stream_update = _nexus_decrypt_stream_updatePtr
+      .asFunction<
+        int Function(
+          ffi.Pointer<StreamingContext>,
+          ffi.Pointer<ffi.Uint8>,
+          int,
+          ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+          ffi.Pointer<ffi.Size>,
+        )
+      >();
+
+  int nexus_encrypt_stream_finalize(
+    ffi.Pointer<StreamingContext> ctx_ptr,
+    ffi.Pointer<ffi.Uint8> in_ptr,
+    int in_len,
+    ffi.Pointer<ffi.Pointer<ffi.Uint8>> out_ptr,
+    ffi.Pointer<ffi.Size> out_len,
+  ) {
+    return _nexus_encrypt_stream_finalize(
+      ctx_ptr,
+      in_ptr,
+      in_len,
+      out_ptr,
+      out_len,
+    );
+  }
+
+  late final _nexus_encrypt_stream_finalizePtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int32 Function(
+        ffi.Pointer<StreamingContext>,
+        ffi.Pointer<ffi.Uint8>,
+        ffi.Size,
+        ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+        ffi.Pointer<ffi.Size>,
+      )
+    >
+  >('nexus_encrypt_stream_finalize');
+  late final _nexus_encrypt_stream_finalize = _nexus_encrypt_stream_finalizePtr
+      .asFunction<
+        int Function(
+          ffi.Pointer<StreamingContext>,
+          ffi.Pointer<ffi.Uint8>,
+          int,
+          ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+          ffi.Pointer<ffi.Size>,
+        )
+      >();
+
+  int nexus_decrypt_stream_finalize(
+    ffi.Pointer<StreamingContext> ctx_ptr,
+    ffi.Pointer<ffi.Uint8> in_ptr,
+    int in_len,
+    ffi.Pointer<ffi.Pointer<ffi.Uint8>> out_ptr,
+    ffi.Pointer<ffi.Size> out_len,
+  ) {
+    return _nexus_decrypt_stream_finalize(
+      ctx_ptr,
+      in_ptr,
+      in_len,
+      out_ptr,
+      out_len,
+    );
+  }
+
+  late final _nexus_decrypt_stream_finalizePtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int32 Function(
+        ffi.Pointer<StreamingContext>,
+        ffi.Pointer<ffi.Uint8>,
+        ffi.Size,
+        ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+        ffi.Pointer<ffi.Size>,
+      )
+    >
+  >('nexus_decrypt_stream_finalize');
+  late final _nexus_decrypt_stream_finalize = _nexus_decrypt_stream_finalizePtr
+      .asFunction<
+        int Function(
+          ffi.Pointer<StreamingContext>,
+          ffi.Pointer<ffi.Uint8>,
+          int,
+          ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+          ffi.Pointer<ffi.Size>,
+        )
+      >();
+
+  void nexus_crypto_stream_drop(ffi.Pointer<StreamingContext> ctx_ptr) {
+    return _nexus_crypto_stream_drop(ctx_ptr);
+  }
+
+  late final _nexus_crypto_stream_dropPtr = _lookup<
+    ffi.NativeFunction<ffi.Void Function(ffi.Pointer<StreamingContext>)>
+  >('nexus_crypto_stream_drop');
+  late final _nexus_crypto_stream_drop = _nexus_crypto_stream_dropPtr
+      .asFunction<void Function(ffi.Pointer<StreamingContext>)>();
+
+  /// --- Encoder Streaming FFI ---
+
+  ffi.Pointer<StreamingEncoder> nexus_encode_stream_init(int mode) {
+    return _nexus_encode_stream_init(mode);
+  }
+
+  late final _nexus_encode_stream_initPtr = _lookup<
+    ffi.NativeFunction<ffi.Pointer<StreamingEncoder> Function(ffi.Int32)>
+  >('nexus_encode_stream_init');
+  late final _nexus_encode_stream_init = _nexus_encode_stream_initPtr
+      .asFunction<ffi.Pointer<StreamingEncoder> Function(int)>();
+
+  int nexus_encode_stream_push(
+    ffi.Pointer<StreamingEncoder> ctx_ptr,
+    ffi.Pointer<ffi.Uint8> in_ptr,
+    int in_len,
+  ) {
+    return _nexus_encode_stream_push(ctx_ptr, in_ptr, in_len);
+  }
+
+  late final _nexus_encode_stream_pushPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int32 Function(
+        ffi.Pointer<StreamingEncoder>,
+        ffi.Pointer<ffi.Uint8>,
+        ffi.Size,
+      )
+    >
+  >('nexus_encode_stream_push');
+  late final _nexus_encode_stream_push = _nexus_encode_stream_pushPtr
+      .asFunction<int Function(ffi.Pointer<StreamingEncoder>, ffi.Pointer<ffi.Uint8>, int)>();
+
+  int nexus_encode_stream_pop_frame(
+    ffi.Pointer<StreamingEncoder> ctx_ptr,
+    ffi.Pointer<ffi.Pointer<ffi.Uint8>> out_ptr,
+    ffi.Pointer<ffi.Size> out_len,
+  ) {
+    return _nexus_encode_stream_pop_frame(ctx_ptr, out_ptr, out_len);
+  }
+
+  late final _nexus_encode_stream_pop_framePtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int32 Function(
+        ffi.Pointer<StreamingEncoder>,
+        ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+        ffi.Pointer<ffi.Size>,
+      )
+    >
+  >('nexus_encode_stream_pop_frame');
+  late final _nexus_encode_stream_pop_frame = _nexus_encode_stream_pop_framePtr
+      .asFunction<
+        int Function(
+          ffi.Pointer<StreamingEncoder>,
+          ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+          ffi.Pointer<ffi.Size>,
+        )
+      >();
+
+  int nexus_encode_stream_finalize(ffi.Pointer<StreamingEncoder> ctx_ptr) {
+    return _nexus_encode_stream_finalize(ctx_ptr);
+  }
+
+  late final _nexus_encode_stream_finalizePtr = _lookup<
+    ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<StreamingEncoder>)>
+  >('nexus_encode_stream_finalize');
+  late final _nexus_encode_stream_finalize = _nexus_encode_stream_finalizePtr
+      .asFunction<int Function(ffi.Pointer<StreamingEncoder>)>();
+
+  void nexus_encoder_stream_drop(ffi.Pointer<StreamingEncoder> ctx_ptr) {
+    return _nexus_encoder_stream_drop(ctx_ptr);
+  }
+
+  late final _nexus_encoder_stream_dropPtr = _lookup<
+    ffi.NativeFunction<ffi.Void Function(ffi.Pointer<StreamingEncoder>)>
+  >('nexus_encoder_stream_drop');
+  late final _nexus_encoder_stream_drop = _nexus_encoder_stream_dropPtr
+      .asFunction<void Function(ffi.Pointer<StreamingEncoder>)>();
+
+  /// --- Decoder Streaming FFI ---
+
+  ffi.Pointer<StreamingDecoder> nexus_decode_stream_init(int mode) {
+    return _nexus_decode_stream_init(mode);
+  }
+
+  late final _nexus_decode_stream_initPtr = _lookup<
+    ffi.NativeFunction<ffi.Pointer<StreamingDecoder> Function(ffi.Int32)>
+  >('nexus_decode_stream_init');
+  late final _nexus_decode_stream_init = _nexus_decode_stream_initPtr
+      .asFunction<ffi.Pointer<StreamingDecoder> Function(int)>();
+
+  int nexus_decode_stream_push(
+    ffi.Pointer<StreamingDecoder> ctx_ptr,
+    ffi.Pointer<ffi.Uint8> in_ptr,
+    int in_len,
+  ) {
+    return _nexus_decode_stream_push(ctx_ptr, in_ptr, in_len);
+  }
+
+  late final _nexus_decode_stream_pushPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int32 Function(
+        ffi.Pointer<StreamingDecoder>,
+        ffi.Pointer<ffi.Uint8>,
+        ffi.Size,
+      )
+    >
+  >('nexus_decode_stream_push');
+  late final _nexus_decode_stream_push = _nexus_decode_stream_pushPtr
+      .asFunction<int Function(ffi.Pointer<StreamingDecoder>, ffi.Pointer<ffi.Uint8>, int)>();
+
+  int nexus_decode_stream_pop(
+    ffi.Pointer<StreamingDecoder> ctx_ptr,
+    ffi.Pointer<ffi.Pointer<ffi.Uint8>> out_ptr,
+    ffi.Pointer<ffi.Size> out_len,
+  ) {
+    return _nexus_decode_stream_pop(ctx_ptr, out_ptr, out_len);
+  }
+
+  late final _nexus_decode_stream_popPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int32 Function(
+        ffi.Pointer<StreamingDecoder>,
+        ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+        ffi.Pointer<ffi.Size>,
+      )
+    >
+  >('nexus_decode_stream_pop');
+  late final _nexus_decode_stream_pop = _nexus_decode_stream_popPtr
+      .asFunction<
+        int Function(
+          ffi.Pointer<StreamingDecoder>,
+          ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+          ffi.Pointer<ffi.Size>,
+        )
+      >();
+
+  void nexus_decoder_stream_drop(ffi.Pointer<StreamingDecoder> ctx_ptr) {
+    return _nexus_decoder_stream_drop(ctx_ptr);
+  }
+
+  late final _nexus_decoder_stream_dropPtr = _lookup<
+    ffi.NativeFunction<ffi.Void Function(ffi.Pointer<StreamingDecoder>)>
+  >('nexus_decoder_stream_drop');
+  late final _nexus_decoder_stream_drop = _nexus_decoder_stream_dropPtr
+      .asFunction<void Function(ffi.Pointer<StreamingDecoder>)>();
 }
+
+final class StreamingContext extends ffi.Opaque {}
+
+final class StreamingEncoder extends ffi.Opaque {}
+
+final class StreamingDecoder extends ffi.Opaque {}
 
 const int NEXUS_OK = 0;
 

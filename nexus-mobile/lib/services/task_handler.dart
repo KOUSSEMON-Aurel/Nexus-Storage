@@ -3,9 +3,9 @@ import 'dart:isolate';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'nexus_service.dart';
-import 'database_service.dart';
 import 'auth_service.dart';
 import '../models/file_record.dart';
+import 'logger_service.dart';
 
 @pragma('vm:entry-point')
 void startCallback() {
@@ -127,7 +127,7 @@ class NexusTaskHandler extends TaskHandler {
       await _showFinalNotification(finalTitle, finalBody, true);
 
     } catch (e) {
-      print('BACKGROUND ERROR: $e');
+      AppLogger.error('BACKGROUND ERROR: $e');
       _sendPort?.send('refresh');
       
       await FlutterForegroundTask.stopService();

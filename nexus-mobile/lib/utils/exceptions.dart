@@ -7,13 +7,13 @@ class NexusException implements Exception {
 }
 
 class SyncException extends NexusException {
-  SyncException(String message, {String? code}) : super(message, code: code);
+  SyncException(super.message, {super.code});
 }
 
 class NetworkException extends NexusException {
-  NetworkException(String message, {String? code}) : super(message, code: code);
+  NetworkException(super.message, {super.code});
 }
 
 class AuthException extends NexusException {
-  AuthException(String message, {String? code}) : super(message, code: code);
+  AuthException(super.message, {super.code});
 }

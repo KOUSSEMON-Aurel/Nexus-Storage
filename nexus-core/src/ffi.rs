@@ -17,11 +17,14 @@ use std::slice;
 
 use crate::{crypto, compress, hasher, encoder};
 use crate::types::{CompressionLevel, EncodingMode};
+use crate::streaming::{StreamingContext, StreamingEncoder, StreamingDecoder};
 
 const NEXUS_OK: c_int = 0;
 const NEXUS_ERR_NULL_PTR: c_int = -1;
 const NEXUS_ERR_CRYPTO: c_int = -2;
 const NEXUS_ERR_COMPRESS: c_int = -3;
+const NEXUS_ERR_ENCODE: c_int = -4;
+const NEXUS_ERR_DECODE: c_int = -5;
 
 // --------------------------
 //  Helpers
@@ -198,7 +201,7 @@ pub unsafe extern "C" fn nexus_encode_to_frames(
     }
     let data = unsafe { slice::from_raw_parts(in_ptr, in_len) }.to_vec();
     let path_str = match unsafe { CStr::from_ptr(output_dir) }.to_str() {
-        Ok(s) => s.to_owned(),
+        Ok(s) => s.to_string(),
         Err(_) => return NEXUS_ERR_NULL_PTR,
     };
     let encoding_mode = match mode {
@@ -237,7 +240,7 @@ pub unsafe extern "C" fn nexus_decode_from_frames(
         return NEXUS_ERR_NULL_PTR;
     }
     let path_str = match unsafe { CStr::from_ptr(frame_dir) }.to_str() {
-        Ok(s) => s.to_owned(),
+        Ok(s) => s.to_string(),
         Err(_) => return NEXUS_ERR_NULL_PTR,
     };
     let encoding_mode = match mode {
@@ -384,5 +387,291 @@ pub unsafe extern "C" fn nexus_derive_master_key(
     match crate::kdf::derive_master_key(password, salt) {
         Ok(key) => unsafe { alloc_bytes(key.to_vec(), out_ptr, out_len) },
         Err(_) => NEXUS_ERR_CRYPTO,
+    }
+}
+
+// --------------------------
+//  Streaming (Hardened)
+// --------------------------
+
+/// Initialize an encryption stream context.
+/// Returns a pointer to the context or null on failure.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nexus_encrypt_stream_init(
+    key_ptr: *const c_uchar,
+    out_nonce_prefix: *mut c_uchar,
+) -> *mut StreamingContext {
+    if key_ptr.is_null() || out_nonce_prefix.is_null() {
+        return std::ptr::null_mut();
+    }
+    let key_slice = unsafe { slice::from_raw_parts(key_ptr, 32) };
+    let key: &[u8; 32] = match key_slice.try_into() {
+        Ok(k) => k,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let ctx = StreamingContext::new_encrypt(key);
+    unsafe {
+        std::ptr::copy_nonoverlapping(ctx.nonce_prefix().as_ptr(), out_nonce_prefix, 16);
+    }
+    Box::into_raw(Box::new(ctx))
+}
+
+/// Initialize a decryption stream context.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nexus_decrypt_stream_init(
+    key_ptr: *const c_uchar,
+    nonce_prefix_ptr: *const c_uchar,
+) -> *mut StreamingContext {
+    if key_ptr.is_null() || nonce_prefix_ptr.is_null() {
+        return std::ptr::null_mut();
+    }
+    let key_slice = unsafe { slice::from_raw_parts(key_ptr, 32) };
+    let key: &[u8; 32] = match key_slice.try_into() {
+        Ok(k) => k,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let prefix_slice = unsafe { slice::from_raw_parts(nonce_prefix_ptr, 16) };
+    let prefix: [u8; 16] = match prefix_slice.try_into() {
+        Ok(p) => p,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let ctx = StreamingContext::new_decrypt(key, prefix);
+    Box::into_raw(Box::new(ctx))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nexus_encrypt_stream_update(
+    ctx_ptr: *mut StreamingContext,
+    in_ptr: *const c_uchar,
+    in_len: usize,
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if ctx_ptr.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    if in_ptr.is_null() && in_len > 0 {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let ctx = unsafe { &mut *ctx_ptr };
+    let data = if in_ptr.is_null() { &[] } else { unsafe { slice::from_raw_parts(in_ptr, in_len) } };
+    
+    match ctx.encrypt_update(data) {
+        Ok(res) => unsafe { alloc_bytes(res, out_ptr, out_len) },
+        Err(_) => NEXUS_ERR_CRYPTO,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nexus_decrypt_stream_update(
+    ctx_ptr: *mut StreamingContext,
+    in_ptr: *const c_uchar,
+    in_len: usize,
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if ctx_ptr.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    if in_ptr.is_null() && in_len > 0 {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let ctx = unsafe { &mut *ctx_ptr };
+    let data = if in_ptr.is_null() { &[] } else { unsafe { slice::from_raw_parts(in_ptr, in_len) } };
+    
+    match ctx.decrypt_update(data) {
+        Ok(res) => unsafe { alloc_bytes(res, out_ptr, out_len) },
+        Err(_) => NEXUS_ERR_CRYPTO,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nexus_encrypt_stream_finalize(
+    ctx_ptr: *mut StreamingContext,
+    in_ptr: *const c_uchar,
+    in_len: usize,
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if ctx_ptr.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    if in_ptr.is_null() && in_len > 0 {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let ctx = unsafe { &mut *ctx_ptr };
+    let data = if in_ptr.is_null() { &[] } else { unsafe { slice::from_raw_parts(in_ptr, in_len) } };
+    
+    match ctx.finalize_encrypt(data) {
+        Ok(res) => unsafe { alloc_bytes(res, out_ptr, out_len) },
+        Err(_) => NEXUS_ERR_CRYPTO,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nexus_decrypt_stream_finalize(
+    ctx_ptr: *mut StreamingContext,
+    in_ptr: *const c_uchar,
+    in_len: usize,
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if ctx_ptr.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    if in_ptr.is_null() && in_len > 0 {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let ctx = unsafe { &mut *ctx_ptr };
+    let data = if in_ptr.is_null() { &[] } else { unsafe { slice::from_raw_parts(in_ptr, in_len) } };
+    
+    match ctx.finalize_decrypt(data) {
+        Ok(res) => unsafe { alloc_bytes(res, out_ptr, out_len) },
+        Err(_) => NEXUS_ERR_CRYPTO,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nexus_crypto_stream_drop(ctx_ptr: *mut StreamingContext) {
+    if !ctx_ptr.is_null() {
+        unsafe {
+            let _ = Box::from_raw(ctx_ptr);
+        }
+    }
+}
+
+// --- Encoder Streaming FFI ---
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nexus_encode_stream_init(mode: c_int) -> *mut StreamingEncoder {
+    let encoding_mode = match mode {
+        1 => EncodingMode::High,
+        _ => EncodingMode::Base,
+    };
+    Box::into_raw(Box::new(StreamingEncoder::new(encoding_mode)))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nexus_encode_stream_push(
+    ctx_ptr: *mut StreamingEncoder,
+    in_ptr: *const c_uchar,
+    in_len: usize,
+) -> c_int {
+    if ctx_ptr.is_null() || in_ptr.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let ctx = unsafe { &mut *ctx_ptr };
+    let data = unsafe { slice::from_raw_parts(in_ptr, in_len) };
+    
+    match ctx.push_data(data) {
+        Ok(n) => n as c_int,
+        Err(_) => NEXUS_ERR_ENCODE,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nexus_encode_stream_pop_frame(
+    ctx_ptr: *mut StreamingEncoder,
+    out_ptr: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if ctx_ptr.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let ctx = unsafe { &mut *ctx_ptr };
+    
+    match ctx.pop_frame() {
+        Some(frame) => unsafe { alloc_bytes(frame, out_ptr, out_len) },
+        None => 1, // Special code for "No more frames currently"
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn nexus_encode_stream_finalize(ctx_ptr: *mut StreamingEncoder) -> c_int {
+    if ctx_ptr.is_null() {
+        return NEXUS_ERR_NULL_PTR;
+    }
+    let ctx = unsafe { &mut *ctx_ptr };
+    
+    match ctx.finalize() {
+        Ok(_) => NEXUS_OK,
+        Err(_) => NEXUS_ERR_ENCODE,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nexus_encoder_stream_drop(ctx_ptr: *mut StreamingEncoder) {
+    if !ctx_ptr.is_null() {
+        unsafe {
+            let _ = Box::from_raw(ctx_ptr);
+        }
+    }
+}
+
+// --- Decoder Streaming FFI ---
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nexus_decode_stream_init(mode: i32) -> *mut StreamingDecoder {
+    let mode = match mode {
+        1 => EncodingMode::High,
+        _ => EncodingMode::Base,
+    };
+    Box::into_raw(Box::new(StreamingDecoder::new(mode)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nexus_decode_stream_push(
+    ctx_ptr: *mut StreamingDecoder,
+    in_ptr: *const u8,
+    in_len: usize,
+) -> i32 {
+    let ctx = unsafe {
+        if ctx_ptr.is_null() { return NEXUS_ERR_NULL_PTR; }
+        &mut *ctx_ptr
+    };
+    if in_ptr.is_null() { return NEXUS_ERR_NULL_PTR; }
+    let data = unsafe { std::slice::from_raw_parts(in_ptr, in_len) };
+
+    match ctx.push_frame(data) {
+        Ok(_) => NEXUS_OK,
+        Err(_) => NEXUS_ERR_DECODE,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nexus_decode_stream_pop(
+    ctx_ptr: *mut StreamingDecoder,
+    out_ptr: *mut *mut u8,
+    out_len: *mut usize,
+) -> i32 {
+    let ctx = unsafe {
+        if ctx_ptr.is_null() { return NEXUS_ERR_NULL_PTR; }
+        &mut *ctx_ptr
+    };
+    if out_ptr.is_null() || out_len.is_null() { return NEXUS_ERR_NULL_PTR; }
+
+    let data = ctx.pop_data();
+    if data.is_empty() {
+        return 1; // Not an error, just no data available
+    }
+
+    let len = data.len();
+    let ptr = Box::into_raw(data.into_boxed_slice()) as *mut u8;
+
+    unsafe {
+        *out_ptr = ptr;
+        *out_len = len;
+    }
+    NEXUS_OK
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nexus_decoder_stream_drop(ctx_ptr: *mut StreamingDecoder) {
+    if !ctx_ptr.is_null() {
+        unsafe {
+            let _ = Box::from_raw(ctx_ptr);
+        }
     }
 }

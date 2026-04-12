@@ -11,6 +11,7 @@ package main
 */
 import "C"
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"unsafe"
@@ -291,3 +292,209 @@ func (nc *NexusCore) DeriveMasterKey(password string, salt []byte) ([]byte, erro
 	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
 }
 
+// ─── Streaming API (Hardened) ────────────────────────────────────────────────
+
+// CryptoStream handles stateful encryption or decryption.
+type CryptoStream struct {
+	ctx         *C.StreamingContext
+	NoncePrefix []byte
+}
+
+func (nc *NexusCore) InitEncryptStream(key []byte) (*CryptoStream, error) {
+	if len(key) != 32 {
+		return nil, fmt.Errorf("invalid key length: %d", len(key))
+	}
+	prefix := make([]byte, 16)
+	if _, err := rand.Read(prefix); err != nil {
+		return nil, fmt.Errorf("failed to generate random prefix: %w", err)
+	}
+	ctx := C.nexus_encrypt_stream_init(
+		(*C.uint8_t)(unsafe.Pointer(&key[0])),
+		(*C.uint8_t)(unsafe.Pointer(&prefix[0])),
+	)
+	if ctx == nil {
+		return nil, errors.New("failed to initialize encryption stream")
+	}
+	return &CryptoStream{ctx: ctx, NoncePrefix: prefix}, nil
+}
+
+func (nc *NexusCore) InitDecryptStream(key []byte, noncePrefix []byte) (*CryptoStream, error) {
+	if len(key) != 32 || len(noncePrefix) != 16 {
+		return nil, errors.New("invalid key or nonce prefix length")
+	}
+	ctx := C.nexus_decrypt_stream_init(
+		(*C.uint8_t)(unsafe.Pointer(&key[0])),
+		(*C.uint8_t)(unsafe.Pointer(&noncePrefix[0])),
+	)
+	if ctx == nil {
+		return nil, errors.New("failed to initialize decryption stream")
+	}
+	return &CryptoStream{ctx: ctx, NoncePrefix: noncePrefix}, nil
+}
+
+func (s *CryptoStream) EncryptUpdate(data []byte) ([]byte, error) {
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+	var inPtr *C.uint8_t
+	if len(data) > 0 {
+		inPtr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	res := C.nexus_encrypt_stream_update(s.ctx, inPtr, C.size_t(len(data)), &outPtr, &outLen)
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("encryption update error (code %d)", res)
+	}
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+}
+
+func (s *CryptoStream) DecryptUpdate(data []byte) ([]byte, error) {
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+	var inPtr *C.uint8_t
+	if len(data) > 0 {
+		inPtr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	res := C.nexus_decrypt_stream_update(s.ctx, inPtr, C.size_t(len(data)), &outPtr, &outLen)
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("decryption update error (code %d)", res)
+	}
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+}
+
+func (s *CryptoStream) EncryptFinalize(data []byte) ([]byte, error) {
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+	var inPtr *C.uint8_t
+	if len(data) > 0 {
+		inPtr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	res := C.nexus_encrypt_stream_finalize(s.ctx, inPtr, C.size_t(len(data)), &outPtr, &outLen)
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("encryption finalize error (code %d)", res)
+	}
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+}
+
+func (s *CryptoStream) DecryptFinalize(data []byte) ([]byte, error) {
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+	var inPtr *C.uint8_t
+	if len(data) > 0 {
+		inPtr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	res := C.nexus_decrypt_stream_finalize(s.ctx, inPtr, C.size_t(len(data)), &outPtr, &outLen)
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("decryption finalize error (code %d)", res)
+	}
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+}
+
+func (s *CryptoStream) Close() {
+	if s.ctx != nil {
+		C.nexus_crypto_stream_drop(s.ctx)
+		s.ctx = nil
+	}
+}
+
+// EncodeStream handles stateful PNG frame generation.
+type EncodeStream struct {
+	ctx *C.StreamingEncoder
+}
+
+func (nc *NexusCore) InitEncodeStream(mode int) (*EncodeStream, error) {
+	ctx := C.nexus_encode_stream_init(C.int32_t(mode))
+	if ctx == nil {
+		return nil, errors.New("failed to initialize encode stream")
+	}
+	return &EncodeStream{ctx: ctx}, nil
+}
+
+func (s *EncodeStream) Push(data []byte) (int, error) {
+	var inPtr *C.uint8_t
+	if len(data) > 0 {
+		inPtr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	res := C.nexus_encode_stream_push(s.ctx, inPtr, C.size_t(len(data)))
+	if res < 0 {
+		return 0, fmt.Errorf("encode push error (code %d)", res)
+	}
+	return int(res), nil
+}
+
+func (s *EncodeStream) PopFrame() ([]byte, error) {
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+	res := C.nexus_encode_stream_pop_frame(s.ctx, &outPtr, &outLen)
+	if res == 1 {
+		return nil, nil // No frames ready
+	}
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("encode pop error (code %d)", res)
+	}
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+}
+
+func (s *EncodeStream) Finalize() error {
+	res := C.nexus_encode_stream_finalize(s.ctx)
+	if res != C.NEXUS_OK {
+		return fmt.Errorf("encode finalize error (code %d)", res)
+	}
+	return nil
+}
+
+func (s *EncodeStream) Close() {
+	if s.ctx != nil {
+		C.nexus_encoder_stream_drop(s.ctx)
+		s.ctx = nil
+	}
+}
+
+// DecodeStream handles stateful PNG frame decoding.
+type DecodeStream struct {
+	ctx *C.StreamingDecoder
+}
+
+func (nc *NexusCore) InitDecodeStream(mode int) (*DecodeStream, error) {
+	ctx := C.nexus_decode_stream_init(C.int32_t(mode))
+	if ctx == nil {
+		return nil, errors.New("failed to initialize decode stream")
+	}
+	return &DecodeStream{ctx: ctx}, nil
+}
+
+func (s *DecodeStream) Push(data []byte) error {
+	var inPtr *C.uint8_t
+	if len(data) > 0 {
+		inPtr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	res := C.nexus_decode_stream_push(s.ctx, inPtr, C.size_t(len(data)))
+	if res != C.NEXUS_OK {
+		return fmt.Errorf("decode push error (code %d)", res)
+	}
+	return nil
+}
+
+func (s *DecodeStream) Pop() ([]byte, error) {
+	var outPtr *C.uint8_t
+	var outLen C.size_t
+	res := C.nexus_decode_stream_pop(s.ctx, &outPtr, &outLen)
+	if res == 1 {
+		return nil, nil // No data ready
+	}
+	if res != C.NEXUS_OK {
+		return nil, fmt.Errorf("decode pop error (code %d)", res)
+	}
+	defer C.nexus_free_bytes(outPtr, outLen)
+	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+}
+
+func (s *DecodeStream) Close() {
+	if s.ctx != nil {
+		C.nexus_decoder_stream_drop(s.ctx)
+		s.ctx = nil
+	}
+}

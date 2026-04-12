@@ -18,6 +18,13 @@ extern "C" {
 #define NEXUS_ERR_IO -6
 
 /**
+ * Streaming API types
+ */
+typedef struct StreamingContext StreamingContext;
+typedef struct StreamingEncoder StreamingEncoder;
+typedef struct StreamingDecoder StreamingDecoder;
+
+/**
  * Free a byte buffer previously allocated by the nexus-core library.
  */
 void nexus_free_bytes(uint8_t* ptr, size_t len);
@@ -165,6 +172,34 @@ int32_t nexus_derive_master_key(
     uint8_t** out_ptr,
     size_t* out_len
 );
+
+/**
+ * Streaming API - Crypto
+ */
+StreamingContext* nexus_encrypt_stream_init(const uint8_t* key_ptr, uint8_t* out_nonce_prefix);
+StreamingContext* nexus_decrypt_stream_init(const uint8_t* key_ptr, const uint8_t* nonce_prefix_ptr);
+int32_t nexus_encrypt_stream_update(StreamingContext* ctx, const uint8_t* in_ptr, size_t in_len, uint8_t** out_ptr, size_t* out_len);
+int32_t nexus_decrypt_stream_update(StreamingContext* ctx, const uint8_t* in_ptr, size_t in_len, uint8_t** out_ptr, size_t* out_len);
+int32_t nexus_encrypt_stream_finalize(StreamingContext* ctx, const uint8_t* in_ptr, size_t in_len, uint8_t** out_ptr, size_t* out_len);
+int32_t nexus_decrypt_stream_finalize(StreamingContext* ctx, const uint8_t* in_ptr, size_t in_len, uint8_t** out_ptr, size_t* out_len);
+void nexus_crypto_stream_drop(StreamingContext* ctx);
+
+/**
+ * Streaming API - Encoder
+ */
+StreamingEncoder* nexus_encode_stream_init(int32_t mode);
+int32_t nexus_encode_stream_push(StreamingEncoder* ctx, const uint8_t* in_ptr, size_t in_len);
+int32_t nexus_encode_stream_pop_frame(StreamingEncoder* ctx, uint8_t** out_ptr, size_t* out_len);
+int32_t nexus_encode_stream_finalize(StreamingEncoder* ctx);
+void nexus_encoder_stream_drop(StreamingEncoder* ctx);
+
+/**
+ * Streaming API - Decoder
+ */
+StreamingDecoder* nexus_decode_stream_init(int32_t mode);
+int32_t nexus_decode_stream_push(StreamingDecoder* ctx, const uint8_t* in_ptr, size_t in_len);
+int32_t nexus_decode_stream_pop(StreamingDecoder* ctx, uint8_t** out_ptr, size_t* out_len);
+void nexus_decoder_stream_drop(StreamingDecoder* ctx);
 
 #ifdef __cplusplus
 }
