@@ -221,7 +221,16 @@ func (nc *NexusCore) EncryptWithKey(data, key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("encrypt_with_key error (code %d)", res)
 	}
 	defer C.nexus_free_bytes(outPtr, outLen)
-	return C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen)), nil
+	out := C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen))
+	// Diagnostic: log encrypted size and sample bytes
+	if len(out) > 0 {
+		start := 8
+		if len(out) < start { start = len(out) }
+		end := 8
+		if len(out) < end { end = len(out) }
+		log.Printf("[debug] EncryptWithKey: out_len=%d start=%x end=%x", len(out), out[:start], out[len(out)-end:])
+	}
+	return out, nil
 }
 
 // DecryptWithKey decrypts a blob produced by EncryptWithKey.
