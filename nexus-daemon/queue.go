@@ -472,6 +472,12 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	if err != nil {
 		return fmt.Errorf("key generation failed: %w", err)
 	}
+	// Diagnostic: log a short sample of the generated raw file key for debugging
+	if len(rawFileKey) >= 8 {
+		log.Printf("[%s] [debug] Generated rawFileKey len=%d start=%x end=%x", t.ID, len(rawFileKey), rawFileKey[:8], rawFileKey[len(rawFileKey)-8:])
+	} else {
+		log.Printf("[%s] [debug] Generated rawFileKey len=%d", t.ID, len(rawFileKey))
+	}
 	
 	// V4 Security: Use password priority:
 	// 1. Custom password provided by user
@@ -800,6 +806,12 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 				if err == nil {
 					rawFileKey = key
 					log.Printf("[%s] ✅ file_key decrypted successfully (%d bytes)", t.ID, len(rawFileKey))
+					// Diagnostic: log a short sample of the decrypted per-file key for debugging
+					if len(rawFileKey) >= 8 {
+						log.Printf("[%s] [debug] Decrypted rawFileKey len=%d start=%x end=%x", t.ID, len(rawFileKey), rawFileKey[:8], rawFileKey[len(rawFileKey)-8:])
+					} else {
+						log.Printf("[%s] [debug] Decrypted rawFileKey len=%d", t.ID, len(rawFileKey))
+					}
 				} else {
 					log.Printf("[%s] ⚠️  file_key decryption FAILED: %v", t.ID, err)
 					log.Printf("[%s]    encryptionSecret first 16 chars: %s", t.ID, encryptionSecret[:16])
