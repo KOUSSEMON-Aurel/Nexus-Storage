@@ -74,11 +74,6 @@ class ForegroundServiceManager {
 
 		val nIntent = Intent(context, ForegroundService::class.java)
 		ForegroundServiceStatus.setData(context, ForegroundServiceAction.API_STOP)
-		ForegroundServiceTypes.clearData(context)
-		NotificationOptions.clearData(context)
-		ForegroundTaskOptions.clearData(context)
-		ForegroundTaskData.clearData(context)
-		NotificationContent.clearData(context)
 		// Use startService instead of startForegroundService because the service
 		// is already running in the foreground and we only need to deliver the
 		// stop command. This avoids the startForeground() contract requirement.

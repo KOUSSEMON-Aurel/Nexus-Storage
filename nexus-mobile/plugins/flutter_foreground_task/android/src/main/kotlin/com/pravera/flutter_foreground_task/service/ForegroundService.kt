@@ -279,8 +279,28 @@ class ForegroundService : Service() {
 
         val serviceId = notificationOptions.serviceId
         val notification = createNotification()
+        
+        Log.d("NexusPlugin", "startForegroundService: id=$serviceId, version=${Build.VERSION.SDK_INT}")
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(serviceId, notification, foregroundServiceTypes.value)
+            // On Android 10+ (Q), it's best to specify the type if we have it.
+            // On Android 14+ (UPSIDE_DOWN_CAKE) it is MANDATORY to match manifest.
+            // We force DATA_SYNC here for Nexus to ensure it works on all targeted versions.
+            val prefType = foregroundServiceTypes.value
+            val serviceType = if (prefType == 0 || prefType == android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST) {
+                Log.d("NexusPlugin", "startForegroundService: Forcing DATA_SYNC (prefType was $prefType)")
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            } else {
+                Log.d("NexusPlugin", "startForegroundService: Using prefType $prefType")
+                prefType
+            }
+            
+            try {
+                startForeground(serviceId, notification, serviceType)
+            } catch (e: Exception) {
+                Log.e("NexusPlugin", "startForeground failed with type $serviceType, trying with default", e)
+                startForeground(serviceId, notification)
+            }
         } else {
             startForeground(serviceId, notification)
         }

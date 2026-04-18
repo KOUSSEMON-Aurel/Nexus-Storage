@@ -55,20 +55,19 @@ data class NotificationOptions(
             val prefs = context.getSharedPreferences(
                 PrefsKey.NOTIFICATION_OPTIONS_PREFS, Context.MODE_PRIVATE)
 
-            val serviceId = map?.get(PrefsKey.SERVICE_ID) as? Int
-                ?: map?.get(PrefsKey.NOTIFICATION_ID) as? Int
+            val serviceId = (map?.get(PrefsKey.SERVICE_ID) as? Number ?: map?.get(PrefsKey.NOTIFICATION_ID) as? Number)?.toInt()
                 ?: 1000
             val channelId = map?.get(PrefsKey.NOTIFICATION_CHANNEL_ID) as? String
             val channelName = map?.get(PrefsKey.NOTIFICATION_CHANNEL_NAME) as? String
             val channelDesc = map?.get(PrefsKey.NOTIFICATION_CHANNEL_DESC) as? String
-            val channelImportance = map?.get(PrefsKey.NOTIFICATION_CHANNEL_IMPORTANCE) as? Int ?: 2
-            val priority = map?.get(PrefsKey.NOTIFICATION_PRIORITY) as? Int ?: -1
+            val channelImportance = (map?.get(PrefsKey.NOTIFICATION_CHANNEL_IMPORTANCE) as? Number)?.toInt() ?: 2
+            val priority = (map?.get(PrefsKey.NOTIFICATION_PRIORITY) as? Number)?.toInt() ?: -1
             val enableVibration = map?.get(PrefsKey.ENABLE_VIBRATION) as? Boolean ?: false
             val playSound = map?.get(PrefsKey.PLAY_SOUND) as? Boolean ?: false
             val showWhen = map?.get(PrefsKey.SHOW_WHEN) as? Boolean ?: false
             val showBadge = map?.get(PrefsKey.SHOW_BADGE) as? Boolean ?: false
             val onlyAlertOnce = map?.get(PrefsKey.ONLY_ALERT_ONCE) as? Boolean ?: false
-            val visibility = map?.get(PrefsKey.VISIBILITY) as? Int ?: 1
+            val visibility = (map?.get(PrefsKey.VISIBILITY) as? Number)?.toInt() ?: 1
 
             with(prefs.edit()) {
                 putInt(PrefsKey.SERVICE_ID, serviceId)

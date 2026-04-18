@@ -320,25 +320,10 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  label: 'Push',
-                  isLoading: _isLoading,
-                  onPressed: () => _handleSyncAction('push'),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: AppButton(
-                  label: 'Pull',
-                  isLoading: _isLoading,
-                  backgroundColor: AppColors.getSurfaceElevated(context),
-                  onPressed: () => _handleSyncAction('pull'),
-                ),
-              ),
-            ],
+          const Text(
+            'Synchronization is now managed automatically based on database state and timestamps.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

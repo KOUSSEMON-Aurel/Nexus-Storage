@@ -91,16 +91,19 @@ class AuthService {
   }
 
   Future<String?> getAccessToken() async {
-    if (_backgroundToken != null) return _backgroundToken;
-    if (_currentUser == null) return null;
-    
-    try {
-      final GoogleSignInAuthentication auth = await _currentUser!.authentication;
-      return auth.accessToken;
-    } catch (e) {
-      AppLogger.error('DEBUG: GetAccessToken Error: $e');
-      return null;
+    // Optimization: Prioritize the active refreshed user over the static background token
+    if (_currentUser != null) {
+      try {
+        final GoogleSignInAuthentication auth = await _currentUser!.authentication;
+        return auth.accessToken;
+      } catch (e) {
+        AppLogger.warn('AuthService: Failed to get fresh token from user session: $e');
+        // Fallback to background token if session refresh fails
+      }
     }
+    
+    if (_backgroundToken != null) return _backgroundToken;
+    return null;
   }
 
   bool get isAuthenticated => _currentUser != null || _backgroundToken != null;

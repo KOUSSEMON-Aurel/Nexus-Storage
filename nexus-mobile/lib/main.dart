@@ -5,9 +5,12 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:disable_battery_optimization/disable_battery_optimization.dart';
 import 'dart:io';
 
 import 'package:nexus_mobile/services/database_service.dart';
+import 'package:nexus_mobile/services/nexus_service.dart';
 import 'package:nexus_mobile/services/task_handler.dart';
 import 'package:nexus_mobile/models/file_record.dart';
 import 'package:nexus_mobile/ui/files_page.dart';
@@ -37,8 +40,6 @@ void main() async {
     
     _initForegroundTask();
     ThermalMonitor.start(); // Start thermal monitoring
-
-    // ... (rest of main code until Validation at startup)
 
     // Validation at startup (Rule 8)
     await Future.wait([
@@ -104,17 +105,65 @@ void _initForegroundTask() {
 
 Future<void> _requestPermissions() async {
   if (Platform.isAndroid) {
-    await [
-      Permission.storage,
-      Permission.photos,
-      Permission.videos,
-      Permission.notification,
-    ].request();
+    final deviceInfo = DeviceInfoPlugin();
+    final androidInfo = await deviceInfo.androidInfo;
+    final sdkInt = androidInfo.version.sdkInt;
+
+    // Bug #1 & #4 refined: Keep only what is strictly necessary for writing to Download/
+    if (sdkInt >= 30) {
+      // Android 11+ (API 30+)
+      // manageExternalStorage is special: it doesn't show a runtime dialog but opens settings.
+      if (!await Permission.manageExternalStorage.isGranted) {
+         await Permission.manageExternalStorage.request();
+      }
+    } else {
+      // Android 10 (API 29) and below: legacy storage is enough with Manifest flag
+      await Permission.storage.request();
+    }
+
+    // Common permissions
+    await Permission.notification.request();
+
+    // Bug #3: Battery Optimization Strategy
+    bool? isIgnoring = await FlutterForegroundTask.isIgnoringBatteryOptimizations;
+    if (!isIgnoring) {
+      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+    }
+    
+    bool? isBatteryOptimizationDisabled = await DisableBatteryOptimization.isAllBatteryOptimizationDisabled;
+    if (isBatteryOptimizationDisabled == false) {
+      await DisableBatteryOptimization.showDisableBatteryOptimizationSettings();
+    }
   }
 }
 
-class NexusApp extends StatelessWidget {
+class NexusApp extends StatefulWidget {
   const NexusApp({super.key});
+
+  @override
+  State<NexusApp> createState() => _NexusAppState();
+}
+
+class _NexusAppState extends State<NexusApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Re-check critical permissions when returning from settings
+      _requestPermissions();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -345,48 +394,42 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _startBackgroundUpload(File file, String name, String password) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
+    print('NexusDebug: Starting direct async upload for $name, taskId: $taskId');
     
-    await FlutterForegroundTask.saveData(key: 'type', value: 'upload');
-    await FlutterForegroundTask.saveData(key: 'path', value: file.path);
-    await FlutterForegroundTask.saveData(key: 'pwd', value: password);
-    await FlutterForegroundTask.saveData(key: 'id', value: taskId);
-    
-    final token = await AuthService().getAccessToken();
-    if (token != null) {
-      await FlutterForegroundTask.saveData(key: 'token', value: token);
-    }
-    
-    if (!await FlutterForegroundTask.isRunningService) {
-      await FlutterForegroundTask.startService(
-        notificationTitle: 'Nexus: Upload Starting',
-        notificationText: 'Preparing $name...',
-        serviceTypes: [ForegroundServiceTypes.dataSync],
-        callback: startCallback,
-      );
+    // Contournement Android 14 ForegroundService limitation
+    try {
+      final nexus = NexusService();
+      await nexus.encodeAndUpload(file, password, explicitTaskId: taskId);
+      DatabaseService().notifyChange();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ Upload Complete: $name'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      AppLogger.error('Upload Error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Upload Failed: $e'), backgroundColor: Colors.red));
+      }
     }
   }
 
   Future<void> _startBackgroundDownload(FileRecord record) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
+    final fileName = record.path.split('/').last;
+    print('NexusDebug: Starting direct async download for $fileName, taskId: $taskId');
     
-    await FlutterForegroundTask.saveData(key: 'type', value: 'download');
-    await FlutterForegroundTask.saveData(key: 'video_id', value: record.videoId);
-    await FlutterForegroundTask.saveData(key: 'file_name', value: record.path.split('/').last);
-    await FlutterForegroundTask.saveData(key: 'pwd', value: record.key);
-    await FlutterForegroundTask.saveData(key: 'id', value: taskId);
-    
-    final token = await AuthService().getAccessToken();
-    if (token != null) {
-      await FlutterForegroundTask.saveData(key: 'token', value: token);
-    }
-    
-    if (!await FlutterForegroundTask.isRunningService) {
-      await FlutterForegroundTask.startService(
-        notificationTitle: 'Nexus: Download Starting',
-        notificationText: 'Fetching ${record.path.split('/').last}...',
-        serviceTypes: [ForegroundServiceTypes.dataSync],
-        callback: startCallback,
-      );
+    // Contournement Android 14 ForegroundService limitation
+    try {
+      final nexus = NexusService();
+      await nexus.downloadAndDecrypt(record, record.key, explicitTaskId: taskId);
+      DatabaseService().notifyChange();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ Download Complete: $fileName'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      AppLogger.error('Download Error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Download Failed: $e'), backgroundColor: Colors.red));
+      }
     }
   }
 

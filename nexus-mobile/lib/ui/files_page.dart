@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:io';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:nexus_mobile/services/database_service.dart';
 import 'package:nexus_mobile/services/settings_service.dart';
 import 'package:nexus_mobile/utils/l10n.dart';
@@ -268,12 +271,19 @@ class _FilesPageState extends State<FilesPage> {
               IconButton(onPressed: () => _handleBulkAction('delete'), icon: const Icon(Icons.delete_forever_rounded, color: AppColors.error)),
             ],
             IconButton(
-              onPressed: () {
+              onPressed: () async {
                 for (var id in _selectedIds) {
                   final file = _files.firstWhere((f) => f.id == id);
                   if (widget.onDownload != null) {
+                    // Request battery optimization once before starting the batch if possible
+                    if (Platform.isAndroid && !await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
+                       await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+                    }
                     widget.onDownload!(file);
                   } else {
+                    if (Platform.isAndroid && !await Permission.manageExternalStorage.isGranted) {
+                        await Permission.manageExternalStorage.request();
+                    }
                     _nexus.downloadAndDecrypt(file, file.key);
                   }
                 }
@@ -492,8 +502,19 @@ class _FilesPageState extends State<FilesPage> {
                 ListTile(
                   leading: const Icon(Icons.download_rounded, color: AppColors.primary),
                   title: const Text('Download Offline'),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(context);
+                    
+                    // Request absolute path permission and battery optimization ignore for background stability
+                    if (Platform.isAndroid) {
+                      if (!await Permission.manageExternalStorage.isGranted) {
+                        await Permission.manageExternalStorage.request();
+                      }
+                      if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
+                        await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+                      }
+                    }
+
                     if (widget.onDownload != null) {
                       widget.onDownload!(file);
                     } else {

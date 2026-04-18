@@ -1,0 +1,1000 @@
+04-14 18:20:12.433 13282 13282 D TranFlingManagerImpl: updateVelocity, scrollType = 1, currVelocity = 15.789145
+04-14 18:20:12.433   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(1616)
+04-14 18:20:12.433   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:12.433   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:12.433 13282 13282 D TranFlingManagerImpl: updateCurrVelocity mFlingFlag currVelocity:15.789145
+04-14 18:20:12.433   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(80)
+04-14 18:20:12.433   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:12.433   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:12.433   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(96)
+04-14 18:20:12.433   679   776 D DPUModule: [ …œhu] support: 0
+04-14 18:20:12.434 13282 13282 D TranFlingManagerImpl: onOverScrollerFinish()
+04-14 18:20:12.440  1092  5599 D AlarmManager: Add alarm packageName=com.google.android.gms, type=3, when=519101403, tag=null, callingUid=10106, callingPackage=com.google.android.gms
+04-14 18:20:12.440  1092  5599 D AlarmManagerService: set alarm to kernel: 517705.518000000, type=2 
+04-14 18:20:12.440  1092  5599 D AlarmManagerService: set alarm to kernel: 517690.388000000, type=3 
+04-14 18:20:12.450   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:12.450   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:12.450   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(1616)
+04-14 18:20:12.450   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:12.450   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:12.450   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(80)
+04-14 18:20:12.450   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:12.450   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:12.450   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(96)
+04-14 18:20:12.450   679   776 D DPUModule: [ …œhu] support: 0
+04-14 18:20:12.451  1092  1092 I TransportConnection: BackupTransportService#2997: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:12.457   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.459  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:12.467   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:12.467   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:12.467   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(1616)
+04-14 18:20:12.467   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:12.467   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:12.467   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(80)
+04-14 18:20:12.467   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:12.467   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:12.467   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(96)
+04-14 18:20:12.467   679   776 D DPUModule: [ …œhu] support: 0
+04-14 18:20:12.472 15011 14734 I NetworkScheduler.Stats: (REDACTED) Task %s/%s started execution. cause:%s exec_start_elapsed_seconds: %s
+04-14 18:20:12.475  4491 12584 I RecoverableKeyStoreGms: [FolsomSyncManager] Starting sync for event: SYNC_PERIODIC
+04-14 18:20:12.483   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:12.483   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:12.483   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(1616)
+04-14 18:20:12.483   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:12.483   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:12.483   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(80)
+04-14 18:20:12.483   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:12.483   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:12.483   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(96)
+04-14 18:20:12.483   679   776 D DPUModule: [ …œhu] support: 0
+04-14 18:20:12.497  6883  6907 E DatabaseUtils: Writing exception to parcel
+04-14 18:20:12.497  6883  6907 E DatabaseUtils: java.lang.IllegalArgumentException: Failed to determine if primary:Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/ComicInfo.xml is child of primary:Documents/Scans: java.io.FileNotFoundException: Missing file for primary:Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/ComicInfo.xml at /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/ComicInfo.xml
+04-14 18:20:12.497  6883  6907 E DatabaseUtils: 	at com.android.internal.content.FileSystemProvider.isChildDocument(FileSystemProvider.java:145)
+04-14 18:20:12.497  6883  6907 E DatabaseUtils: 	at android.provider.DocumentsProvider.enforceTree(DocumentsProvider.java:235)
+04-14 18:20:12.497  6883  6907 E DatabaseUtils: 	at android.provider.DocumentsProvider.query(DocumentsProvider.java:923)
+04-14 18:20:12.497  6883  6907 E DatabaseUtils: 	at android.content.ContentProvider$Transport.query(ContentProvider.java:293)
+04-14 18:20:12.497  6883  6907 E DatabaseUtils: 	at android.content.ContentProviderNative.onTransact(ContentProviderNative.java:107)
+04-14 18:20:12.497  6883  6907 E DatabaseUtils: 	at android.os.Binder.execTransactInternal(Binder.java:1281)
+04-14 18:20:12.497  6883  6907 E DatabaseUtils: 	at android.os.Binder.execTransact(Binder.java:1244)
+04-14 18:20:12.501   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.512  4491 15195 I SelfReportingProvisione: Location is still disabled, so not trying to auto-enable LKL. [CONTEXT service_id=284 ]
+04-14 18:20:12.519  1092  1547 D BroadcastQueue: Add broadcast <BroadcastRecord{95e865a u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:12.519  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{95e865a u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:12.520  6883  6907 E DatabaseUtils: Writing exception to parcel
+04-14 18:20:12.520  6883  6907 E DatabaseUtils: java.lang.IllegalArgumentException: Failed to determine if primary:Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/ComicInfo.xml is child of primary:Documents/Scans: java.io.FileNotFoundException: Missing file for primary:Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/ComicInfo.xml at /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/ComicInfo.xml
+04-14 18:20:12.520  6883  6907 E DatabaseUtils: 	at com.android.internal.content.FileSystemProvider.isChildDocument(FileSystemProvider.java:145)
+04-14 18:20:12.520  6883  6907 E DatabaseUtils: 	at android.provider.DocumentsProvider.enforceTree(DocumentsProvider.java:235)
+04-14 18:20:12.520  6883  6907 E DatabaseUtils: 	at android.provider.DocumentsProvider.query(DocumentsProvider.java:923)
+04-14 18:20:12.520  6883  6907 E DatabaseUtils: 	at android.content.ContentProvider$Transport.query(ContentProvider.java:293)
+04-14 18:20:12.520  6883  6907 E DatabaseUtils: 	at android.content.ContentProviderNative.onTransact(ContentProviderNative.java:107)
+04-14 18:20:12.520  6883  6907 E DatabaseUtils: 	at android.os.Binder.execTransactInternal(Binder.java:1281)
+04-14 18:20:12.520  6883  6907 E DatabaseUtils: 	at android.os.Binder.execTransact(Binder.java:1244)
+04-14 18:20:12.521  1092  5599 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:12.523  1092  1228 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@b93ea67
+04-14 18:20:12.524  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:12.525  4491  4536 W GoogleApiManager: Not showing notification since connectionResult is not user-facing: ConnectionResult{statusCode=API_UNAVAILABLE, resolution=null, message=null, clientMethodKey=null}
+04-14 18:20:12.527  4491 15197 I SelfReportingProvisione: Wearable API isn't available on this device. [CONTEXT service_id=284 ]
+04-14 18:20:12.527  4491 15197 I SelfReportingProvisione: Device isn't provisioned, so stopping self location fetcher. [CONTEXT service_id=284 ]
+04-14 18:20:12.529  1092  1092 I TransportConnection: BackupTransportService#2999: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:12.537  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:12.544  2973 31396 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:12.544   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.544  2973 31396 W MediaProvider: isAppCloneUserPair for user 0: false
+04-14 18:20:12.561  2973  3010 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:12.580   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.581  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{37b81e3 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:12.582  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{37b81e3 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:12.598  1092  1092 I TransportConnection: BackupTransportService#3001: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:12.608  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:12.612  4491 15195 I SelfRptRegSyncer: Starting owner key synchronization for a non-LKL account [CONTEXT service_id=284 ]
+04-14 18:20:12.613  4491 15195 I SelfRptRegSyncer: Starting owner key synchronization for a non-LKL account [CONTEXT service_id=284 ]
+04-14 18:20:12.613  4491 15195 I SelfRptRegSyncer: Starting owner key synchronization for a non-LKL account [CONTEXT service_id=284 ]
+04-14 18:20:12.613  4491 15195 I SelfRptRegSyncer: Starting owner key synchronization for a non-LKL account [CONTEXT service_id=284 ]
+04-14 18:20:12.613  4491 15195 I SelfRptRegSyncer: Starting owner key synchronization for a non-LKL account [CONTEXT service_id=284 ]
+04-14 18:20:12.618  4491 15197 I GmsCoreXrpcWrapper: (REDACTED) Creating a custom channel provider with trafficStatsTag=%d trafficStatsUid=%d
+04-14 18:20:12.623   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.636  1092  2920 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:12.637  1092  2920 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@afd631f
+04-14 18:20:12.640  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:12.641  4491  4536 W ServiceBindIntentUtils: Dynamic lookup for intent failed for action: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START
+04-14 18:20:12.643  1092  1547 D BroadcastQueue: Add broadcast <BroadcastRecord{b10d66c u0 android.intent.action.MEDIA_SCANNER_SCAN_FILE}> into [ordered | background], pending size 0
+04-14 18:20:12.646  1092  2920 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START pkg=com.google.android.gms } U=0: not found
+04-14 18:20:12.646  1092  1547 D BroadcastQueue: Add broadcast <BroadcastRecord{72e5f96 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:12.646  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{72e5f96 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:12.649  1092  2920 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@def8db3
+04-14 18:20:12.649  6883  6907 E DatabaseUtils: Writing exception to parcel
+04-14 18:20:12.649  6883  6907 E DatabaseUtils: java.lang.IllegalArgumentException: Failed to determine if primary:Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f.cbz_tmp is child of primary:Documents/Scans: java.io.FileNotFoundException: Missing file for primary:Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f.cbz_tmp at /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f.cbz_tmp
+04-14 18:20:12.649  6883  6907 E DatabaseUtils: 	at com.android.internal.content.FileSystemProvider.isChildDocument(FileSystemProvider.java:145)
+04-14 18:20:12.649  6883  6907 E DatabaseUtils: 	at android.provider.DocumentsProvider.enforceTree(DocumentsProvider.java:235)
+04-14 18:20:12.649  6883  6907 E DatabaseUtils: 	at android.provider.DocumentsProvider.query(DocumentsProvider.java:923)
+04-14 18:20:12.649  6883  6907 E DatabaseUtils: 	at android.content.ContentProvider$Transport.query(ContentProvider.java:293)
+04-14 18:20:12.649  6883  6907 E DatabaseUtils: 	at android.content.ContentProviderNative.onTransact(ContentProviderNative.java:107)
+04-14 18:20:12.649  6883  6907 E DatabaseUtils: 	at android.os.Binder.execTransactInternal(Binder.java:1281)
+04-14 18:20:12.649  6883  6907 E DatabaseUtils: 	at android.os.Binder.execTransact(Binder.java:1244)
+04-14 18:20:12.650  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START on com.google.android.gms
+04-14 18:20:12.652  4491 15197 I SyncOwnerKeyStateMach: Starting syncOwnerKey [CONTEXT service_id=284 ]
+04-14 18:20:12.653  1092  2920 D F_TranHibernation: screen off bc restricted1 by uid 10202
+04-14 18:20:12.654  4491 15195 I KeychainDomainChooser: Continuing to use the default LSKF Keychain domain. [CONTEXT service_id=284 ]
+04-14 18:20:12.655  1092  1275 D BroadcastQueue: Finished with ordered broadcast BroadcastRecord{b10d66c u0 android.intent.action.MEDIA_SCANNER_SCAN_FILE} receivers:([ResolveInfo{6cb520f com.google.android.providers.media.module/com.android.providers.media.MediaReceiver m=0x208000}, ResolveInfo{e2cb29c com.folderv.file/.UsbBroadcastReceiver m=0x208000}]) take 11ms in [background], remains -1
+04-14 18:20:12.655  4491 15195 I KeychainOwnerKeysImport: No owner key is installed [CONTEXT service_id=284 ]
+04-14 18:20:12.655  4491 15195 I KeychainOwnerKeysImport: (REDACTED) Missing in-use exported owner key(s): %s
+04-14 18:20:12.655  4491 15197 I KeychainOwnerKeysImport: (REDACTED) Retrieving LSKF domain keys. Domain name: '%s'
+04-14 18:20:12.657  1092  1547 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:12.658  1092  1547 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@81bc4a5
+04-14 18:20:12.659  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:12.660   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.661  4491  4536 W ServiceBindIntentUtils: Dynamic lookup for intent failed for action: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START
+04-14 18:20:12.662  1092  1092 I TransportConnection: BackupTransportService#3007: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:12.665  1092  5607 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START pkg=com.google.android.gms } U=0: not found
+04-14 18:20:12.665  2973  3813 I MediaProvider: Begin Intent { act=android.intent.action.MEDIA_SCANNER_SCAN_FILE dat=file:///... flg=0x1000010 cmp=com.google.android.providers.media.module/com.android.providers.media.MediaService }
+04-14 18:20:12.670  1092  1228 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:12.670  1092  5607 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@522b934
+04-14 18:20:12.673  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START on com.google.android.gms
+04-14 18:20:12.679  2973 31397 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:12.680  2973 31397 W MediaProvider: isAppCloneUserPair for user 0: false
+04-14 18:20:12.682  4491 14898 I RecoverableKeyStoreGms: [GetKeyMaterialOperation] GetKeyMaterialOperation: 15cee3f5-4103-44a9-b6d4-cb437c54d6bc
+04-14 18:20:12.682  2973  3813 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:12.705   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.706  2973  3813 I MediaProvider: End Intent { act=android.intent.action.MEDIA_SCANNER_SCAN_FILE dat=file:///... flg=0x1000010 cmp=com.google.android.providers.media.module/com.android.providers.media.MediaService }
+04-14 18:20:12.714  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:12.745   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.748  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{6d609c9 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:12.749  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{6d609c9 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:12.763  1092  1092 I TransportConnection: BackupTransportService#3009: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:12.771  1092  1228 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:12.782  1092  1224 I system_server: Background young concurrent mark compact GC freed 24MB AllocSpace bytes, 0(0B) LOS objects, 29% free, 56MB/80MB, paused 2.482ms,7.327ms total 122.488ms
+04-14 18:20:12.783   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.792  1092  1700 D BroadcastQueue: Add broadcast <BroadcastRecord{710b2d7 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:12.793  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{710b2d7 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:12.798  1092  1092 I TransportConnection: BackupTransportService#3010: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:12.805  1092  9406 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:12.811  4491 14898 I RecoverableKeyStoreGms: [FolsomSyncManager] Starting sync for event:  GET_KEY_MATERIAL
+04-14 18:20:12.818 15011 14734 I NetworkScheduler.Stats: (REDACTED) Task %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s
+04-14 18:20:12.822   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.834  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{13068b7 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:12.838  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{13068b7 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:12.840  1092  9576 D AlarmManagerService: set alarm to kernel: 517705.518000000, type=2 
+04-14 18:20:12.840  1092  9576 D AlarmManagerService: set alarm to kernel: 517690.388000000, type=3 
+04-14 18:20:12.845  1092  1092 I TransportConnection: BackupTransportService#3015: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:12.862   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.862  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:12.874  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{4491bb u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:12.882  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{4491bb u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:12.883  1092  5607 V AlarmManager: set(PendingIntent{ffadca2: PendingIntentRecord{2fa0a4e com.google.android.gms/com.google.android.gms.scheduler broadcastIntent}}) : type=3 listener=null listenerTag=null workSource=WorkSource{10106 com.google.android.gms} callingPackage=com.google.android.gms callingUid=10106 triggerAtTime=519101403 win=1083593 tElapsed=519101403 maxElapsed=520184996 interval=0 flags=0x0
+04-14 18:20:12.883  1092  5607 D AlarmManager: Add alarm packageName=com.google.android.gms, type=3, when=519101403, tag=null, callingUid=10106, callingPackage=com.google.android.gms
+04-14 18:20:12.884  1092  5607 D AlarmManagerService: set alarm to kernel: 517705.518000000, type=2 
+04-14 18:20:12.884  1092  5607 D AlarmManagerService: set alarm to kernel: 517690.388000000, type=3 
+04-14 18:20:12.902   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.903  1092  1092 I TransportConnection: BackupTransportService#3019: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:12.921 15011 14909 I NetworkScheduler.Stats: (REDACTED) Task %s/%s started execution. cause:%s exec_start_elapsed_seconds: %s
+04-14 18:20:12.923  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:12.927  1092  1547 D BroadcastQueue: Add broadcast <BroadcastRecord{d1af8e4 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:12.927  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{d1af8e4 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:12.943   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.947  1092  1092 I TransportConnection: BackupTransportService#3023: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:12.956  1092  2920 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:12.971  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{1522a57 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:12.972  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{1522a57 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:12.978   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:12.978  1092  1092 I TransportConnection: BackupTransportService#3025: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:12.983  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:12.999  1092  1547 D BroadcastQueue: Add broadcast <BroadcastRecord{f953e55 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.000  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{f953e55 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.001  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.007  1092  1092 I TransportConnection: BackupTransportService#3026: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.010  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/002.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.012  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.018   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.042  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.048  1092  1700 D BroadcastQueue: Add broadcast <BroadcastRecord{e10c940 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.049  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{e10c940 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.049  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/004.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.055  1092  1092 I TransportConnection: BackupTransportService#3028: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.060   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.068  1092  1228 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.078  1092  5607 D BroadcastQueue: Add broadcast <BroadcastRecord{4d45d21 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.078  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{4d45d21 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.080  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.091  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/003.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.096  1092  1092 I TransportConnection: BackupTransportService#3031: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.100   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.106  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.122  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{97fe085 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.125  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{97fe085 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.126  2973 16652 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.128  4491 12584 I RecoverableKeyStoreGms: [FolsomSyncManager] Starting sync for event: SYNC_PERIODIC
+04-14 18:20:13.132  1092  1092 I TransportConnection: BackupTransportService#3032: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.133  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/007.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.141  1092  9576 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.144   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.155 15065 15065 W ThreadPoolForeg: type=1400 audit(0.0:508782): avc: denied { write } for name="traced_producer" dev="tmpfs" ino=26121 scontext=u:r:gmscore_app:s0:c512,c768 tcontext=u:object_r:traced_producer_socket:s0 tclass=sock_file permissive=0 app=com.google.android.gms
+04-14 18:20:13.162  1092  9576 D BroadcastQueue: Add broadcast <BroadcastRecord{a0c0565 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.163  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{a0c0565 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.166  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.171  1092  1092 I TransportConnection: BackupTransportService#3037: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.175  1092  9406 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.176  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/001.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.178  4491 15197 I KeychainOwnerKeysImport: Import aborted. [CONTEXT service_id=284 ]
+04-14 18:20:13.179  4491 15197 I SyncOwnerKeyStateMach: syncOwnerKey result: hollow victory [CONTEXT service_id=284 ]
+04-14 18:20:13.183   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.187  4491 15195 I GmsCoreXrpcWrapper: (REDACTED) Creating a custom channel provider with trafficStatsTag=%d trafficStatsUid=%d
+04-14 18:20:13.193  1092  5607 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:13.198  1092  5607 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@b42f78
+04-14 18:20:13.200  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:13.200  1092  5607 D BroadcastQueue: Add broadcast <BroadcastRecord{2b8cb24 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.201  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{2b8cb24 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.202  4491  4536 W ServiceBindIntentUtils: Dynamic lookup for intent failed for action: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START
+04-14 18:20:13.205  1092  5607 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START pkg=com.google.android.gms } U=0: not found
+04-14 18:20:13.205  1092  5607 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@c497590
+04-14 18:20:13.206  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START on com.google.android.gms
+04-14 18:20:13.208  2973 16652 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.208  1092  1092 I TransportConnection: BackupTransportService#3038: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.210  1092  1228 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:13.214  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.215  4491 15195 I SyncOwnerKeyStateMach: Starting syncOwnerKey [CONTEXT service_id=284 ]
+04-14 18:20:13.215  1092  1228 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@40a5ecb
+04-14 18:20:13.216  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:13.217  2973 16652 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/009.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.219  4491  4536 W ServiceBindIntentUtils: Dynamic lookup for intent failed for action: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START
+04-14 18:20:13.222   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.229  1092  2920 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START pkg=com.google.android.gms } U=0: not found
+04-14 18:20:13.230  4491 15197 I KeychainDomainChooser: No Keychain domain is in use. [CONTEXT service_id=284 ]
+04-14 18:20:13.238  1092  5607 D BroadcastQueue: Add broadcast <BroadcastRecord{8d490bb u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.239  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{8d490bb u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.239  1092  1700 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@23cc9d8
+04-14 18:20:13.241  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START on com.google.android.gms
+04-14 18:20:13.248  4491 14898 I RecoverableKeyStoreGms: (REDACTED) [GetSyncStatusOperation] GetSyncStatusOperation: %s
+04-14 18:20:13.249  2973 16652 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.259  2973 16652 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/008.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.262  1092  1092 I TransportConnection: BackupTransportService#3039: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.264   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.274  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.298   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.301  1092  1700 D BroadcastQueue: Add broadcast <BroadcastRecord{a281b95 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.302  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{a281b95 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.302  2973 16652 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.309  1092  1092 I TransportConnection: BackupTransportService#3045: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.311  2973 16652 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/006.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.314  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.336  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{4baeb81 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.336  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{4baeb81 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.337  1092  1700 I RecoverableAppKeyStore: Get 0/10106/com.google.android.gms.auth.folsom/v1/1733584411499/23AC82A345E4691FB3A5AD753726CEB1
+04-14 18:20:13.343   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.344  2973 16652 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.346  1092  5607 I RecoverableAppKeyStore: Get 0/10106/com.google.android.gms.auth.folsom/v1/1776164283224/32D6904718203974F01022A83463FE5D
+04-14 18:20:13.353  4491 14898 I KeychainDomainChooser: (REDACTED) Can create an LSKF Keychain domain, so using the default one (syncStatus: %s).
+04-14 18:20:13.353  4491 14898 I KeychainOwnerKeysImport: No owner key is installed [CONTEXT service_id=284 ]
+04-14 18:20:13.353  4491 14898 I KeychainOwnerKeysImport: No in-use exported owner keys are missing [CONTEXT service_id=284 ]
+04-14 18:20:13.353  4491 15197 I KeychainOwnerKeysImport: (REDACTED) Retrieving LSKF domain keys. Domain name: '%s'
+04-14 18:20:13.354  2973 16652 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/005.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.355  1092  1092 I TransportConnection: BackupTransportService#3046: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.368  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.369  4491 14898 I RecoverableKeyStoreGms: [GetKeyMaterialOperation] GetKeyMaterialOperation: 15cee3f5-4103-44a9-b6d4-cb437c54d6bc
+04-14 18:20:13.385  2973 16652 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.385   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.394  1092  1547 D BroadcastQueue: Add broadcast <BroadcastRecord{c54efba u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.395  2973 16652 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/015.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.396  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{c54efba u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.405  1092  1092 I TransportConnection: BackupTransportService#3053: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.417  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.420   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.421  2973 16652 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.424  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{4e2b8f8 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.425  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{4e2b8f8 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.429  2973 16652 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/010.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.437  1092  1092 I TransportConnection: BackupTransportService#3055: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.437  4491 14898 I RecoverableKeyStoreGms: [FolsomSyncManager] Starting sync for event:  GET_KEY_MATERIAL
+04-14 18:20:13.441 15011 14734 I NetworkScheduler.Stats: (REDACTED) Task %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s
+04-14 18:20:13.446  1092  2920 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.456  1092  5607 D AlarmManagerService: set alarm to kernel: 517705.518000000, type=2 
+04-14 18:20:13.457  1092  5607 D AlarmManagerService: set alarm to kernel: 517690.388000000, type=3 
+04-14 18:20:13.462   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.465  2973 16652 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.476  2973 16652 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/011.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.483   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:13.483   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:13.483   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(1616)
+04-14 18:20:13.483   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:13.483   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:13.483   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(80)
+04-14 18:20:13.483   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:13.483   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:13.483   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(96)
+04-14 18:20:13.483   679   776 D DPUModule: [ …œhu] support: 0
+04-14 18:20:13.485  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{96b1779 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.486  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{96b1779 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.496  1092  1092 I TransportConnection: BackupTransportService#3058: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.497  1092  9406 V AlarmManager: set(PendingIntent{7d33cb1: PendingIntentRecord{2fa0a4e com.google.android.gms/com.google.android.gms.scheduler broadcastIntent}}) : type=3 listener=null listenerTag=null workSource=WorkSource{10106 com.google.android.gms} callingPackage=com.google.android.gms callingUid=10106 triggerAtTime=519101403 win=1083132 tElapsed=519101403 maxElapsed=520184535 interval=0 flags=0x0
+04-14 18:20:13.498  1092  9406 D AlarmManager: Add alarm packageName=com.google.android.gms, type=3, when=519101403, tag=null, callingUid=10106, callingPackage=com.google.android.gms
+04-14 18:20:13.498  1092  9406 D AlarmManagerService: set alarm to kernel: 517705.518000000, type=2 
+04-14 18:20:13.499  1092  9406 D AlarmManagerService: set alarm to kernel: 517690.388000000, type=3 
+04-14 18:20:13.499  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.500   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:13.500   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:13.500   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(1616)
+04-14 18:20:13.500   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:13.500   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:13.500   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(80)
+04-14 18:20:13.500   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:13.500   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:13.500   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(96)
+04-14 18:20:13.500   679   776 D DPUModule: [ …œhu] support: 0
+04-14 18:20:13.502   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.507  2973 16652 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.516  2973 16652 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/013.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.519 15011 14909 I NetworkScheduler.Stats: (REDACTED) Task %s/%s started execution. cause:%s exec_start_elapsed_seconds: %s
+04-14 18:20:13.541   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.548  1092  2920 W JobScheduler: Job didn't exist in JobStore: a5725f1 #u0a99/65510 com.google.android.apps.nbu.files/androidx.work.impl.background.systemjob.SystemJobService
+04-14 18:20:13.553  1092  1547 D BroadcastQueue: Add broadcast <BroadcastRecord{5bbb421 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.553  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{5bbb421 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.554  2973 16652 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.562  2973 16652 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/019.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.564  1092  1092 I TransportConnection: BackupTransportService#3059: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.575  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.582   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.594  2973 16652 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.600  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{955dfe7 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.602  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{955dfe7 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.603  2973 16652 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/014.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.609  1092  1092 I TransportConnection: BackupTransportService#3070: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.615  1092  9576 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.618   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.631  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{de95dc4 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.632  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{de95dc4 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.634  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.640  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/012.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.649  1092  1092 I TransportConnection: BackupTransportService#3071: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.657  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.662  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{f165306 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.663  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{f165306 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.665   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.673  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.678  1092  1547 D BroadcastQueue: Add broadcast <BroadcastRecord{75c4278 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.678  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/016.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.682  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{75c4278 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.688  4491 14896 I RecoverableKeyStoreGms: [FolsomSyncManager] Starting sync for event: SYNC_PERIODIC
+04-14 18:20:13.691  1092  1092 I TransportConnection: BackupTransportService#3073: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.696  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.701   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.711  4491 15197 I KeychainOwnerKeysImport: Import aborted. [CONTEXT service_id=284 ]
+04-14 18:20:13.712  4491 15197 I SyncOwnerKeyStateMach: syncOwnerKey result: hollow victory [CONTEXT service_id=284 ]
+04-14 18:20:13.713  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.717  4491 15195 I GmsCoreXrpcWrapper: (REDACTED) Creating a custom channel provider with trafficStatsTag=%d trafficStatsUid=%d
+04-14 18:20:13.723  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/017.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.725  1092  9576 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:13.725  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{7ba089f u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.726  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{7ba089f u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.726  1092  9576 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@2d04dec
+04-14 18:20:13.727  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:13.729  4491  4536 W ServiceBindIntentUtils: Dynamic lookup for intent failed for action: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START
+04-14 18:20:13.731  1092  9576 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START pkg=com.google.android.gms } U=0: not found
+04-14 18:20:13.732  1092  1092 I TransportConnection: BackupTransportService#3081: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.735  1092  9576 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@6946e84
+04-14 18:20:13.737  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START on com.google.android.gms
+04-14 18:20:13.743   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.743  1092  1228 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:13.744  1092  1547 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@b220c69
+04-14 18:20:13.745  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:13.746  1092  1228 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.746  4491  4536 W ServiceBindIntentUtils: Dynamic lookup for intent failed for action: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START
+04-14 18:20:13.752  4491 15195 I SyncOwnerKeyStateMach: Starting syncOwnerKey [CONTEXT service_id=284 ]
+04-14 18:20:13.757  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.758  1092  9576 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START pkg=com.google.android.gms } U=0: not found
+04-14 18:20:13.762  1092  9576 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@91da987
+04-14 18:20:13.763  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START on com.google.android.gms
+04-14 18:20:13.765  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/022.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.770  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{2b779e u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.771  1092  9576 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:13.772  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{2b779e u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.773  1092  1228 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@b536faa
+04-14 18:20:13.773  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:13.775  4491 15195 I KeychainDomainChooser: No Keychain domain is in use. [CONTEXT service_id=284 ]
+04-14 18:20:13.778  1092  1092 I TransportConnection: BackupTransportService#3086: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.780   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.782  4491 14898 I RecoverableKeyStoreGms: (REDACTED) [GetSyncStatusOperation] GetSyncStatusOperation: %s
+04-14 18:20:13.788  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.799  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.802   955  1727 D GNSSMGT : watchdog: PowerState: CP SLEEP
+04-14 18:20:13.805  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/020.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.820  1092  5607 D BroadcastQueue: Add broadcast <BroadcastRecord{c912303 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.821  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{c912303 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.822   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.830  1092  1092 I TransportConnection: BackupTransportService#3091: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.833  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.841  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/018.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.844  1092  1228 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.861   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.864  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{6dbb547 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.865  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{6dbb547 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.876  1092  1228 I RecoverableAppKeyStore: Get 0/10106/com.google.android.gms.auth.folsom/v1/1733584411499/23AC82A345E4691FB3A5AD753726CEB1
+04-14 18:20:13.877  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.880  1092  1228 I RecoverableAppKeyStore: Get 0/10106/com.google.android.gms.auth.folsom/v1/1776164283224/32D6904718203974F01022A83463FE5D
+04-14 18:20:13.884  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/030.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.884  1092  1092 I TransportConnection: BackupTransportService#3101: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.887  4491 14898 I KeychainDomainChooser: (REDACTED) Can create an LSKF Keychain domain, so using the default one (syncStatus: %s).
+04-14 18:20:13.888  4491 14898 I KeychainOwnerKeysImport: No owner key is installed [CONTEXT service_id=284 ]
+04-14 18:20:13.888  4491 14898 I KeychainOwnerKeysImport: No in-use exported owner keys are missing [CONTEXT service_id=284 ]
+04-14 18:20:13.888  4491 15195 I KeychainOwnerKeysImport: (REDACTED) Retrieving LSKF domain keys. Domain name: '%s'
+04-14 18:20:13.889  4491 14904 I RecoverableKeyStoreGms: [GetKeyMaterialOperation] GetKeyMaterialOperation: 15cee3f5-4103-44a9-b6d4-cb437c54d6bc
+04-14 18:20:13.894  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.900   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.914  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.919  1092  9406 D BroadcastQueue: Add broadcast <BroadcastRecord{870fd2f u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.919  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{870fd2f u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.923  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/021.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.928  1092  1092 I TransportConnection: BackupTransportService#3102: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.939   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.944  1092  9406 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.949  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:13.956  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{c70d935 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:13.959  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/032.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:13.959  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{c70d935 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:13.961  4491 14904 I RecoverableKeyStoreGms: [FolsomSyncManager] Starting sync for event:  GET_KEY_MATERIAL
+04-14 18:20:13.966 15011 14734 I NetworkScheduler.Stats: (REDACTED) Task %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s
+04-14 18:20:13.981  1092  1092 I TransportConnection: BackupTransportService#3104: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:13.981   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:13.983  1092  5607 D AlarmManagerService: set alarm to kernel: 517705.518000000, type=2 
+04-14 18:20:13.983  1092  5607 D AlarmManagerService: set alarm to kernel: 517690.388000000, type=3 
+04-14 18:20:13.987  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:13.999  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.005  1092  1547 D BroadcastQueue: Add broadcast <BroadcastRecord{b5f0b21 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.005  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{b5f0b21 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.008  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/023.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.020   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.021  1092  1092 I TransportConnection: BackupTransportService#3105: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.028  1092  1547 V AlarmManager: set(PendingIntent{635a3cc: PendingIntentRecord{2fa0a4e com.google.android.gms/com.google.android.gms.scheduler broadcastIntent}}) : type=3 listener=null listenerTag=null workSource=WorkSource{10106 com.google.android.gms} callingPackage=com.google.android.gms callingUid=10106 triggerAtTime=519101403 win=1082733 tElapsed=519101403 maxElapsed=520184136 interval=0 flags=0x0
+04-14 18:20:14.028  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.029  1092  1547 D AlarmManager: Add alarm packageName=com.google.android.gms, type=3, when=519101403, tag=null, callingUid=10106, callingPackage=com.google.android.gms
+04-14 18:20:14.029  1092  1547 D AlarmManagerService: set alarm to kernel: 517705.518000000, type=2 
+04-14 18:20:14.029  1092  1547 D AlarmManagerService: set alarm to kernel: 517690.388000000, type=3 
+04-14 18:20:14.040  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.047  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/027.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.050 15011 14909 I NetworkScheduler.Stats: (REDACTED) Task %s/%s started execution. cause:%s exec_start_elapsed_seconds: %s
+04-14 18:20:14.052  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{36f19ce u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.053  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{36f19ce u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.063   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.071  1092  1092 I TransportConnection: BackupTransportService#3107: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.082  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.087  1092  2920 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.090  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/025.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.097  1092  9406 D BroadcastQueue: Add broadcast <BroadcastRecord{57a588a u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.098  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{57a588a u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.102   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.106  1092  1092 I TransportConnection: BackupTransportService#3108: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.111  1092  9576 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.121  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.131  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/026.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.134  1092  5607 D BroadcastQueue: Add broadcast <BroadcastRecord{6a75e06 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.139  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{6a75e06 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.141   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.157  1092  1092 I TransportConnection: BackupTransportService#3109: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.166  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.171  1092  9576 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.176  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/024.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.178  1092  9576 D BroadcastQueue: Add broadcast <BroadcastRecord{4e0642 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.178  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{4e0642 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.182   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.193  1092  1092 I TransportConnection: BackupTransportService#3110: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.201  1092  2920 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.203  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.211  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/029.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.220  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{5c3efd8 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.221   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.224  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{5c3efd8 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.227  4491 14896 I RecoverableKeyStoreGms: [FolsomSyncManager] Starting sync for event: SYNC_PERIODIC
+04-14 18:20:14.232  1092  1092 I TransportConnection: BackupTransportService#3117: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.237  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.239  1092  1228 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.242  4491 15195 I KeychainOwnerKeysImport: Import aborted. [CONTEXT service_id=284 ]
+04-14 18:20:14.242  4491 15195 I SyncOwnerKeyStateMach: syncOwnerKey result: hollow victory [CONTEXT service_id=284 ]
+04-14 18:20:14.246  4491 15197 I GmsCoreXrpcWrapper: (REDACTED) Creating a custom channel provider with trafficStatsTag=%d trafficStatsUid=%d
+04-14 18:20:14.246  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/031.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.260   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.263  4491 15197 I SyncOwnerKeyStateMach: Starting syncOwnerKey [CONTEXT service_id=284 ]
+04-14 18:20:14.269  1092  2920 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:14.272  1092  2920 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@a8903b4
+04-14 18:20:14.272  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:14.274  4491  4536 W ServiceBindIntentUtils: Dynamic lookup for intent failed for action: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START
+04-14 18:20:14.275  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{fd1d17f u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.275  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.276  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{fd1d17f u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.278  1092  1547 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START pkg=com.google.android.gms } U=0: not found
+04-14 18:20:14.278  1092  9576 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@94f6995
+04-14 18:20:14.279  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START on com.google.android.gms
+04-14 18:20:14.284  4491 15197 I KeychainDomainChooser: Continuing to use the default password KF Keychain domain. [CONTEXT service_id=284 ]
+04-14 18:20:14.284  4491 15197 I KeychainOwnerKeysImport: (REDACTED) Owner key is installed. Version: %d
+04-14 18:20:14.284  4491 15197 I KeychainOwnerKeysImport: No in-use exported owner keys are missing [CONTEXT service_id=284 ]
+04-14 18:20:14.285  4491 15195 I KeychainOwnerKeysImport: (REDACTED) Retrieving GAIA password domain keys. Domain name: '%s'
+04-14 18:20:14.285  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/038.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.286  1092  1092 I TransportConnection: BackupTransportService#3121: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.291  1092  2920 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.303   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.309  4491 14898 I RecoverableKeyStoreGms: [GetKeyMaterialOperation] GetKeyMaterialOperation: d0061058-f181-4837-b54c-e6aa22093eb7
+04-14 18:20:14.319  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.327  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{c86a168 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.328  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/028.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.328  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{c86a168 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.337  1092  1092 I TransportConnection: BackupTransportService#3122: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.340   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.345  1092  9576 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.360  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.371  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/033.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.375  1092  9406 D BroadcastQueue: Add broadcast <BroadcastRecord{14edf2d u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.377  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{14edf2d u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.381   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.384  1092  1092 I TransportConnection: BackupTransportService#3124: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.393  1092  9406 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.398  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.408  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/040.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.413  1092  9406 D BroadcastQueue: Add broadcast <BroadcastRecord{37e5d5e u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.414  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{37e5d5e u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.423   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.425  1092  1092 I TransportConnection: BackupTransportService#3126: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.433  1092  9406 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.448  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.450  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{6027c4b u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.459  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{6027c4b u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.459   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.460  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/035.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.472  1092  1092 I TransportConnection: BackupTransportService#3131: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.478  1092  9406 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.490  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.492  1092  1547 D BroadcastQueue: Add broadcast <BroadcastRecord{965317 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.493  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{965317 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.500  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/034.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.501   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.501  1092  1092 I TransportConnection: BackupTransportService#3132: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.506  1092  9576 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.527  1092  9406 D BroadcastQueue: Add broadcast <BroadcastRecord{301c5a3 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.528  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{301c5a3 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.528  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.537  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/037.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.541  1092  1092 I TransportConnection: BackupTransportService#3133: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.542  1092  9406 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.544   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.571  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.575  1092  1700 D BroadcastQueue: Add broadcast <BroadcastRecord{9621585 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.575  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{9621585 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.578   674 11408 D dtsaudio: eagle pipeline proc call 6948000 (size =1920, inCh=3, outCh=3, android fmt in=5, out=5) ret 0 
+04-14 18:20:14.578   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.579  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/036.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.588  1092  1092 I TransportConnection: BackupTransportService#3136: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.597  1092  2920 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.610  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.616  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{4a6b071 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.618  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{4a6b071 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.620   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.621  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/039.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.627  1092  1092 I TransportConnection: BackupTransportService#3137: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.640  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.658  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.665   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.666  1092  9406 D BroadcastQueue: Add broadcast <BroadcastRecord{a70d11d u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.671  4491 14898 I KeychainDomainRetriever: (REDACTED) Got %d domain keys starting from #%d
+04-14 18:20:14.671  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/042.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.674  4491 15195 I KeychainDomainRetriever: No reason to believe that the available Keychain domain keys are stale. [CONTEXT service_id=284 ]
+04-14 18:20:14.676  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{a70d11d u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.677  4491 15197 I KeychainOwnerKeysImport: No encrypted owner keys that the retrieved domain keys would allow us to decrypt need to be imported. [CONTEXT service_id=284 ]
+04-14 18:20:14.677 15011 14734 I NetworkScheduler.Stats: (REDACTED) Task %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s
+04-14 18:20:14.683  1092  1092 I TransportConnection: BackupTransportService#3141: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.684  4491 15197 I SyncOwnerKeyStateMach: The installed owner key is in use and thus needs to be exported [CONTEXT service_id=284 ]
+04-14 18:20:14.691  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.693  1092  1700 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:14.697 13282 13286 I aoapp.musically: Background young concurrent mark compact GC freed 19MB AllocSpace bytes, 23(2564KB) LOS objects, 18% free, 89MB/108MB, paused 3.096ms,11.892ms total 369.559ms
+04-14 18:20:14.703  1092  1228 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@8e24b7
+04-14 18:20:14.703  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:14.704  4491  4536 W GoogleApiManager: Not showing notification since connectionResult is not user-facing: ConnectionResult{statusCode=API_UNAVAILABLE, resolution=null, message=null, clientMethodKey=null}
+04-14 18:20:14.704   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.705  4491 15197 I FinderWearable: [WearOwnerKeyPublisher] Wearable API isn't available on this device. [CONTEXT service_id=284 ]
+04-14 18:20:14.705  4491 15197 I OwnerKeyExporter: (REDACTED) An export of owner key #%d encrypted with the latest domain key (#%d) already exists
+04-14 18:20:14.706  4491 15197 I SyncOwnerKeyStateMach: Adding LSKF to password domain is disabled [CONTEXT service_id=284 ]
+04-14 18:20:14.706  4491 15197 I SyncOwnerKeyStateMach: syncOwnerKey result: victory [CONTEXT service_id=284 ]
+04-14 18:20:14.706  1092  9406 D BroadcastQueue: Add broadcast <BroadcastRecord{df3ce90 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.707  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{df3ce90 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.709  4491 15195 I GmsCoreXrpcWrapper: (REDACTED) Creating a custom channel provider with trafficStatsTag=%d trafficStatsUid=%d
+04-14 18:20:14.709  1092  2920 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:14.710  1092  2920 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@335f69a
+04-14 18:20:14.710  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:14.711  4491  4536 W ServiceBindIntentUtils: Dynamic lookup for intent failed for action: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START
+04-14 18:20:14.714  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.714  1092  9406 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START pkg=com.google.android.gms } U=0: not found
+04-14 18:20:14.716  1092  1092 I TransportConnection: BackupTransportService#3143: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.718  1092  9406 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@4391bcb
+04-14 18:20:14.718  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START on com.google.android.gms
+04-14 18:20:14.721  1092  9406 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.721  1092  5607 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:14.722  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/044.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.722  1092  5607 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@2c24e54
+04-14 18:20:14.723  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:14.724  4491  4536 W ServiceBindIntentUtils: Dynamic lookup for intent failed for action: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START
+04-14 18:20:14.727  1092  5607 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START pkg=com.google.android.gms } U=0: not found
+04-14 18:20:14.727  1092  1228 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@1d4bef2
+04-14 18:20:14.728  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START on com.google.android.gms
+04-14 18:20:14.730  1092  5607 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.wearable.BIND pkg=com.google.android.gms } U=0: not found
+04-14 18:20:14.730  4491 15195 I SyncOwnerKeyStateMach: Starting syncOwnerKey [CONTEXT service_id=284 ]
+04-14 18:20:14.731  1092  5607 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@ad2e0f9
+04-14 18:20:14.732  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.wearable.BIND on com.google.android.gms
+04-14 18:20:14.737  4491  4536 W ServiceBindIntentUtils: Dynamic lookup for intent failed for action: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START
+04-14 18:20:14.739  1092  5607 D BroadcastQueue: Add broadcast <BroadcastRecord{c8c4a97 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.739  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{c8c4a97 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.740   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.743  1092  9406 W ActivityManager: Unable to start service Intent { act=com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START pkg=com.google.android.gms } U=0: not found
+04-14 18:20:14.743  1092  9406 W ActivityManager: Unbind failed: could not find connection for android.os.BinderProxy@8b6c8a2
+04-14 18:20:14.744  4491  4536 W GmsClient: unable to connect to service: com.google.android.gms.onboardingconsent.api.ConsentManagerApiService.START on com.google.android.gms
+04-14 18:20:14.748  1092  1092 I TransportConnection: BackupTransportService#3145: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.752  1092  5607 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.755  4491 15195 I KeychainDomainChooser: No Keychain domain is in use. [CONTEXT service_id=284 ]
+04-14 18:20:14.756  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.764  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/041.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.766  1092  5607 D BroadcastQueue: Add broadcast <BroadcastRecord{4c69e52 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.767  4491 12584 I RecoverableKeyStoreGms: (REDACTED) [GetSyncStatusOperation] GetSyncStatusOperation: %s
+04-14 18:20:14.767  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{4c69e52 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.778  1092  1092 I TransportConnection: BackupTransportService#3146: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.779   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.788  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.793  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.802  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/043.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.803  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{bbc7468 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.804  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{bbc7468 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.810  1092  1092 I TransportConnection: BackupTransportService#3150: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.819   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.820  1092  1228 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.829  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{f4063d6 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.830  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{f4063d6 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.841  1092  1092 I TransportConnection: BackupTransportService#3152: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.843  1092  1228 I RecoverableAppKeyStore: Get 0/10106/com.google.android.gms.auth.folsom/v1/1733584411499/23AC82A345E4691FB3A5AD753726CEB1
+04-14 18:20:14.844  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.847  1092  1547 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.848  1092  1547 I RecoverableAppKeyStore: Get 0/10106/com.google.android.gms.auth.folsom/v1/1776164283224/32D6904718203974F01022A83463FE5D
+04-14 18:20:14.852  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/045.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.854  4491 12584 I KeychainDomainChooser: (REDACTED) Can create an LSKF Keychain domain, so using the default one (syncStatus: %s).
+04-14 18:20:14.854  4491 12584 I KeychainOwnerKeysImport: No owner key is installed [CONTEXT service_id=284 ]
+04-14 18:20:14.854  4491 12584 I KeychainOwnerKeysImport: No in-use exported owner keys are missing [CONTEXT service_id=284 ]
+04-14 18:20:14.855  4491 15195 I KeychainOwnerKeysImport: (REDACTED) Retrieving LSKF domain keys. Domain name: '%s'
+04-14 18:20:14.856  4491 12584 I RecoverableKeyStoreGms: [GetKeyMaterialOperation] GetKeyMaterialOperation: 15cee3f5-4103-44a9-b6d4-cb437c54d6bc
+04-14 18:20:14.857  1092  9406 D BroadcastQueue: Add broadcast <BroadcastRecord{54b1347 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:14.859  4491 12584 I RecoverableKeyStoreGms: [FolsomSyncManager] Starting sync for event:  GET_KEY_MATERIAL
+04-14 18:20:14.861  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{54b1347 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:14.865   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.876  1092  1092 I TransportConnection: BackupTransportService#3153: Notifying [AppBackupUtils.appIsRunningAndEligibleForBackupWithTransport] transport = BackupTransportClient
+04-14 18:20:14.889  1092  2920 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:14.891  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.898   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.900  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/046.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.906 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.system.navigation, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.907 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.android.launcher3, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.908 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.spreadtrum.sgps, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.909 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.zhiliaoapp.musically, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.909 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.unisoc, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.909 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.monix.monix.monix, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.909 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.os.typeface, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.910 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.google.android.apps.messaging, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.910 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.google.android.apps.maps, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.910 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=android.overlay.systemui.go, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.911 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.google.android.calculator, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.912 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=android.overlay.bluetoothres, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.912 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.deskclock, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.913 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.aurel.nexusStorage, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.913 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=android.unisoc_framework_res.overlay, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.913 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.facebook.lite, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.913 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.camera.auto_generated_rro_vendor__, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.914 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.unisoc.auto_generated_rro_product__, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.914 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.filemanagerx, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.914 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.overlaysuw.resoverlay, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.914 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.camera, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.914 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.teop, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.915 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.android.systemui, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.915 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=android.overlay.framework, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.915 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.trancare, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.915 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.folderv.file, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.915 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.fmradio, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.916 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.android.providers.telephony, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.916 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.dynamicbar, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.917 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.infinix, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.917 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.android.wallpaperbackup, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.917 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.itel.manual, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.917 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.plat.appupdate, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.917 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.tjapp.markdownviewer, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.917 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.anthropic.claude, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.917 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.whatsapp, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.918 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.theme.icondefaultshape, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.918 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=mlz.numbersystemconverter.free, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.918 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.termux, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.918 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.nephilim, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.918 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.resolver, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.918 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.evisions.mobilemoney, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.918 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=android.auto_generated_rro_product__, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.918 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.gallery20, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.919 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=android.go_unisoc_framework_res.overlay, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.919 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.theme.icon, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.919 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=com.transsion.dtsaudio, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.919 15011 14908 I Backup  : [FreshnessTargetTierChecker] Should back up PackageAndBackupType(packageName=android.overlay.navbar, backupType=BACKUP_AGENT): no previous backup record found.
+04-14 18:20:14.920 15011 14862 I Backup  : [BackUpNowOperation] Starting backup.
+04-14 18:20:14.920 15011 14862 I Backup  : [BackUpNowOperation] As per config, running backup agent backups
+04-14 18:20:14.924  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.931  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/057.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.942   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:14.965  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:14.973  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/048.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:14.979 15011 14862 I Backup  : [BackupNowBackupAgentsRunner] Requesting backup for packages: [com.google.android.apps.messaging, com.google.android.apps.maps, com.facebook.lite, com.android.systemui, com.whatsapp, com.android.providers.telephony, com.android.wallpaperbackup]
+04-14 18:20:14.984   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.003  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.005  1092  2920 D BroadcastQueue: Add broadcast <BroadcastRecord{568d696 u-1 android.net.conn.CONNECTIVITY_CHANGE}> into [parallel | background], pending size 0
+04-14 18:20:15.006  1092  1275 D BroadcastQueue: Done with parallel broadcast [background] [BroadcastRecord{568d696 u-1 android.net.conn.CONNECTIVITY_CHANGE}]
+04-14 18:20:15.011  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/047.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.013  1092  1092 I TransportConnection: BackupTransportService#3154: Notifying [BMS.getOperationTypeFromTransport] transport = BackupTransportClient
+04-14 18:20:15.013  4491 15195 I KeychainOwnerKeysImport: Import aborted. [CONTEXT service_id=284 ]
+04-14 18:20:15.013  4491 15195 I SyncOwnerKeyStateMach: syncOwnerKey result: hollow victory [CONTEXT service_id=284 ]
+04-14 18:20:15.016   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.016   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.016   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(1616)
+04-14 18:20:15.016   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.016   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.016   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(80)
+04-14 18:20:15.016   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.016   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.016   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(96)
+04-14 18:20:15.016   679   776 D DPUModule: [ …œhu] support: 0
+04-14 18:20:15.020  1092  2920 D BackupTransportManager: Transport com.google.android.gms/.backup.BackupTransportService updated its attributes
+04-14 18:20:15.021   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.023 15011 14734 I NetworkScheduler.Stats: (REDACTED) HousekeepingTask %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s
+04-14 18:20:15.025  4491  4491 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.findmydevice.spot.sync.SelfReportingRegistrationAndOwnerKeySyncService.ACTION_TASK_READY dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsInternalBoundBrokerService }
+04-14 18:20:15.033   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.033   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.033   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(1616)
+04-14 18:20:15.033   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.033   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.033   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(80)
+04-14 18:20:15.033   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.033   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.033   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(96)
+04-14 18:20:15.033   679   776 D DPUModule: [ …œhu] support: 0
+04-14 18:20:15.041  1092  2901 V BackupManagerService: [UserID:0] Acquired wakelock:*backup*-0-2901
+04-14 18:20:15.047  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.054  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/049.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.055  4491  4491 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.auth.api.credentials.nextgen.service.MaintainVerifiableCredentialsService.ACTION_TASK_READY dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsInternalBoundBrokerService }
+04-14 18:20:15.055  4491  4491 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.auth.api.credentials.nextgen.service.MaintainVerifiableCredentialsService.ACTION_TASK_READY dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsInternalBoundBrokerService }
+04-14 18:20:15.061   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.062 15011 14734 I NetworkScheduler.Stats: (REDACTED) Task %s/%s started execution. cause:%s exec_start_elapsed_seconds: %s
+04-14 18:20:15.063  1092  2901 D KeyValueBackupTask: Spinning thread key-value-backup-10
+04-14 18:20:15.064  1092 15238 D PFTBT   : backupmanager pftbt token=1b0b341d
+04-14 18:20:15.064  1092 15238 V KeyValueBackupTask: Beginning backup of 6 targets
+04-14 18:20:15.069  1092 15238 D KeyValueBackupTask: Starting key-value backup of @pm@
+04-14 18:20:15.071  4491  4711 I Auth.Api.Credentials: (REDACTED) [MaintainVerifiableCredentials_flowRunner] Flow step started: %s.
+04-14 18:20:15.074  1092 15238 D KeyValueBackupTask: Invoking agent on @pm@
+04-14 18:20:15.084  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.092  1092  2391 D SmartBandWith_Controller2: [handleMessage] what: 1004
+04-14 18:20:15.093  1092  2391 D SmartBandWith_Controller2: [isNetworkRateSatisfy]mUid = 10282, curWhiteAppByte = 9801602569 Byte
+04-14 18:20:15.093  1092  2391 D SmartBandWith_Controller2: [isNetworkRateSatisfy]System totalRate = 8.486653 kbps
+04-14 18:20:15.093  1092  2391 D SmartBandWith_Controller2: system network is out of limit scale or fg App not using
+04-14 18:20:15.093  1092  2391 D SmartBandWith_Controller2: isNetworkRateSatisfy: false
+04-14 18:20:15.093  1092  2391 D SmartBandWith_Controller2: needOptimize: false
+04-14 18:20:15.093  1092  2391 D SmartBandWith_Controller2: [handleMessage] what: 1002
+04-14 18:20:15.093  1092  2391 D SmartBandWith_Controller2: onNetworkOptimize curMarkId = 157, curIfName = wlan0
+04-14 18:20:15.093  1092  2391 D SmartBandWith_Controller2: onNetworkOptimize optimize = false, mReadyToQueryNwState = true, mCurWorkUids size = 1
+04-14 18:20:15.093  1092  2391 D SmartBandWith_Controller2: onNetworkOptimize sendNetworkOptimizeMsg as false
+04-14 18:20:15.094   657   657 E OemNetd : sendNetworkOptimizeMsg: ifname = wlan0, exMarkId = 0x4000009d, isLimit = 0
+04-14 18:20:15.094  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/051.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.094   657   657 E OemNetd : limitingIf = wlan0, mLastMarkId = 0x4000009d
+04-14 18:20:15.094   657   657 E TranTrafficController: clearIptablesOptimize uid = 10215
+04-14 18:20:15.098   657   657 E TranTrafficController: clear iptables done, result 0
+04-14 18:20:15.098   657   657 E OemNetd : mLastUids size cleared succeed
+04-14 18:20:15.098   657   657 E TranTrafficController: clearTcFilter adapter = wlan0
+04-14 18:20:15.100 15239 15239 E TranTrafficController: execTcCmd child execute
+04-14 18:20:15.103   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.118  4491  4711 I Auth.Api.Credentials: (REDACTED) [MaintainVerifiableCredentials_flowRunner] Flow step completed: %s; successful=%s.
+04-14 18:20:15.119  1092 15238 I BackupRestoreController: Getting widget state for user: 0
+04-14 18:20:15.122  4491  4711 I Auth.Api.Credentials: (REDACTED) [MaintainVerifiableCredentials_flowRunner] Flow step started: %s.
+04-14 18:20:15.123  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.135  4491 15229 I AndroidBackupEventsLogg: (REDACTED) Logging without sampling %s
+04-14 18:20:15.135  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/053.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.141   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.145  4491 15197 I Auth.Api.Credentials: (REDACTED) [MaintainVerifiableCredentials_flowRunner] Flow step completed: %s; successful=%s.
+04-14 18:20:15.145  4491 15197 I Auth.Api.Credentials: [MaintainVerifiableCredentials_flowRunner] Flow completed. [CONTEXT service_id=68 ]
+04-14 18:20:15.151 15011 14734 I NetworkScheduler.Stats: (REDACTED) HousekeepingTask %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s
+04-14 18:20:15.152  4491  4491 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.auth.api.credentials.nextgen.service.MaintainVerifiableCredentialsService.ACTION_TASK_READY dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsInternalBoundBrokerService }
+04-14 18:20:15.157  1092  5607 D Griffin/filterReceiveBroadcast: not limit Intent { act=com.google.android.libraries.storage.protostore.SIGNAL_ACTION dat=android://com.google.android.gms/... flg=0x10000010 pkg=com.google.android.gms } for resultTo not null
+04-14 18:20:15.158  1092  5607 D BroadcastQueue: Add broadcast <BroadcastRecord{69569cc u0 com.google.android.libraries.storage.protostore.SIGNAL_ACTION}> into [ordered | foreground], pending size 0
+04-14 18:20:15.160   657   657 E TranTrafficController: execTcCmd child 15239 end with status: 0 after wait 1 times
+04-14 18:20:15.160   657   657 E OemNetd : sendNetworkOptimizeMsg clear tc limitingIf res :0
+04-14 18:20:15.160   657   657 E OemNetd : sendNetworkOptimizeMsg done res = 0
+04-14 18:20:15.160 15011 14910 I NetworkScheduler.Stats: (REDACTED) Task %s/%s finished executing. cause:%s result: %s elapsed_millis: %s uptime_millis: %s exec_start_elapsed_seconds: %s
+04-14 18:20:15.160  1092  1228 D SmartBandWith_Controller2: IOemNetdCallback mLastIfName = , mLastMarkId = 0, fail = false
+04-14 18:20:15.161 15011 15011 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.scheduler.standalone.housekeeping.HousekeepingTrainTaskService.ACTION_TASK_READY dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentInternalBoundBrokerService }
+04-14 18:20:15.164  4491 15229 I Backup  : [GmsBackupTransport] Performing encrypted kv backup: @pm@
+04-14 18:20:15.166  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.166  1092  1228 D BroadcastQueue: Finished with ordered broadcast BroadcastRecord{69569cc u0 com.google.android.libraries.storage.protostore.SIGNAL_ACTION} receivers:([BroadcastFilter{190c6d1 10106/u0 ReceiverList{c20f1f8 15011 com.google.android.gms.persistent/10106/u0 remote:fcdc55b}}, BroadcastFilter{5ef6b59 10106/u0 ReceiverList{cc8b3a0 4491 com.google.android.gms/10106/u0 remote:32a64a3}}]) take 8ms in [foreground], remains -1
+04-14 18:20:15.175  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/052.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.180  1092  1228 I RecoverableAppKeyStore: Get 0/10106/com.google.android.gms.backup/folsom/CA7FBE8A6B5EE5A957EB5E855B6AAA33
+04-14 18:20:15.182   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.206  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.210   441   441 E TrustyKeymaster: succeeded to send cmd (4) to com.android.trusty.keymaster with rc(310). errno: Success
+04-14 18:20:15.210   441   441 E TrustyKeymaster: Getting response size (28)
+04-14 18:20:15.212   441   441 E TrustyKeymaster: succeeded to send cmd (8) to com.android.trusty.keymaster with rc(76). errno: Success
+04-14 18:20:15.212   441   441 E TrustyKeymaster: Getting response size (60)
+04-14 18:20:15.213   441   441 E TrustyKeymaster: succeeded to send cmd (12) to com.android.trusty.keymaster with rc(32). errno: Success
+04-14 18:20:15.214   441   441 E TrustyKeymaster: Getting response size (24)
+04-14 18:20:15.215  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/050.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.217   441   441 E TrustyKeymaster: succeeded to send cmd (4) to com.android.trusty.keymaster with rc(286). errno: Success
+04-14 18:20:15.217   441   441 E TrustyKeymaster: Getting response size (52)
+04-14 18:20:15.219   441   441 E TrustyKeymaster: succeeded to send cmd (8) to com.android.trusty.keymaster with rc(60). errno: Success
+04-14 18:20:15.220   441   441 E TrustyKeymaster: Getting response size (60)
+04-14 18:20:15.220   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.221   441   441 E TrustyKeymaster: succeeded to send cmd (12) to com.android.trusty.keymaster with rc(32). errno: Success
+04-14 18:20:15.221   441   441 E TrustyKeymaster: Getting response size (40)
+04-14 18:20:15.247  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.257  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/054.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.261   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.278  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.286  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/ComicInfo.xml. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.302   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.313  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.317 15011 15011 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.common.telemetry.service.START dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentApiService }
+04-14 18:20:15.324  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/055.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.333  1514  1514 D TranCellSignalStrengthImpl: [LTE] dbm: -95
+04-14 18:20:15.333  1514  1514 D TranCellSignalStrengthImpl: [LTE] dbm: -95
+04-14 18:20:15.336  1092  1282 D TranCellSignalStrengthImpl: [LTE] dbm: -95
+04-14 18:20:15.337  1514  1514 D TranPhoneInterfaceManagerEx: [onSignalStrengthsChanged]
+04-14 18:20:15.338  1514  1514 D TranSmartAllocController: mDefaultDataSubId = 5  subId = 5
+04-14 18:20:15.338  1514  1514 D TranSmartAllocController: mSupport = true  mBwAllocEnable = true mSimReady =true  mScreenOn =true
+04-14 18:20:15.339  1604  1762 D Dito    : mcc=616, mnc=03
+04-14 18:20:15.342   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.355  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.363  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/058.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.369   441   441 E TrustyKeymaster: succeeded to send cmd (16) to com.android.trusty.keymaster with rc(12). errno: Success
+04-14 18:20:15.370   441   441 E TrustyKeymaster: Getting response size (8)
+04-14 18:20:15.380   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.393  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.402  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/056.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.424   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.438  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.452  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/067.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.469   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.483   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.483   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.483   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(1616)
+04-14 18:20:15.483   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.483   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.483   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(80)
+04-14 18:20:15.483   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.483   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.483   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(96)
+04-14 18:20:15.483   679   776 D DPUModule: [ …œhu] support: 0
+04-14 18:20:15.489  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.499   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.500   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.500   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(1616)
+04-14 18:20:15.500   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.500   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.500   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(80)
+04-14 18:20:15.500   679   776 I DPUModule: DpuR5P0::checkLayerFormat <142>: checkLayerFormat: Format(1)
+04-14 18:20:15.500   679   776 I DPUModule: DpuR5P0::checkTransform <35>: checkTransform: Transform(0), SRCRect(0,0)
+04-14 18:20:15.500   679   776 I DPUModule: DpuR5P0::checkAFBCBlockSize <97>: checkAFBCBlockSize: compressed(1),format(1), pitch(720), vstride(96)
+04-14 18:20:15.500   679   776 D DPUModule: [ …œhu] support: 0
+04-14 18:20:15.501  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/062.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.502   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.528  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.540   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.540  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/061.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.566  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.578  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/065.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.581   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.609  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.623   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.624  2973 17798 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/064.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.649  2973 17798 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.658  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/066.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.659   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.660  1092  1244 E UnisocWatchdog: WDT_Monitor: writeWDTMonitor duration=50,shutdowning=false
+04-14 18:20:15.660  1092  1244 E UnisocWatchdog: UnisocWatchdogImpl sendMessage:0
+04-14 18:20:15.660  1092  1334 E UnisocWatchdog: UNISOCWATCHDOG_MESSAGE_TIMER30 trigger
+04-14 18:20:15.681  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.690  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/063.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.699   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.716  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.725  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/068.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.740   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.753  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.758  4491 15229 I AndroidBackupEventsLogg: (REDACTED) Logging without sampling %s
+04-14 18:20:15.762  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/059.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.767  1092  1228 D Griffin/filterReceiveBroadcast: not limit Intent { act=com.google.android.libraries.storage.protostore.SIGNAL_ACTION dat=android://com.google.android.gms/... flg=0x10000010 pkg=com.google.android.gms } for resultTo not null
+04-14 18:20:15.768  1092  1228 D BroadcastQueue: Add broadcast <BroadcastRecord{244bada u0 com.google.android.libraries.storage.protostore.SIGNAL_ACTION}> into [ordered | foreground], pending size 0
+04-14 18:20:15.781   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.785  1092  1547 D BroadcastQueue: Finished with ordered broadcast BroadcastRecord{244bada u0 com.google.android.libraries.storage.protostore.SIGNAL_ACTION} receivers:([BroadcastFilter{190c6d1 10106/u0 ReceiverList{c20f1f8 15011 com.google.android.gms.persistent/10106/u0 remote:fcdc55b}}, BroadcastFilter{5ef6b59 10106/u0 ReceiverList{cc8b3a0 4491 com.google.android.gms/10106/u0 remote:32a64a3}}]) take 16ms in [foreground], remains -1
+04-14 18:20:15.795  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.798  4491 15229 I Backup  : [GmsBackupTransport] Backup finished for @pm@
+04-14 18:20:15.800  4491 15229 I AndroidBackupEventsLogg: (REDACTED) Logging without sampling %s
+04-14 18:20:15.802   955  1727 D GNSSMGT : watchdog: PowerState: CP SLEEP
+04-14 18:20:15.805  2973 13333 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f_tmp/060.jpg. Uid: 10053. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+04-14 18:20:15.806  1092 15238 D KeyValueBackupTask: Starting key-value backup of com.google.android.apps.messaging
+04-14 18:20:15.809  1092 15238 D BackupManagerService: [UserID:0] awaiting agent for ApplicationInfo{2c3aaa6 com.google.android.apps.messaging}
+04-14 18:20:15.822  1092  1547 D BroadcastQueue: Add broadcast <BroadcastRecord{3d0f094 u0 android.intent.action.MEDIA_SCANNER_SCAN_FILE}> into [ordered | background], pending size 0
+04-14 18:20:15.823   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.831  2973 31490 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.834  2973 31490 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.843  1092  5607 D F_TranHibernation: screen off bc restricted1 by uid 10202
+04-14 18:20:15.846  1092  1275 D BroadcastQueue: Finished with ordered broadcast BroadcastRecord{3d0f094 u0 android.intent.action.MEDIA_SCANNER_SCAN_FILE} receivers:([ResolveInfo{3318a39 com.google.android.providers.media.module/com.android.providers.media.MediaReceiver m=0x208000}, ResolveInfo{54b687e com.folderv.file/.UsbBroadcastReceiver m=0x208000}]) take 23ms in [background], remains -1
+04-14 18:20:15.848  2973  3813 I MediaProvider: Begin Intent { act=android.intent.action.MEDIA_SCANNER_SCAN_FILE dat=file:///... flg=0x1000010 cmp=com.google.android.providers.media.module/com.android.providers.media.MediaService }
+04-14 18:20:15.852  2973  3813 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.853  2973  3813 W ModernMediaScanner: Failed to visit /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f.cbz_tmp: java.nio.file.NoSuchFileException: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f.cbz_tmp
+04-14 18:20:15.859   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.872  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.874  2973 13333 W ModernMediaScanner: Failed to visit /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f.cbz_tmp: java.nio.file.NoSuchFileException: /storage/emulated/0/Documents/Scans/downloads/Mangas-Origines.fr (FR)/Perfect Surgeon/Chapitre 69 - De la chance_bf1e8f.cbz_tmp
+04-14 18:20:15.881  1092  1547 D BackupManagerService: [UserID:0] agentConnected pkg=com.google.android.apps.messaging agent=android.os.BinderProxy@a6611df
+04-14 18:20:15.881  1092 15238 I BackupManagerService: [UserID:0] got agent android.app.IBackupAgent$Stub$Proxy@861be2c
+04-14 18:20:15.881  1092 15238 D KeyValueBackupTask: Invoking agent on com.google.android.apps.messaging
+04-14 18:20:15.888  2973  3813 I MediaProvider: Scanned external_primary due to REASON_DEMAND, found 0 items in 37ms, 0 inserts 0 updates 0 deletes
+04-14 18:20:15.888  2973  3813 I MediaProvider: End Intent { act=android.intent.action.MEDIA_SCANNER_SCAN_FILE dat=file:///... flg=0x1000010 cmp=com.google.android.providers.media.module/com.android.providers.media.MediaService }
+04-14 18:20:15.904   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.914  2973 13333 I MediaProvider: Scanned external_primary due to REASON_DEMAND, found 0 items in 43ms, 0 inserts 0 updates 0 deletes
+04-14 18:20:15.918  2973 13333 I MediaProvider: Observed non-standard /storage/emulated/0/Documents/Scans/downloads/.nomedia
+04-14 18:20:15.923  1092 15238 I BackupRestoreController: Getting widget state for user: 0
+04-14 18:20:15.923  1092 15238 V BackupManagerConstants: getBackupFinishedNotificationReceivers(...) returns 
+04-14 18:20:15.924 15011 15011 I Backup  : [BackupNowBackupAgentsRunner] Backup done for com.google.android.apps.messaging, success: 0
+04-14 18:20:15.938  1092 15238 D KeyValueBackupTask: Starting key-value backup of com.google.android.apps.maps
+04-14 18:20:15.940  1092 15238 D CompatibilityChangeReporter: Compat change id reported: 177438394; UID 10129; state: DISABLED
+04-14 18:20:15.940  1092 15238 D CompatibilityChangeReporter: Compat change id reported: 135772972; UID 10129; state: DISABLED
+04-14 18:20:15.940  1092 15238 D CompatibilityChangeReporter: Compat change id reported: 135754954; UID 10129; state: ENABLED
+04-14 18:20:15.941  1092 15238 D BackupManagerService: [UserID:0] awaiting agent for ApplicationInfo{16de9ad com.google.android.apps.maps}
+04-14 18:20:15.941  1092  1276 D ActivityManager: asking zygote to start proc:ProcessRecord{65ba6c4 0:com.google.android.apps.maps/u0a129}
+04-14 18:20:15.942  1092  1092 D DeviceIdleControllerEx: packageName: com.whatsapp uid: 10191 is in preset white app list
+04-14 18:20:15.942  1092  1276 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10129; state: ENABLED
+04-14 18:20:15.944  1092  1276 D Prefork : startResult is empty and running normal execution.
+04-14 18:20:15.946   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.948  1092  1092 D Griffin/ComponentManager: Limit start proc:com.anthropic.claude for 3rd-normal-service caller=system/1092,Intent { cmp=com.anthropic.claude/androidx.work.impl.background.systemjob.SystemJobService }
+04-14 18:20:15.949  1092  1092 W ActivityManager: Unable to launch app com.anthropic.claude/10330 for service Intent { cmp=com.anthropic.claude/androidx.work.impl.background.systemjob.SystemJobService }: AutoStart Limit
+04-14 18:20:15.949  1092  1092 D ActivityManager: isGriffinSupport  bringUpServiceLocked and unbindServiceLockedIntent { cmp=com.anthropic.claude/androidx.work.impl.background.systemjob.SystemJobService }
+04-14 18:20:15.949  1092  1092 W ActivityManager: Unbind failed: could not find connection for android.app.LoadedApk$ServiceDispatcher$InnerConnection@1fd0073
+04-14 18:20:15.954   658   658 D Zygote  : Forked child process 15242
+04-14 18:20:15.955  1092  1276 I ActivityManager: Start proc 15242:com.google.android.apps.maps/u0a129 for backup {com.google.android.apps.maps/com.google.android.apps.gmm.backup.GmmPersistentBackupAgentHelper}
+04-14 18:20:15.959  1092  1092 E JobScheduler.Concurrency: Error executing JobStatus{15aeb1d #u0a330/66 com.anthropic.claude/androidx.work.impl.background.systemjob.SystemJobService u=0 s=10330 TIME=-1d1h35m56s443ms:none NET failures=1 READY}
+04-14 18:20:15.967  1092  1092 D Griffin/ComponentManager: Limit start proc:com.deepseek.chat for 3rd-normal-service caller=system/1092,Intent { cmp=com.deepseek.chat/com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService }
+04-14 18:20:15.967  1092  1092 W ActivityManager: Unable to launch app com.deepseek.chat/10286 for service Intent { cmp=com.deepseek.chat/com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService }: AutoStart Limit
+04-14 18:20:15.967  1092  1092 D ActivityManager: isGriffinSupport  bringUpServiceLocked and unbindServiceLockedIntent { cmp=com.deepseek.chat/com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService }
+04-14 18:20:15.967  1092  1092 W ActivityManager: Unbind failed: could not find connection for android.app.LoadedApk$ServiceDispatcher$InnerConnection@81d30cf
+04-14 18:20:15.969  1092  1092 E JobScheduler.Concurrency: Error executing JobStatus{52e50ff #u0a286/-814799897 com.deepseek.chat/com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService u=0 s=10286 TIME=-1d1h9m25s49ms:none NET READY}
+04-14 18:20:15.973 15242 15242 I droid.apps.maps: Using CollectorTypeCMC GC.
+04-14 18:20:15.975  1092  1092 D Griffin/ComponentManager: Limit start proc:com.openai.chatgpt for 3rd-normal-service caller=system/1092,Intent { cmp=com.openai.chatgpt/androidx.work.impl.background.systemjob.SystemJobService }
+04-14 18:20:15.975  1092  1092 W ActivityManager: Unable to launch app com.openai.chatgpt/10270 for service Intent { cmp=com.openai.chatgpt/androidx.work.impl.background.systemjob.SystemJobService }: AutoStart Limit
+04-14 18:20:15.976  1092  1092 D ActivityManager: isGriffinSupport  bringUpServiceLocked and unbindServiceLockedIntent { cmp=com.openai.chatgpt/androidx.work.impl.background.systemjob.SystemJobService }
+04-14 18:20:15.976  1092  1092 W ActivityManager: Unbind failed: could not find connection for android.app.LoadedApk$ServiceDispatcher$InnerConnection@892ae3a
+04-14 18:20:15.976  1092  1092 E JobScheduler.Concurrency: Error executing JobStatus{c34fd82 #u0a270/3236 com.openai.chatgpt/androidx.work.impl.background.systemjob.SystemJobService u=0 s=10270 TIME=-1d0h37m14s76ms:none NET READY}
+04-14 18:20:15.981 15242 15242 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+04-14 18:20:15.981  1092  1092 D Griffin/ComponentManager: Limit start proc:org.telegram.messenger for 3rd-normal-service caller=system/1092,Intent { cmp=org.telegram.messenger/com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService }
+04-14 18:20:15.982  1092  1092 W ActivityManager: Unable to launch app org.telegram.messenger/10209 for service Intent { cmp=org.telegram.messenger/com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService }: AutoStart Limit
+04-14 18:20:15.982  1092  1092 D ActivityManager: isGriffinSupport  bringUpServiceLocked and unbindServiceLockedIntent { cmp=org.telegram.messenger/com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService }
+04-14 18:20:15.983   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:15.983  1092  1092 W ActivityManager: Unbind failed: could not find connection for android.app.LoadedApk$ServiceDispatcher$InnerConnection@fdeee1
+04-14 18:20:15.984  1092  1092 E JobScheduler.Concurrency: Error executing JobStatus{bfcca24 #u0a209/-1341184476 org.telegram.messenger/com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService u=0 s=10209 TIME=-2h18m31s309ms:none NET READY}
+04-14 18:20:15.984  2973 31396 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage
+04-14 18:20:15.991  1092  1092 D Griffin/ComponentManager: Limit start proc:com.whatsapp for 3rd-normal-service caller=system/1092,Intent { cmp=com.whatsapp/androidx.work.impl.background.systemjob.SystemJobService }
+04-14 18:20:15.991  1092  1092 W ActivityManager: Unable to launch app com.whatsapp/10191 for service Intent { cmp=com.whatsapp/androidx.work.impl.background.systemjob.SystemJobService }: AutoStart Limit
+04-14 18:20:15.992  1092  1092 D ActivityManager: isGriffinSupport  bringUpServiceLocked and unbindServiceLockedIntent { cmp=com.whatsapp/androidx.work.impl.background.systemjob.SystemJobService }
+04-14 18:20:15.992  1092  1092 W ActivityManager: Unbind failed: could not find connection for android.app.LoadedApk$ServiceDispatcher$InnerConnection@9d848f4
+04-14 18:20:15.992  1092  1092 E JobScheduler.Concurrency: Error executing JobStatus{4e0ff27 #u0a191/217534 com.whatsapp/androidx.work.impl.background.systemjob.SystemJobService u=0 s=10191 TIME=-23m16s297ms:none NET CHARGING READY}
+04-14 18:20:15.994 23266 23273 I adbd    : jdwp connection from 15242
+04-14 18:20:15.997  1092  5607 D CompatibilityChangeReporter: Compat change id reported: 168419799; UID 10129; state: DISABLED
+04-14 18:20:15.998  1092  5607 D os.ActivityManagerServiceLice: make process active com.google.android.apps.maps(15242)
+04-14 18:20:15.999  1092  5607 W ActivityManager: setOomAdj Pid: 15242, Uid: 10129, Adj 300
+04-14 18:20:16.006 15242 15242 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10129; state: ENABLED
+04-14 18:20:16.006  2973 31490 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage
+04-14 18:20:16.011 15242 15242 D TranClassInfo: instance successfully. com.transsion.hubcore.graphics.TranGraphicImpl@d5c8fb3 from com.transsion.hubcore.graphics.ITranGraphic
+04-14 18:20:16.011 15242 15255 E droid.apps.maps: Could not write anonymous vdex /system_ext/framework/oat/arm64/unisoc-framework.vdex: Could not open /system_ext/framework/oat/arm64/unisoc-framework.vdex for writing
+04-14 18:20:16.012 15242 15242 D os.SingleLiceFactory: instance successfully. com.transsion.typeface.v1.TypefaceLice@6a34b61 from android.graphics.IGraphicLice
+04-14 18:20:16.012 15242 15242 D os.LiceInfo: instance successfully. com.transsion.graphics.GraphicLice@ba3e970 from android.graphics.IGraphicLice
+04-14 18:20:16.016 15242 15248 W droid.apps.maps: userfaultfd: MOVE ioctl seems unsupported: Try again
+04-14 18:20:16.017  2973  7441 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage
+04-14 18:20:16.021   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:16.025 15011 15011 D BoundBrokerSvc: onRebind: Intent { act=com.google.android.gms.libs.gmscorelogger.service.START dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentDirectBootAwareApiService }
+04-14 18:20:16.027  2973  7441 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage
+04-14 18:20:16.038  2973  9227 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage
+04-14 18:20:16.046 15242 15242 D nativeloader: Configuring clns-4 for other apk /system/framework/org.apache.http.legacy.jar. target_sdk_version=36, uses_libraries=ALL, library_path=/data/app/~~KHqsI7Gb4mItSvV-ILJjMg==/com.google.android.apps.maps-SadqGhkhFLHrWfSEV_3F-A==/lib/arm64:/data/app/~~KHqsI7Gb4mItSvV-ILJjMg==/com.google.android.apps.maps-SadqGhkhFLHrWfSEV_3F-A==/base.apk!/lib/arm64-v8a:/data/app/~~KHqsI7Gb4mItSvV-ILJjMg==/com.google.android.apps.maps-SadqGhkhFLHrWfSEV_3F-A==/split_config.arm64_v8a.apk!/lib/arm64-v8a:/data/app/~~KHqsI7Gb4mItSvV-ILJjMg==/com.google.android.apps.maps-SadqGhkhFLHrWfSEV_3F-A==/split_config.en.apk!/lib/arm64-v8a:/data/app/~~KHqsI7Gb4mItSvV-ILJjMg==/com.google.android.apps.maps-SadqGhkhFLHrWfSEV_3F-A==/split_config.fr.apk!/lib/arm64-v8a:/data/app/~~KHqsI7Gb4mItSvV-ILJjMg==/com.google.android.apps.maps-SadqGhkhFLHrWfSEV_3F-A==/split_config.xhdpi.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.google.android.apps.maps
+04-14 18:20:16.049  2973 14510 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage
+04-14 18:20:16.058  2973 31397 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage
+04-14 18:20:16.061   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:16.076  2973 31488 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage
+04-14 18:20:16.085  2973 13256 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage
+04-14 18:20:16.098  2973 31478 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage
+04-14 18:20:16.101   674 11196 I audio_hw_primary: app type:0x   0, is_voip:0, device:2, pcm:-352510464, usecase:0x   8
+04-14 18:20:16.110  2973  7441 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage
+04-14 18:20:16.122  2973 31488 I MediaProvider: Deleted 1 0 0 0 0 0 0 items on external_primary due to com.android.externalstorage

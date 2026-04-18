@@ -1,0 +1,8 @@
+04-14 18:20:40.786  1092  1314 I AppsFilter: interaction: PackageSetting{e4caf6b com.aurel.nexusStorage/10258} -> PackageSetting{9ce0c84 com.facebook.appmanager/10120} BLOCKED
+04-14 18:20:41.868  1092  1314 I AppsFilter: interaction: PackageSetting{e4caf6b com.aurel.nexusStorage/10258} -> PackageSetting{b00a51 app.mihon/10215} BLOCKED
+04-14 18:22:12.718 13282 14762 I ffmpeg  : [mdl @ 0x7a0eecc000] <ff_mdl.c,tt_mdl_open,753>mdl open failed, ret: -1414092869, range:3470, 0, 0
+04-14 18:22:12.718 13282 14762 I ffmpeg  : 
+04-14 18:22:12.718 13282 14762 I ffmpeg  : [mdl @ 0x7a0eed6000] <avio.c,ffurl_connect,232>err:-1414092869
+04-14 18:22:12.718 13282 14762 I ffmpeg  : 
+04-14 18:22:12.718 13282 14762 I ffmpeg  : <aviobuf.c,ffio_open_whitelist,1309>err:-1414092869
+04-14 18:22:12.718 13282 14762 I ffmpeg  : 

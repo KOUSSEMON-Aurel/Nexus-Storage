@@ -671,6 +671,26 @@ class NexusCoreBindings {
   late final _nexus_encode_stream_push = _nexus_encode_stream_pushPtr
       .asFunction<int Function(ffi.Pointer<StreamingEncoder>, ffi.Pointer<ffi.Uint8>, int)>();
 
+  int nexus_encode_stream_push_fec(
+    ffi.Pointer<StreamingEncoder> ctx_ptr,
+    ffi.Pointer<ffi.Uint8> in_ptr,
+    int in_len,
+  ) {
+    return _nexus_encode_stream_push_fec(ctx_ptr, in_ptr, in_len);
+  }
+
+  late final _nexus_encode_stream_push_fecPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int32 Function(
+        ffi.Pointer<StreamingEncoder>,
+        ffi.Pointer<ffi.Uint8>,
+        ffi.Size,
+      )
+    >
+  >('nexus_encode_stream_push_fec');
+  late final _nexus_encode_stream_push_fec = _nexus_encode_stream_push_fecPtr
+      .asFunction<int Function(ffi.Pointer<StreamingEncoder>, ffi.Pointer<ffi.Uint8>, int)>();
+
   int nexus_encode_stream_pop_frame(
     ffi.Pointer<StreamingEncoder> ctx_ptr,
     ffi.Pointer<ffi.Pointer<ffi.Uint8>> out_ptr,
@@ -747,6 +767,26 @@ class NexusCoreBindings {
     >
   >('nexus_decode_stream_push');
   late final _nexus_decode_stream_push = _nexus_decode_stream_pushPtr
+      .asFunction<int Function(ffi.Pointer<StreamingDecoder>, ffi.Pointer<ffi.Uint8>, int)>();
+
+  int nexus_decode_stream_push_fec(
+    ffi.Pointer<StreamingDecoder> ctx_ptr,
+    ffi.Pointer<ffi.Uint8> in_ptr,
+    int in_len,
+  ) {
+    return _nexus_decode_stream_push_fec(ctx_ptr, in_ptr, in_len);
+  }
+
+  late final _nexus_decode_stream_push_fecPtr = _lookup<
+    ffi.NativeFunction<
+      ffi.Int32 Function(
+        ffi.Pointer<StreamingDecoder>,
+        ffi.Pointer<ffi.Uint8>,
+        ffi.Size,
+      )
+    >
+  >('nexus_decode_stream_push_fec');
+  late final _nexus_decode_stream_push_fec = _nexus_decode_stream_push_fecPtr
       .asFunction<int Function(ffi.Pointer<StreamingDecoder>, ffi.Pointer<ffi.Uint8>, int)>();
 
   int nexus_decode_stream_pop(

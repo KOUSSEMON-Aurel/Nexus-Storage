@@ -11,10 +11,20 @@ data class ForegroundServiceTypes(val value: Int) {
             val prefs = context.getSharedPreferences(
                 PreferencesKey.FOREGROUND_SERVICE_TYPES_PREFS, Context.MODE_PRIVATE)
 
-            val value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            var value = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 prefs.getInt(PreferencesKey.FOREGROUND_SERVICE_TYPES, ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST)
             } else {
                 prefs.getInt(PreferencesKey.FOREGROUND_SERVICE_TYPES, 0) // none
+            }
+
+            // Android 10+ (Q) strictness: if we have a type in manifest, it's better to pass it.
+            // On Android 14+ (UPSIDE_DOWN_CAKE) it is MANDATORY.
+            // We force DATA_SYNC (1) for Nexus to avoid "foregroundServiceType : 0" errors.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if (value == 0 || value == ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST) {
+                    value = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    android.util.Log.d("NexusPlugin", "Android 10+ detected: Forced DATA_SYNC (1) for service initialization (prev was 0 or -1)")
+                }
             }
 
             return ForegroundServiceTypes(value = value)
@@ -36,12 +46,11 @@ data class ForegroundServiceTypes(val value: Int) {
                 }
             }
 
-            // not none type
-            if (value > 0) {
-                with(prefs.edit()) {
-                    putInt(PreferencesKey.FOREGROUND_SERVICE_TYPES, value)
-                    commit()
-                }
+            // Always save the value to ensure it's persisted even if it's 0 (none)
+            // or if we're overwriting a previous value.
+            with(prefs.edit()) {
+                putInt(PreferencesKey.FOREGROUND_SERVICE_TYPES, value)
+                commit()
             }
         }
 

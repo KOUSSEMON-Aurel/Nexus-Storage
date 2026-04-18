@@ -1,6 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:crypto/crypto.dart' as crypto;
 import '../models/file_record.dart';
 import 'logger_service.dart';
 
@@ -292,6 +294,59 @@ class DatabaseService {
     final db = await database;
     final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM files WHERE deleted_at IS NULL'));
     return count ?? 0;
+  }
+
+  Future<Map<String, int>> getSyncStats() async {
+    final db = await database;
+    final files = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM files')) ?? 0;
+    final folders = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM folders')) ?? 0;
+    final tasks = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM tasks')) ?? 0;
+    return {
+      'files': files,
+      'folders': folders,
+      'tasks': tasks,
+    };
+  }
+
+  Future<String?> getLastModified() async {
+    final db = await database;
+    final res = await db.rawQuery('SELECT MAX(last_update) as last_modified FROM files');
+    if (res.isNotEmpty) {
+      return res.first['last_modified'] as String?;
+    }
+    return null;
+  }
+
+  Future<void> checkpointWAL() async {
+    final db = await database;
+    // PRAGMA wal_checkpoint(TRUNCATE) forces all WAL changes into the .db file
+    await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+  }
+
+  Future<String> calculateLogicalHash() async {
+    final db = await database;
+    final List<String> lines = [];
+
+    // Files (id and last_update timestamp ensure content freshness)
+    final files = await db.rawQuery('SELECT id, last_update FROM files ORDER BY id');
+    for (var r in files) {
+      lines.add('file:${r['id']}:${r['last_update']}');
+    }
+
+    // Folders (id is enough for now as schema is simpler)
+    final folders = await db.rawQuery('SELECT id FROM folders ORDER BY id');
+    for (var r in folders) {
+      lines.add('folder:${r['id']}');
+    }
+
+    // Tasks (id and created_at)
+    final tasks = await db.rawQuery('SELECT id, created_at FROM tasks ORDER BY id');
+    for (var r in tasks) {
+      lines.add('task:${r['id']}:${r['created_at']}');
+    }
+
+    final content = lines.join('\n');
+    return crypto.sha256.convert(utf8.encode(content)).toString();
   }
 
   Future<void> deleteTask(String id) async {
