@@ -233,6 +233,26 @@ func (nc *NexusCore) DecryptWithKey(data, key []byte) ([]byte, error) {
 	}
 	var outPtr *C.uint8_t
 	var outLen C.size_t
+	// Diagnostic logging: show sizes and small byte samples to help debug
+	if len(data) < 1024 {
+		log.Printf("[debug] DecryptWithKey: incoming blob len=%d", len(data))
+	} else {
+		log.Printf("[debug] DecryptWithKey: incoming blob len=%d (truncated for log)", len(data))
+	}
+	// print first/last few bytes (hex) to compare upload vs download
+	sampleStart := 8
+	if len(data) < sampleStart {
+		sampleStart = len(data)
+	}
+	sampleEnd := 8
+	if len(data) < sampleEnd {
+		sampleEnd = len(data)
+	}
+	if len(data) > 0 {
+		startHex := fmt.Sprintf("%x", data[:sampleStart])
+		endHex := fmt.Sprintf("%x", data[len(data)-sampleEnd:])
+		log.Printf("[debug] DecryptWithKey: start=%s end=%s", startHex, endHex)
+	}
 	res := C.nexus_decrypt_with_key(
 		(*C.uint8_t)(unsafe.Pointer(&data[0])),
 		C.size_t(len(data)),
