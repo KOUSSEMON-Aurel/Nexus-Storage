@@ -547,6 +547,14 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		if err != nil {
 			return err
 		}
+		// Diagnostic: log encrypted blob size and sample bytes to help trace corruption
+		if len(encrypted) > 0 {
+			start := 8
+			if len(encrypted) < start { start = len(encrypted) }
+			end := 8
+			if len(encrypted) < end { end = len(encrypted) }
+			log.Printf("[%s] [ENC] Encrypted shard %d size=%d start=%x end=%x", t.ID, i+1, len(encrypted), encrypted[:start], encrypted[len(encrypted)-end:])
+		}
 
 		t.Status = fmt.Sprintf("Encoding Shard %d/%d", i+1, numShards)
 		apiMode := 0 // Base
@@ -897,6 +905,14 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 		var decrypted []byte
 		if rawFileKey != nil {
 			log.Printf("[%s] 🔐 Shard %d: Decrypting with per-file key (%d bytes)", t.ID, i+1, len(rawFileKey))
+			// Diagnostic: log rawData size and samples
+			if len(rawData) > 0 {
+				start := 8
+				if len(rawData) < start { start = len(rawData) }
+				end := 8
+				if len(rawData) < end { end = len(rawData) }
+				log.Printf("[%s] [DEC] Raw shard %d size=%d start=%x end=%x", t.ID, i+1, len(rawData), rawData[:start], rawData[len(rawData)-end:])
+			}
 			decrypted, err = q.core.DecryptWithKey(rawData, rawFileKey)
 		} else {
 			log.Printf("[%s] 🔐 Shard %d: Decrypting with encryptionSecret (fallback)", t.ID, i+1)

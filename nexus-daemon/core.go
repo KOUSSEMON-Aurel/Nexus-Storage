@@ -14,6 +14,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log"
 	"unsafe"
 )
 

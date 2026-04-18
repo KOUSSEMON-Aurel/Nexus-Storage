@@ -90,6 +90,10 @@ func main() {
 
 	apiPort = *port
 
+	// Enable verbose logging: timestamps, microseconds and file:line to aid debugging
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
+	log.Println("🔎 Debug logging enabled")
+
 	fmt.Println("🚀 NexusStorage Daemon starting (FUSE Engine)...")
 
 	// 0. Clean up orphaned temp folders older than 1 hour to prevent disk leak
