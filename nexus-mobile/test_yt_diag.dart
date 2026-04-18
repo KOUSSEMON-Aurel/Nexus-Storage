@@ -1,30 +1,29 @@
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:nexus_mobile/services/logger_service.dart';
 
 void main() async {
   final yt = YoutubeExplode();
   final videoId = 'Q-6teAgx8HA'; // ID vu dans les logs logcat
   
   try {
-    print('--- Diagnostic YouTube Explode ---');
-    print('Vidéo ID: $videoId');
+    AppLogger.info('--- Diagnostic YouTube Explode ---');
+    AppLogger.info('Vidéo ID: $videoId');
     
     final manifest = await yt.videos.streamsClient.getManifest(videoId);
-    print('Flux vidéo uniquement (Adaptive): ${manifest.videoOnly.length}');
-    print('Flux multiplexés (Muxed): ${manifest.muxed.length}');
+    AppLogger.info('Flux vidéo uniquement (Adaptive): ${manifest.videoOnly.length}');
+    AppLogger.info('Flux multiplexés (Muxed): ${manifest.muxed.length}');
     
-    final allStreams = [...manifest.videoOnly, ...manifest.muxed];
-    for (var stream in allStreams) {
-      if (stream is VideoStreamInfo) {
-        print(' - [${stream.container.name}] ${stream.videoQuality} (Index: ${stream.videoQuality.index}) | Adaptive: ${stream is VideoOnlyStreamInfo} | Size: ${stream.size.totalMegaBytes.toStringAsFixed(2)}MB');
-      }
+    final allStreams = [...manifest.videoOnly, ...manifest.muxed].cast<VideoStreamInfo>();
+    for (final VideoStreamInfo stream in allStreams) {
+      AppLogger.info(' - [${stream.container.name}] ${stream.videoQuality} (Index: ${stream.videoQuality.index}) | Adaptive: ${stream is VideoOnlyStreamInfo} | Size: ${stream.size.totalMegaBytes.toStringAsFixed(2)}MB');
     }
     
     if (allStreams.isEmpty) {
-      print('ERREUR: Aucun flux trouvé !');
+      AppLogger.error('ERREUR: Aucun flux trouvé !');
     }
     
-  } catch (e) {
-    print('EXCEPTION FATALE: $e');
+  } catch (e, s) {
+    AppLogger.error('EXCEPTION FATALE: $e', e, s);
   } finally {
     yt.close();
   }

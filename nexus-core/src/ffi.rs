@@ -683,7 +683,7 @@ pub extern "C" fn nexus_decode_stream_push_fec(
     in_ptr: *const u8,
     in_len: usize,
 ) -> i32 {
-    unsafe { nexus_decode_stream_push(ctx_ptr, in_ptr, in_len) }
+    nexus_decode_stream_push(ctx_ptr, in_ptr, in_len)
 }
 
 #[unsafe(no_mangle)]

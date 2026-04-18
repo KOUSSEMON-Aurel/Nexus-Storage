@@ -10,3 +10,8 @@ version = "5.3.4"
 edition = "2024"
 authors = ["KOUSSEMON-Aurel"]
 license = "MIT"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

@@ -11,7 +11,7 @@ import 'dart:io';
 
 import 'package:nexus_mobile/services/database_service.dart';
 import 'package:nexus_mobile/services/nexus_service.dart';
-import 'package:nexus_mobile/services/task_handler.dart';
+// background task handler imported only in isolate entrypoint; not used here
 import 'package:nexus_mobile/models/file_record.dart';
 import 'package:nexus_mobile/ui/files_page.dart';
 import 'package:nexus_mobile/ui/tasks_page.dart';
@@ -394,7 +394,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _startBackgroundUpload(File file, String name, String password) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
-    print('NexusDebug: Starting direct async upload for $name, taskId: $taskId');
+    AppLogger.info('NexusDebug: Starting direct async upload for $name, taskId: $taskId');
     
     // Contournement Android 14 ForegroundService limitation
     try {
@@ -415,7 +415,7 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _startBackgroundDownload(FileRecord record) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
     final fileName = record.path.split('/').last;
-    print('NexusDebug: Starting direct async download for $fileName, taskId: $taskId');
+    AppLogger.info('NexusDebug: Starting direct async download for $fileName, taskId: $taskId');
     
     // Contournement Android 14 ForegroundService limitation
     try {

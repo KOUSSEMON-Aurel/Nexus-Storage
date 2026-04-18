@@ -145,7 +145,7 @@ class SyncService {
     
     // Verify logical hash after pull?
     // Write to temp, open and calculate logical hash
-    final tempPath = '${dbPath}.new';
+    final tempPath = '$dbPath.new';
     await File(tempPath).writeAsBytes(dbBytes);
     
     // To calculate logical hash, we'd need to open the new DB.
@@ -153,7 +153,7 @@ class SyncService {
     
     await _db.close();
     if (await File(dbPath).exists()) {
-      await File(dbPath).rename('${dbPath}.bak');
+      await File(dbPath).rename('$dbPath.bak');
     }
     await File(tempPath).rename(dbPath);
     await _db.database;
@@ -163,13 +163,13 @@ class SyncService {
       // Revert if possible
       await _db.close();
       await File(dbPath).delete();
-      await File('${dbPath}.bak').rename(dbPath);
+      await File('$dbPath.bak').rename(dbPath);
       await _db.database;
       throw SyncException('Pull verification failed: Logical hash mismatch.');
     }
 
-    if (await File('${dbPath}.bak').exists()) {
-      await File('${dbPath}.bak').delete();
+    if (await File('$dbPath.bak').exists()) {
+      await File('$dbPath.bak').delete();
     }
 
     await _db.setKV('manifest_version', remoteLSN.toString());

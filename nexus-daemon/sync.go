@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"strconv"
 	"math"
 	"os"
 	"sync"
@@ -24,6 +28,8 @@ type SyncManifest struct {
 	LastModified string         `json:"last_modified"`
 	Stats        map[string]int `json:"stats"`
 	PushedAt     string         `json:"pushed_at"`
+	BinarySHA    string         `json:"binary_sha256,omitempty"`
+	Encrypted    bool           `json:"encrypted,omitempty"`
 }
 
 type SyncManager struct {
@@ -67,10 +73,49 @@ func (s *SyncManager) retryWithBackoff(maxAttempts int, opName string, fn func(c
 }
 
 // PushDBToDrive implements the strict push logic
-func (s *SyncManager) PushDBToDrive() error {
+func (s *SyncManager) PushDBToDrive() (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	log.Printf("🔄 Starting strict DB push to Drive...")
+
+	// Circuit-breaker: refuse pushes if suspended
+	if suspended, derr := s.isPushSuspended(); derr == nil && suspended {
+		return fmt.Errorf("push suspended by circuit-breaker")
+	} else if derr != nil {
+		log.Printf("⚠️  Failed to evaluate push circuit-breaker: %v", derr)
+	}
+
+	// Track success/failure and update circuit-breaker state and structured logs
+	start := time.Now()
+	var logicalHash string
+	var localLSN int64
+	defer func() {
+		// record circuit-breaker counters
+		if err != nil {
+			if rerr := s.recordPushFailure(); rerr != nil {
+				log.Printf("⚠️  Failed to record push failure: %v", rerr)
+			}
+		} else {
+			if rerr := s.resetPushFailures(); rerr != nil {
+				log.Printf("⚠️  Failed to reset push failure counter: %v", rerr)
+			}
+		}
+
+		// structured log entry
+		entry := map[string]interface{}{
+			"type":       "push_result",
+			"lsn":        localLSN,
+			"logicalHash": logicalHash,
+			"success":    err == nil,
+			"duration_s": time.Since(start).Seconds(),
+		}
+		if err != nil {
+			entry["error"] = err.Error()
+		}
+		if lerr := s.appendSyncLog(entry); lerr != nil {
+			log.Printf("⚠️ Failed to append sync log: %v", lerr)
+		}
+	}()
 
 	// 0. Check pending_sync for failed entries
 	if failed, err := s.db.HasFailedSyncs(); err == nil && failed {
@@ -102,7 +147,7 @@ func (s *SyncManager) PushDBToDrive() error {
 	}
 
 	// 3. Local LSN Check
-	localLSN, err := s.db.GetLocalLSN()
+	localLSN, err = s.db.GetLocalLSN()
 	if err != nil {
 		return err
 	}
@@ -117,45 +162,78 @@ func (s *SyncManager) PushDBToDrive() error {
 	}
 
 	if remoteManifest != nil {
-		// 5. Smart Decision Logic
-		stats, _ := s.db.GetSyncStats()
-		logicalHash, _ := s.db.CalculateLogicalHash()
-		lastModified, _ := s.db.GetLastModified()
+		// Explicit decision state machine with 5 cases:
+		// 1) Identical -> noop
+		// 2) Local richer -> push
+		// 3) Remote richer -> require pull
+		// 4) Equal counts but local newer -> push
+		// 5) Equal counts but remote newer -> require pull
 
-		// Rule 2: In Sync check
-		statsEqual := stats["files"] == remoteManifest.Stats["files"] &&
-			stats["folders"] == remoteManifest.Stats["folders"] &&
-			stats["tasks"] == remoteManifest.Stats["tasks"]
+		statsLocal, _ := s.db.GetSyncStats()
+		logicalLocal, _ := s.db.CalculateLogicalHash()
+		lastLocal, _ := s.db.GetLastModified()
 
-		if statsEqual && remoteManifest.LogicalHash == logicalHash {
+		statsRemote := remoteManifest.Stats
+		logicalRemote := remoteManifest.LogicalHash
+		lastRemote := remoteManifest.LastModified
+
+		// Helper totals
+		localTotal := statsLocal["files"] + statsLocal["folders"] + statsLocal["tasks"]
+		remoteTotal := statsRemote["files"] + statsRemote["folders"] + statsRemote["tasks"]
+
+		// Case 1: identical (counts + logical hash)
+		if localTotal == remoteTotal && logicalLocal == logicalRemote {
 			log.Printf("✅ DB already in sync (LSN %d)", localLSN)
 			return nil
 		}
 
-		// Rule 3 & 4: Row Counts
-		localTotal := stats["files"] + stats["folders"] + stats["tasks"]
-		remoteTotal := remoteManifest.Stats["files"] + remoteManifest.Stats["folders"] + remoteManifest.Stats["tasks"]
-
+		// Case 2/3: richer counts decide (local richer -> push, remote richer -> pull)
 		if localTotal > remoteTotal {
-			log.Printf("🚀 Local is richer (%d > %d). Pushing...", localTotal, remoteTotal)
-			// Proceed to push
+			log.Printf("🚀 Decision: Local is richer (%d > %d). Proceeding to push.", localTotal, remoteTotal)
+			// proceed
 		} else if remoteTotal > localTotal {
-			return fmt.Errorf("remote is richer (%d > %d). PUL_REQUIRED", remoteTotal, localTotal)
+			log.Printf("⏸️  Decision: Remote is richer (%d > %d). Pull required.", remoteTotal, localTotal)
+			return fmt.Errorf("PUL_REQUIRED: remote richer (%d > %d)", remoteTotal, localTotal)
 		} else {
-			// Rule 5: Totals equal but hash diff (Divergence)
-			log.Printf("⚠️  Row counts equal but hashes differ. Using date tiebreaker.")
-			localDate, _ := time.Parse(time.RFC3339, lastModified)
-			if lastModified == "" {
+			// Equal counts but different logical hashes -> tiebreak with lastModified
+			// Parse times safely
+			var localDate time.Time
+			var remoteDate time.Time
+			if lastLocal == "" {
 				localDate = time.Unix(0, 0)
+			} else {
+				if d, e := time.Parse(time.RFC3339, lastLocal); e == nil {
+					localDate = d
+				} else {
+					localDate = time.Unix(0, 0)
+				}
 			}
-			remoteDate, _ := time.Parse(time.RFC3339, remoteManifest.LastModified)
+			if lastRemote == "" {
+				remoteDate = time.Unix(0, 0)
+			} else {
+				if d, e := time.Parse(time.RFC3339, lastRemote); e == nil {
+					remoteDate = d
+				} else {
+					remoteDate = time.Unix(0, 0)
+				}
+			}
+
+			// If logical hashes match (should have matched earlier) treat as noop
+			if logicalLocal == logicalRemote {
+				log.Printf("✅ Logical hashes match after re-evaluation")
+				return nil
+			}
 
 			if localDate.After(remoteDate) {
-				log.Printf("🚀 Local is newer. Pushing...")
+				log.Printf("🚀 Decision: counts equal but local is newer by timestamp. Proceeding to push.")
+				// proceed
 			} else if remoteDate.After(localDate) {
-				return fmt.Errorf("remote is newer. PUL_REQUIRED")
+				log.Printf("⏸️  Decision: counts equal but remote is newer by timestamp. Pull required.")
+				return fmt.Errorf("PUL_REQUIRED: remote newer by timestamp")
 			} else {
-				return fmt.Errorf("CONFLICT DETECTED: Same size, same date, different data")
+				// Exact tie on counts and timestamps but different logical hashes -> conflict
+				log.Printf("❗ CONFLICT_DETECTED: equal counts & dates but different logical hashes")
+				return fmt.Errorf("CONFLICT_DETECTED: equal counts & dates but different logical hashes")
 			}
 		}
 	}
@@ -167,7 +245,13 @@ func (s *SyncManager) PushDBToDrive() error {
 	}
 	defer os.Remove(tmpSnapshot)
 
-	logicalHash, _ := s.db.CalculateLogicalHash()
+	// compute binary SHA for the snapshot as additional verification metadata
+	snapshotBinarySHA, err := s.calculateFileHash(tmpSnapshot)
+	if err != nil {
+		return fmt.Errorf("failed to compute snapshot binary hash: %w", err)
+	}
+
+	logicalHash, _ = s.db.CalculateLogicalHash()
 	stats, _ := s.db.GetSyncStats()
 	lastMod, _ := s.db.GetLastModified()
 
@@ -178,12 +262,39 @@ func (s *SyncManager) PushDBToDrive() error {
 		LastModified: lastMod,
 		Stats:        stats,
 		PushedAt:     time.Now().Format(time.RFC3339),
+		BinarySHA:    snapshotBinarySHA,
 	}
 
-	if err := s.retryWithBackoff(3, "UploadDBFileToDrive", func(ctx context.Context) error {
-		return s.UploadDBFileToDrive(ctx, manifest, tmpSnapshot)
-	}); err != nil {
-		return fmt.Errorf("upload failed: %w", err)
+	// structured log: push start
+	if lerr := s.appendSyncLog(map[string]interface{}{"type": "push_start", "lsn": localLSN, "time": time.Now().Format(time.RFC3339)}); lerr != nil {
+		log.Printf("⚠️ Failed to append push_start log: %v", lerr)
+	}
+
+	// If a master key is provided via NEXUS_SNAPSHOT_KEY (hex, 32 bytes), encrypt the snapshot before upload.
+	if key, kerr := readMasterKey(); kerr == nil && key != nil {
+		encPath := tmpSnapshot + ".enc"
+		log.Printf("🔒 Master key present: encrypting snapshot to %s before upload", encPath)
+		if err := encryptFileAESGCM(tmpSnapshot, encPath, key); err != nil {
+			return fmt.Errorf("failed to encrypt snapshot before upload: %w", err)
+		}
+		// upload encrypted file but keep BinarySHA as hash of plaintext
+		manifest.Encrypted = true
+		if err := s.retryWithBackoff(3, "UploadDBFileToDrive", func(ctx context.Context) error {
+			return s.UploadDBFileToDrive(ctx, manifest, encPath)
+		}); err != nil {
+			os.Remove(encPath)
+			return fmt.Errorf("upload failed: %w", err)
+		}
+		os.Remove(encPath)
+	} else if kerr != nil {
+		return fmt.Errorf("invalid master key: %w", kerr)
+	} else {
+		// No master key: upload plaintext snapshot (existing behavior)
+		if err := s.retryWithBackoff(3, "UploadDBFileToDrive", func(ctx context.Context) error {
+			return s.UploadDBFileToDrive(ctx, manifest, tmpSnapshot)
+		}); err != nil {
+			return fmt.Errorf("upload failed: %w", err)
+		}
 	}
 
 	// 7.5 Post-Push Verification: Re-read from Drive and verify hash
@@ -194,16 +305,59 @@ func (s *SyncManager) PushDBToDrive() error {
 	}
 	defer os.Remove(tempVerify)
 
-	verifyHash, err := s.calculateFileHash(tempVerify)
-	if err != nil {
-		return fmt.Errorf("post-push hash calculation failed: %w", err)
+	// If snapshot was uploaded encrypted, decrypt the downloaded file before verification
+	verifyPath := tempVerify
+	if manifest.Encrypted {
+		key, kerr := readMasterKey()
+		if kerr != nil {
+			os.Remove(tempVerify)
+			return fmt.Errorf("master key invalid or missing for post-push verification: %w", kerr)
+		}
+		decPath := tempVerify + ".dec"
+		if err := decryptFileAESGCM(tempVerify, decPath, key); err != nil {
+			os.Remove(tempVerify)
+			return fmt.Errorf("failed to decrypt downloaded snapshot for verification: %w", err)
+		}
+		// remove the encrypted temp and use decrypted path for checks
+		os.Remove(tempVerify)
+		verifyPath = decPath
+		defer os.Remove(decPath)
 	}
 
-	if verifyHash != logicalHash {
-		log.Printf("❌ CRITICAL: Push corruption detected! Hash mismatch on Drive.")
-		return fmt.Errorf("push verification failed: hash mismatch (local: %s, remote: %s)", logicalHash[:8], verifyHash[:8])
+	// 1) Optional: verify binary SHA if manifest contains it (plaintext SHA)
+	if manifest.BinarySHA != "" {
+		downloadedBinarySHA, err := s.calculateFileHash(verifyPath)
+		if err != nil {
+			os.Remove(verifyPath)
+			return fmt.Errorf("post-push binary hash calculation failed: %w", err)
+		}
+		if downloadedBinarySHA != manifest.BinarySHA {
+			log.Printf("❌ CRITICAL: Push corruption detected! Binary SHA mismatch on Drive.")
+			os.Remove(verifyPath)
+			return fmt.Errorf("push verification failed: binary sha mismatch (manifest: %s, remote: %s)", manifest.BinarySHA[:8], downloadedBinarySHA[:8])
+		}
+		log.Printf("✅ Post-push binary SHA matched manifest.")
 	}
-	log.Printf("✅ Push verification successful.")
+
+	// 2) Verify by opening the downloaded snapshot as a DB and comparing logical hashes
+	tempDB := &Database{}
+	if err := tempDB.Init(verifyPath); err != nil {
+		os.Remove(verifyPath)
+		return fmt.Errorf("post-push verification failed to open downloaded DB: %w", err)
+	}
+	downloadedLogicalHash, err := tempDB.CalculateLogicalHash()
+	tempDB.Close()
+	if err != nil {
+		os.Remove(verifyPath)
+		return fmt.Errorf("post-push logical hash calculation failed: %w", err)
+	}
+
+	if downloadedLogicalHash != logicalHash {
+		log.Printf("❌ CRITICAL: Push corruption detected! Logical hash mismatch on Drive.")
+		os.Remove(verifyPath)
+		return fmt.Errorf("push verification failed: logical hash mismatch (local: %s, remote: %s)", logicalHash[:8], downloadedLogicalHash[:8])
+	}
+	log.Printf("✅ Push verification successful (logical hash matched).")
 
 	// 8. Update Local Status — MUST SUCCEED
 	if err := s.db.UpdatePushStatus(localLSN, logicalHash); err != nil {
@@ -220,10 +374,31 @@ func (s *SyncManager) PushDBToDrive() error {
 }
 
 // PullDBFromDrive implements the strict pull logic
-func (s *SyncManager) PullDBFromDrive(force bool) error {
+func (s *SyncManager) PullDBFromDrive(force bool) (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	log.Printf("🔄 Starting strict DB pull from Drive...")
+
+	start := time.Now()
+	var remoteLSN int64
+	var remoteLogical string
+	defer func() {
+		entry := map[string]interface{}{
+			"type":      "pull_result",
+			"lsn":       remoteLSN,
+			"success":   err == nil,
+			"duration_s": time.Since(start).Seconds(),
+		}
+		if remoteLogical != "" {
+			entry["logicalHash"] = remoteLogical
+		}
+		if err != nil {
+			entry["error"] = err.Error()
+		}
+		if lerr := s.appendSyncLog(entry); lerr != nil {
+			log.Printf("⚠️ Failed to append pull_result log: %v", lerr)
+		}
+	}()
 
 	// 1. Read Remote Manifest
 	remoteManifest, err := s.GetRemoteManifest()
@@ -232,6 +407,13 @@ func (s *SyncManager) PullDBFromDrive(force bool) error {
 	}
 	if remoteManifest == nil {
 		return fmt.Errorf("no remote backup found on Drive")
+	}
+	remoteLSN = remoteManifest.LSN
+	remoteLogical = remoteManifest.LogicalHash
+
+	// structured log: pull start
+	if lerr := s.appendSyncLog(map[string]interface{}{"type": "pull_start", "lsn": remoteLSN, "time": time.Now().Format(time.RFC3339)}); lerr != nil {
+		log.Printf("⚠️ Failed to append pull_start log: %v", lerr)
 	}
 
 	// 2. Local LSN Check (unless forced)
@@ -262,47 +444,94 @@ func (s *SyncManager) PullDBFromDrive(force bool) error {
 		return fmt.Errorf("download failed: %w", err)
 	}
 
-	// To verify logical hash, we need to open the temp DB
-	tempDB := &Database{}
-	if err := tempDB.Init(tempPath); err != nil {
+	// If the remote snapshot is encrypted, decrypt it before verification/replace
+	var verifyPath string = tempPath
+	if remoteManifest.Encrypted {
+		key, kerr := readMasterKey()
+		if kerr != nil {
+			os.Remove(tempPath)
+			return fmt.Errorf("master key invalid or missing for decrypting snapshot: %w", kerr)
+		}
+		decPath := tempPath + ".dec"
+		if err := decryptFileAESGCM(tempPath, decPath, key); err != nil {
+			os.Remove(tempPath)
+			return fmt.Errorf("failed to decrypt downloaded snapshot: %w", err)
+		}
+		// prefer to remove the encrypted temp after successful decryption
 		os.Remove(tempPath)
+		verifyPath = decPath
+		defer os.Remove(decPath)
+	}
+
+	// To verify logical hash, we need to open the (possibly decrypted) temp DB
+	tempDB := &Database{}
+	if err := tempDB.Init(verifyPath); err != nil {
+		os.Remove(verifyPath)
 		return fmt.Errorf("failed to open downloaded DB for verification: %w", err)
 	}
 	downloadedHash, err := tempDB.CalculateLogicalHash()
 	tempDB.Close()
 
 	if err != nil {
-		os.Remove(tempPath)
+		os.Remove(verifyPath)
 		return err
 	}
 
 	if downloadedHash != remoteManifest.LogicalHash {
-		os.Remove(tempPath)
+		os.Remove(verifyPath)
 		return fmt.Errorf("downloaded logical hash (%s) does not match manifest (%s). Corruption suspected", downloadedHash[:8], remoteManifest.LogicalHash[:8])
 	}
 
-	// 6. Final Integrity Check on Downloaded File
-	if err := s.checkIntegrityOfFile(tempPath); err != nil {
-		os.Remove(tempPath)
+	// 6. Final Integrity Check on (possibly decrypted) file
+	if err := s.checkIntegrityOfFile(verifyPath); err != nil {
+		os.Remove(verifyPath)
 		return fmt.Errorf("downloaded DB integrity check failed: %w", err)
 	}
 
 	// 7. Atomic Replace
 	s.db.Close() // Must close before move on Windows
+
+	// Move the downloaded temp file into place
 	if err := os.Rename(tempPath, s.dbPath); err != nil {
 		return fmt.Errorf("failed to replace local DB: %w", err)
 	}
 
-	// Re-open DB
+	// Re-open DB. If Init fails, attempt automatic rollback from backup_pre_pull.
 	if err := s.db.Init(s.dbPath); err != nil {
-		// This is bad, we might need to restore the backup
-		log.Printf("❌ CRITICAL: Failed to re-open DB after pull: %v. Attempting restore...", err)
-		os.Rename(backupPath, s.dbPath)
-		s.db.Init(s.dbPath)
-		return err
+		log.Printf("❌ CRITICAL: Failed to re-open DB after pull: %v. Attempting automatic restore from backup_pre_pull...", err)
+
+		// If backup exists, try to restore it atomically
+		if _, statErr := os.Stat(backupPath); statErr == nil {
+			// Remove the faulty DB file before restoring
+			if rerr := os.Remove(s.dbPath); rerr != nil {
+				log.Printf("⚠️  Failed to remove faulty DB at %s before restore: %v", s.dbPath, rerr)
+			}
+
+			if rerr := os.Rename(backupPath, s.dbPath); rerr != nil {
+				log.Printf("❌ Failed to restore backup_pre_pull (%s -> %s): %v", backupPath, s.dbPath, rerr)
+				return fmt.Errorf("pull failed and automatic restore failed: %w; restore error: %v", err, rerr)
+			}
+
+			// Try to re-open restored DB
+			if ierr := s.db.Init(s.dbPath); ierr != nil {
+				log.Printf("❌ CRITICAL: Restored DB failed to open after restore: %v", ierr)
+				return fmt.Errorf("pull failed, restore attempted but restored DB invalid: %w; restore-open-error: %v", err, ierr)
+			}
+
+			log.Printf("✅ Automatic restore from backup_pre_pull succeeded. Local DB restored.")
+			return fmt.Errorf("pull failed initially but automatic restore succeeded; original error: %w", err)
+		}
+
+		// No backup available or stat failed
+		log.Printf("❌ No backup_pre_pull available to restore. Local DB may be left in a corrupted state.")
+		return fmt.Errorf("pull failed and no backup available to restore: %w", err)
 	}
 
-	os.Remove(backupPath)
+	// Success: remove the backup
+	if err := os.Remove(backupPath); err != nil && !os.IsNotExist(err) {
+		log.Printf("⚠️  Failed to remove backup_pre_pull (%s): %v", backupPath, err)
+	}
+
 	log.Printf("✅ DB successfully pulled from Drive (LSN %d)", remoteManifest.LSN)
 	return nil
 }
@@ -342,6 +571,100 @@ func (s *SyncManager) GetRemoteManifest() (*SyncManifest, error) {
 	return nil, lastErr
 }
 
+// appendSyncLog stores a structured sync event into kv_store with an incrementing key
+func (s *SyncManager) appendSyncLog(entry map[string]interface{}) error {
+	// get counter
+	raw, _ := s.db.GetKV("sync_log_counter")
+	n := 0
+	if raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			n = v
+		}
+	}
+	n++
+	key := fmt.Sprintf("sync_log_%d", n)
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
+	if err := s.db.SetKV(key, string(data)); err != nil {
+		return err
+	}
+	// update counter
+	if err := s.db.SetKV("sync_log_counter", strconv.Itoa(n)); err != nil {
+		return err
+	}
+
+	// Rotation: keep only the most recent N entries to avoid unbounded growth
+	const maxLogs = 1000
+	if n > maxLogs {
+		// delete oldest entries from 1..(n-maxLogs)
+		cutoff := n - maxLogs
+		for i := 1; i <= cutoff; i++ {
+			delKey := fmt.Sprintf("sync_log_%d", i)
+			// best-effort delete
+			_ = s.db.SetKV(delKey, "")
+		}
+		// Note: we don't renumber existing keys; counter continues increasing.
+	}
+	return nil
+}
+
+// Circuit breaker helpers: store counters in kv_store
+func (s *SyncManager) isPushSuspended() (bool, error) {
+	val, ok := s.db.GetKV("push_suspended_until")
+	if !ok || val == "" {
+		return false, nil
+	}
+	t, err := time.Parse(time.RFC3339, val)
+	if err != nil {
+		return false, err
+	}
+	if time.Now().Before(t) {
+		return true, nil
+	}
+	// expired -> clear
+	if err := s.db.SetKV("push_suspended_until", ""); err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+func (s *SyncManager) recordPushFailure() error {
+	raw, _ := s.db.GetKV("push_fail_count")
+	n := 0
+	if raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			n = v
+		}
+	}
+	n++
+	if err := s.db.SetKV("push_fail_count", strconv.Itoa(n)); err != nil {
+		return err
+	}
+	// Threshold -> suspend pushes for a cooldown
+	const threshold = 3
+	const cooldown = 15 * time.Minute
+	if n >= threshold {
+		until := time.Now().Add(cooldown).Format(time.RFC3339)
+		if err := s.db.SetKV("push_suspended_until", until); err != nil {
+			return err
+		}
+		log.Printf("⛔ Circuit-breaker: push suspended until %s after %d consecutive failures", until, n)
+	}
+	return nil
+}
+
+func (s *SyncManager) resetPushFailures() error {
+	if err := s.db.SetKV("push_fail_count", "0"); err != nil {
+		return err
+	}
+	if err := s.db.SetKV("push_suspended_until", ""); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *SyncManager) getRemoteManifestWithContext(ctx context.Context) (*SyncManifest, error) {
 	driveSvc := s.yt.GetDriveService()
 	if driveSvc == nil {
@@ -354,12 +677,34 @@ func (s *SyncManager) getRemoteManifestWithContext(ctx context.Context) (*SyncMa
 		query = fmt.Sprintf("name = 'nexus-sync.json' and '%s' in parents and trashed = false", folderID)
 	}
 
-	fileList, err := driveSvc.Files.List().Q(query).Fields("files(id)").Context(ctx).Do()
+	// Prefer the most-recent manifest if duplicates exist. Include metadata for dedupe auditing.
+	fileList, err := driveSvc.Files.List().Q(query).OrderBy("modifiedTime desc").Fields("files(id,modifiedTime,md5Checksum)").Context(ctx).Do()
 	if err != nil {
 		return nil, fmt.Errorf("list files error: %w", err)
 	}
 	if len(fileList.Files) == 0 {
 		return nil, &notFoundError{msg: "nexus-sync.json not found"}
+	}
+	if len(fileList.Files) > 1 {
+		log.Printf("⚠️  Multiple manifest files found (%d). Keeping most-recent (ID: %s). Archiving older duplicates.", len(fileList.Files), fileList.Files[0].Id)
+		// Archive older duplicates (keep index 0)
+		for i := 1; i < len(fileList.Files); i++ {
+			dupID := fileList.Files[i].Id
+			archiveName := fmt.Sprintf("nexus-sync.json.dup.%s.%s", time.Now().UTC().Format("20060102T150405Z"), dupID[:8])
+			copyMeta := &drive.File{Name: archiveName}
+			if folderID != "" {
+				copyMeta.Parents = []string{folderID}
+			}
+			if _, cerr := driveSvc.Files.Copy(dupID, copyMeta).Context(ctx).Do(); cerr != nil {
+				log.Printf("⚠️ failed to archive duplicate manifest %s: %v", dupID, cerr)
+				continue
+			}
+			if derr := driveSvc.Files.Delete(dupID).Context(ctx).Do(); derr != nil {
+				log.Printf("⚠️ failed to delete duplicate manifest %s after archiving: %v", dupID, derr)
+			} else {
+				log.Printf("🗄️ Archived and removed duplicate manifest %s -> %s", dupID, archiveName)
+			}
+		}
 	}
 
 	resp, err := driveSvc.Files.Get(fileList.Files[0].Id).Context(ctx).Download()
@@ -403,6 +748,19 @@ func (s *SyncManager) createDBSnapshot(destPath string) error {
 		return fmt.Errorf("snapshot checkpoint failed: %w (vacuum err: %v)", cerr, err)
 	}
 
+	// Ensure WAL is empty before copying. If not, attempt a second TRUNCATE checkpoint.
+	walPath := s.dbPath + "-wal"
+	if info, statErr := os.Stat(walPath); statErr == nil && info.Size() > 0 {
+		log.Printf("⚠️  WAL file has %d bytes after first checkpoint. Attempting TRUNCATE checkpoint.", info.Size())
+		if cerr2 := s.db.Checkpoint(); cerr2 != nil {
+			return fmt.Errorf("snapshot checkpoint truncate failed: %w", cerr2)
+		}
+		// re-stat
+		if info2, statErr2 := os.Stat(walPath); statErr2 == nil && info2.Size() > 0 {
+			return fmt.Errorf("snapshot aborted: WAL still non-empty (%d bytes) after checkpoint; refusing to copy", info2.Size())
+		}
+	}
+
 	// Copy the DB file to destPath
 	if copyErr := s.copyFile(s.dbPath, destPath); copyErr != nil {
 		return fmt.Errorf("snapshot copy failed: %w (vacuum err: %v)", copyErr, err)
@@ -424,6 +782,75 @@ func (s *SyncManager) calculateFileHash(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
+// readMasterKey reads hex key from env NEXUS_SNAPSHOT_KEY (32 bytes hex => 32 bytes key)
+func readMasterKey() ([]byte, error) {
+	hexk := os.Getenv("NEXUS_SNAPSHOT_KEY")
+	if hexk == "" {
+		return nil, nil
+	}
+	b, err := hex.DecodeString(hexk)
+	if err != nil {
+		return nil, fmt.Errorf("invalid NEXUS_SNAPSHOT_KEY hex: %w", err)
+	}
+	if len(b) != 32 {
+		return nil, fmt.Errorf("invalid NEXUS_SNAPSHOT_KEY length: want 32 bytes, got %d", len(b))
+	}
+	return b, nil
+}
+
+// encryptFileAESGCM encrypts src -> dst using AES-256-GCM. Output format: 12-byte nonce || ciphertext
+func encryptFileAESGCM(src, dst string, key []byte) error {
+	in, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return err
+	}
+	g, err := cipher.NewGCM(block)
+	if err != nil {
+		return err
+	}
+	nonce := make([]byte, g.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return err
+	}
+	out := g.Seal(nil, nonce, in, nil)
+	// prepend nonce
+	data := append(nonce, out...)
+	return os.WriteFile(dst, data, 0600)
+}
+
+// decryptFileAESGCM decrypts src -> dst assuming format: 12-byte nonce || ciphertext
+func decryptFileAESGCM(src, dst string, key []byte) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return err
+	}
+	g, err := cipher.NewGCM(block)
+	if err != nil {
+		return err
+	}
+	ns := g.NonceSize()
+	if len(data) < ns {
+		return fmt.Errorf("ciphertext too short")
+	}
+	nonce := data[:ns]
+	cipherText := data[ns:]
+	plain, err := g.Open(nil, nonce, cipherText, nil)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, plain, 0600)
+}
+
+	// use crypto/rand.Reader for nonce generation
+
 func (s *SyncManager) UploadToDrive(manifest SyncManifest) error {
 	// Deprecated: prefer UploadDBFileToDrive with an explicit snapshot.
 	// Create a consistent snapshot and upload it via the snapshot uploader.
@@ -433,7 +860,26 @@ func (s *SyncManager) UploadToDrive(manifest SyncManifest) error {
 	}
 	defer os.Remove(tmpSnapshot)
 
-	// Use retry wrapper to provide context and backoff.
+	// If master key present, encrypt snapshot before uploading
+	if key, kerr := readMasterKey(); kerr == nil && key != nil {
+		encPath := tmpSnapshot + ".enc"
+		if err := encryptFileAESGCM(tmpSnapshot, encPath, key); err != nil {
+			return fmt.Errorf("failed to encrypt snapshot for upload: %w", err)
+		}
+		manifest.Encrypted = true
+		if err := s.retryWithBackoff(3, "UploadToDrive", func(ctx context.Context) error {
+			return s.UploadDBFileToDrive(ctx, manifest, encPath)
+		}); err != nil {
+			os.Remove(encPath)
+			return fmt.Errorf("upload failed: %w", err)
+		}
+		os.Remove(encPath)
+		return nil
+	} else if kerr != nil {
+		return fmt.Errorf("invalid master key: %w", kerr)
+	}
+
+	// Use retry wrapper to provide context and backoff for plaintext upload.
 	if err := s.retryWithBackoff(3, "UploadToDrive", func(ctx context.Context) error {
 		return s.UploadDBFileToDrive(ctx, manifest, tmpSnapshot)
 	}); err != nil {
@@ -465,10 +911,42 @@ func (s *SyncManager) UploadDBFileToDrive(ctx context.Context, manifest SyncMani
 		query = fmt.Sprintf("name = 'nexus.db' and '%s' in parents and trashed = false", folderID)
 	}
 
-	fileList, err := driveSvc.Files.List().Q(query).Fields("files(id)").Context(ctx).Do()
-	if err == nil && len(fileList.Files) > 0 {
-		fileID := fileList.Files[0].Id
-		log.Printf("📄 Found existing nexus.db (ID: %s), performing PATCH update...", fileID)
+	// Prefer the most-recent nexus.db file and include metadata to detect duplicates
+	fileList, err := driveSvc.Files.List().Q(query).OrderBy("modifiedTime desc").Fields("files(id,modifiedTime,md5Checksum,parents)").Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("drive list error: %w", err)
+	}
+
+	if len(fileList.Files) > 0 {
+		// If multiple, remove older duplicates (keep the most recent at index 0)
+		if len(fileList.Files) > 1 {
+			log.Printf("⚠️  Multiple nexus.db files found on Drive (%d). Keeping most recent (ID: %s), deleting older duplicates.", len(fileList.Files), fileList.Files[0].Id)
+			for i := 1; i < len(fileList.Files); i++ {
+				did := fileList.Files[i].Id
+				if err := driveSvc.Files.Delete(did).Context(ctx).Do(); err != nil {
+					log.Printf("⚠️  Failed to delete duplicate nexus.db (ID: %s): %v", did, err)
+				} else {
+					log.Printf("🗑️  Deleted old duplicate nexus.db (ID: %s)", did)
+				}
+			}
+		}
+
+		// Create a backup copy of the current nexus.db on Drive before updating
+		existingID := fileList.Files[0].Id
+		backupName := fmt.Sprintf("nexus.db.bak.%s", time.Now().Format("20060102T150405"))
+		backupFile := &drive.File{Name: backupName}
+		if folderID != "" {
+			backupFile.Parents = []string{folderID}
+		}
+		if _, err := driveSvc.Files.Copy(existingID, backupFile).Context(ctx).Do(); err != nil {
+			log.Printf("⚠️  Failed to create Drive backup of existing nexus.db (ID: %s): %v", existingID, err)
+		} else {
+			log.Printf("💾 Created Drive backup of nexus.db as %s", backupName)
+		}
+
+		// Update the existing file (PATCH)
+		fileID := existingID
+		log.Printf("📄 Updating existing nexus.db (ID: %s) via PATCH...", fileID)
 		if _, err = driveSvc.Files.Update(fileID, nil).Media(dbFile).Context(ctx).Do(); err != nil {
 			return err
 		}
@@ -492,8 +970,11 @@ func (s *SyncManager) UploadDBFileToDrive(ctx context.Context, manifest SyncMani
 	if folderID != "" {
 		query = fmt.Sprintf("name = 'nexus-sync.json' and '%s' in parents and trashed = false", folderID)
 	}
-	fileList, err = driveSvc.Files.List().Q(query).Fields("files(id)").Context(ctx).Do()
+	fileList, err = driveSvc.Files.List().Q(query).OrderBy("modifiedTime desc").Fields("files(id,modifiedTime,md5Checksum)").Context(ctx).Do()
 	if err == nil && len(fileList.Files) > 0 {
+		if len(fileList.Files) > 1 {
+			log.Printf("⚠️  Multiple manifest files found when uploading (%d). Updating most-recent (ID: %s).", len(fileList.Files), fileList.Files[0].Id)
+		}
 		if _, err = driveSvc.Files.Update(fileList.Files[0].Id, nil).Media(bytes.NewReader(manifestJSON)).Context(ctx).Do(); err != nil {
 			return err
 		}
@@ -526,9 +1007,13 @@ func (s *SyncManager) DownloadFromDrive(destPath string) error {
 		}
 
 		// Find file with timeout
-		fileList, err := driveSvc.Files.List().Q(query).Fields("files(id)").Context(ctx).Do()
+		// Prefer the most-recent nexus.db file and include metadata to detect duplicates
+		fileList, err := driveSvc.Files.List().Q(query).OrderBy("modifiedTime desc").Fields("files(id,modifiedTime,md5Checksum)").Context(ctx).Do()
 		if err != nil || len(fileList.Files) == 0 {
 			return fmt.Errorf("nexus.db not found on Drive")
+		}
+		if len(fileList.Files) > 1 {
+			log.Printf("⚠️  Multiple nexus.db files found on Drive (%d). Using most-recent (ID: %s).", len(fileList.Files), fileList.Files[0].Id)
 		}
 
 		// Download with timeout

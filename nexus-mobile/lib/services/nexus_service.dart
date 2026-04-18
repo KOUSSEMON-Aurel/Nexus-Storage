@@ -6,7 +6,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:ffmpeg_kit_flutter_new/ffprobe_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit_config.dart';
 import '../ffi/nexus_bindings.dart';
@@ -23,7 +22,7 @@ class NexusService {
   final DatabaseService _db = DatabaseService();
   final YouTubeService _youtube = YouTubeService();
   DateTime _lastRefreshTime = DateTime.fromMillisecondsSinceEpoch(0);
-  static const bool keepFramesForDebug = false;
+  static const bool keepFramesForDebug = true;
 
   Future<void> _updateStatus(String taskId, double progress, String status, {String? fileName}) async {
     await _db.updateTaskProgress(taskId, progress, status);
@@ -56,7 +55,7 @@ class NexusService {
     Pointer<Size>? outLenPtr;
     Directory? framesDir;
     File? videoFile;
-    const bool keepFramesForDebug = true; // set true to retain extracted frames for inspection
+    // local debug flag removed (use class-level `keepFramesForDebug`)
 
     try {
       if (!await inputFile.exists()) {
@@ -338,21 +337,21 @@ class NexusService {
           }
         }
         
-        AppLogger.info('NexusService: Video resolution detected: ${width}x${height}');
+          AppLogger.info('NexusService: Video resolution detected: ${width}x$height');
         
         if (width != null && height != null) {
           // Validation de sécurité pour éviter le décodage de bruit (ex: 144p)
           if (!isHighMode && (width < 640 || height < 360)) { // Seuil minimal absolu pour Base (idéal 720p)
-            throw NexusException('Qualité insuffisante : ${width}x${height}. Le mode Base requiert au moins du 360p (idéal 720p).');
+            throw NexusException('Qualité insuffisante : ${width}x$height. Le mode Base requiert au moins du 360p (idéal 720p).');
           }
           // (debug) frames retention handled later per-frame during decoding loop
           if (isHighMode && (width < 1280 || height < 720)) {
-            throw NexusException('Qualité insuffisante pour le mode High : ${width}x${height}. 720p minimum requis.');
+            throw NexusException('Qualité insuffisante pour le mode High : ${width}x$height. 720p minimum requis.');
           }
            
           if (width != 1280 || height != 720) {
             if (!isHighMode) {
-                AppLogger.warn('NexusService: Resolution mismatch (Base). Expected 1280x720, got ${width}x${height}. FFmpeg will rescale.');
+                AppLogger.warn('NexusService: Resolution mismatch (Base). Expected 1280x720, got ${width}x$height. FFmpeg will rescale.');
             }
           }
         }
@@ -576,7 +575,7 @@ class NexusService {
       }
 
       try {
-        if (ios != null) await ios.close();
+        await ios.close();
       } catch (e) {
         AppLogger.warn('NexusService: Failed to close output file (ignored): $e');
       }
@@ -590,12 +589,10 @@ class NexusService {
       await _updateStatus(taskId, 0.0, 'Failed', fileName: fileName);
       rethrow;
     } finally {
-      if (ios != null) {
-        try {
-          await ios.close();
-        } catch (e) {
-          AppLogger.warn('NexusService: Ignored error closing output file in finally: $e');
-        }
+      try {
+        await ios!.close();
+      } catch (e) {
+        AppLogger.warn('NexusService: Ignored error closing output file in finally: $e');
       }
       if (decoderCtx != null) _native.nexus_decoder_stream_drop(decoderCtx);
       if (cryptoCtx != null) _native.nexus_crypto_stream_drop(cryptoCtx);

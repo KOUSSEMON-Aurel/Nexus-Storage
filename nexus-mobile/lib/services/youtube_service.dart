@@ -122,7 +122,7 @@ class YouTubeService {
         AppLogger.info(' - Qualité: ${s.videoQuality}, Format: ${s.container.name}, Adaptive: ${s.container.name != "muxed"}, Taille: ${(s.size.totalBytes / 1024 / 1024).toStringAsFixed(2)}MB');
       }
 
-      yt_explode.StreamInfo? streamInfo;
+      late yt_explode.StreamInfo streamInfo;
 
       // 1. Chercher d'abord un flux vidéo seul (Adaptive) en 720p MP4 (le plus stable)
       final streams720mp4 = manifest.videoOnly.where((s) => 
@@ -148,12 +148,11 @@ class YouTubeService {
         }
       }
 
-      if (streamInfo is yt_explode.VideoStreamInfo) {
-          final vInfo = streamInfo as yt_explode.VideoStreamInfo;
+        if (streamInfo is yt_explode.VideoStreamInfo) {
+          final yt_explode.VideoStreamInfo vInfo = streamInfo;
           AppLogger.info('YT API: NATIVE CHOICE -> ${vInfo.videoQuality} (${vInfo.container.name}) - Bitrate: ${vInfo.bitrate}');
-      }
+        }
       
-      if (streamInfo == null) throw Exception('No compatible streams found');
       AppLogger.info('YT API: Selected stream size: ${streamInfo.size.totalBytes} (Format: ${streamInfo.container.name})');
 
       final cacheDir = await getTemporaryDirectory();
@@ -192,7 +191,7 @@ class YouTubeService {
       AppLogger.info('YT API: Download finished. Real Size: $downloadedBytes');
       return videoFile;
     } catch (e, s) {
-      AppLogger.error('YouTube Download Error in Service: $e');
+      AppLogger.error('YouTube Download Error in Service: $e', e, s);
       return null;
     }
   }

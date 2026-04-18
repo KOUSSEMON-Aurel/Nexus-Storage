@@ -81,23 +81,22 @@ class NexusTaskHandler extends TaskHandler {
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
-    print('NexusDebug: Background task onStart at $timestamp, starter: $starter');
-    AppLogger.info('BACKGROUND TASK STARTING AT $timestamp');
+    AppLogger.info('BACKGROUND TASK STARTING AT $timestamp, starter: $starter');
     FlutterForegroundTask.sendDataToMain('refresh');
 
-    print('NexusDebug: Attempting silent sign-in');
+    AppLogger.info('Attempting silent sign-in');
     final user = await AuthService().signInSilently();
     
     if (user != null) {
-      print('NexusDebug: Silent sign-in success. Using refreshed user session.');
+      AppLogger.info('Silent sign-in success. Using refreshed user session.');
     } else {
-      print('NexusDebug: Silent sign-in failed. Attempting to use stored token fallback.');
+      AppLogger.info('Silent sign-in failed. Attempting to use stored token fallback.');
       final token = await FlutterForegroundTask.getData<String>(key: 'token');
       if (token != null) {
-        print('NexusDebug: Falling back to token retrieved from storage');
+        AppLogger.info('Falling back to token retrieved from storage');
         AuthService().setBackgroundToken(token);
       } else {
-        print('NexusDebug: No token found in foreground task storage');
+        AppLogger.info('No token found in foreground task storage');
       }
     }
 
@@ -105,10 +104,10 @@ class NexusTaskHandler extends TaskHandler {
     final taskId = await FlutterForegroundTask.getData<String>(key: 'id');
     final password = await FlutterForegroundTask.getData<String>(key: 'pwd') ?? '';
 
-    print('NexusDebug: Task info - type: $type, id: $taskId, pwd length: ${password.length}');
+    AppLogger.info('Task info - type: $type, id: $taskId, pwd length: ${password.length}');
 
     if (taskId == null) {
-      print('NexusDebug: taskId is NULL, stopping service');
+      AppLogger.warn('taskId is NULL, stopping service');
       FlutterForegroundTask.stopService();
       return;
     }
@@ -120,18 +119,18 @@ class NexusTaskHandler extends TaskHandler {
       
       if (type == 'upload') {
         final filePath = await FlutterForegroundTask.getData<String>(key: 'path');
-        print('NexusDebug: Starting upload for $filePath');
+        AppLogger.info('Starting upload for $filePath');
         if (filePath == null) throw Exception('Missing upload path');
         
         await nexus.encodeAndUpload(File(filePath), password, explicitTaskId: taskId);
         finalTitle = '✅ Upload Complete';
         finalBody = 'File secured on YouTube.';
-        print('NexusDebug: Upload finished successfully');
+        AppLogger.info('Upload finished successfully');
       } else if (type == 'download') {
         final videoId = await FlutterForegroundTask.getData<String>(key: 'video_id');
         final fileName = await FlutterForegroundTask.getData<String>(key: 'file_name');
         
-        print('NexusDebug: Starting download for $fileName ($videoId)');
+        AppLogger.info('Starting download for $fileName ($videoId)');
         if (videoId == null || fileName == null) throw Exception('Missing download data');
 
         final record = FileRecord(
@@ -154,24 +153,23 @@ class NexusTaskHandler extends TaskHandler {
         await nexus.downloadAndDecrypt(record, password, explicitTaskId: taskId);
         finalTitle = '✅ Download Complete';
         finalBody = 'Saved: /Download/NexusStorage/$fileName';
-        print('NexusDebug: Download finished successfully');
+        AppLogger.info('Download finished successfully');
       }
 
       FlutterForegroundTask.sendDataToMain('refresh');
       
       // 1. Stop Foreground Service (removes non-swipable notif)
-      print('NexusDebug: Stopping service after success');
+      AppLogger.info('Stopping service after success');
       await FlutterForegroundTask.stopService();
 
       // 2. Show Standard swipable notification
       await _showFinalNotification(finalTitle, finalBody, true);
 
     } catch (e) {
-      print('NexusDebug: BACKGROUND ERROR: $e');
       AppLogger.error('BACKGROUND ERROR: $e');
       FlutterForegroundTask.sendDataToMain('refresh');
       
-      print('NexusDebug: Stopping service after failure');
+      AppLogger.info('Stopping service after failure');
       await FlutterForegroundTask.stopService();
       await _showFinalNotification('❌ Task Failed', e.toString().split('\n').first, false);
     }

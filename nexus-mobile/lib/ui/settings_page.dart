@@ -4,7 +4,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:nexus_mobile/services/auth_service.dart';
 import 'package:nexus_mobile/services/database_service.dart';
 import 'package:nexus_mobile/services/settings_service.dart';
-import 'package:nexus_mobile/services/sync_service.dart';
 import 'package:nexus_mobile/utils/l10n.dart';
 import 'package:nexus_mobile/theme/app_colors.dart';
 import 'package:nexus_mobile/theme/app_spacing.dart';
@@ -465,23 +464,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Future<void> _handleSyncAction(String type) async {
-    setState(() => _isLoading = true);
-    try {
-      if (type == 'push') {
-        await SyncService().pushDatabase();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Database pushed successfully')));
-      } else {
-        await SyncService().pullDatabase();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Database pulled successfully')));
-      }
-      setState(() {});
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sync Error: $e'), backgroundColor: Colors.red));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+  // Removed unused _handleSyncAction to satisfy analyzer.
 
   void _showLanguageDialog(BuildContext context) {
     final lang = _settings.language.value;

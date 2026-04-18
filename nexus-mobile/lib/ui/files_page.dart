@@ -274,6 +274,7 @@ class _FilesPageState extends State<FilesPage> {
               onPressed: () async {
                 for (var id in _selectedIds) {
                   final file = _files.firstWhere((f) => f.id == id);
+                  if (!mounted) return;
                   if (widget.onDownload != null) {
                     // Request battery optimization once before starting the batch if possible
                     if (Platform.isAndroid && !await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
@@ -287,7 +288,11 @@ class _FilesPageState extends State<FilesPage> {
                     _nexus.downloadAndDecrypt(file, file.key);
                   }
                 }
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started for selected items')));
+                if (!mounted) return;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started for selected items')));
+                });
                 _exitSelecting();
               }, 
               icon: const Icon(Icons.download_rounded, color: AppColors.primary)
@@ -520,7 +525,11 @@ class _FilesPageState extends State<FilesPage> {
                     } else {
                       _nexus.downloadAndDecrypt(file, file.key);
                     }
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started...')));
+                    if (!mounted) return;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started...')));
+                    });
                   },
                 ),
                 ListTile(
