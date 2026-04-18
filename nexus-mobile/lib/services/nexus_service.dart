@@ -23,7 +23,7 @@ class NexusService {
   final DatabaseService _db = DatabaseService();
   final YouTubeService _youtube = YouTubeService();
   DateTime _lastRefreshTime = DateTime.fromMillisecondsSinceEpoch(0);
-  static const bool keepFramesForDebug = true;
+  static const bool keepFramesForDebug = false;
 
   Future<void> _updateStatus(String taskId, double progress, String status, {String? fileName}) async {
     await _db.updateTaskProgress(taskId, progress, status);
