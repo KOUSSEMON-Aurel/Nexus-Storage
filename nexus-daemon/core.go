@@ -424,6 +424,19 @@ func (s *EncodeStream) Push(data []byte) (int, error) {
 	return int(res), nil
 }
 
+// PushFEC is an explicit alias for Push, ensuring Forward Error Correction is used.
+func (s *EncodeStream) PushFEC(data []byte) (int, error) {
+	var inPtr *C.uint8_t
+	if len(data) > 0 {
+		inPtr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	res := C.nexus_encode_stream_push_fec(s.ctx, inPtr, C.size_t(len(data)))
+	if res < 0 {
+		return 0, fmt.Errorf("encode push fec error (code %d)", res)
+	}
+	return int(res), nil
+}
+
 func (s *EncodeStream) PopFrame() ([]byte, error) {
 	var outPtr *C.uint8_t
 	var outLen C.size_t
@@ -474,6 +487,19 @@ func (s *DecodeStream) Push(data []byte) error {
 	res := C.nexus_decode_stream_push(s.ctx, inPtr, C.size_t(len(data)))
 	if res != C.NEXUS_OK {
 		return fmt.Errorf("decode push error (code %d)", res)
+	}
+	return nil
+}
+
+// PushFEC is an explicit alias for Push, providing RaptorQ-based recovery.
+func (s *DecodeStream) PushFEC(data []byte) error {
+	var inPtr *C.uint8_t
+	if len(data) > 0 {
+		inPtr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	res := C.nexus_decode_stream_push_fec(s.ctx, inPtr, C.size_t(len(data)))
+	if res != C.NEXUS_OK {
+		return fmt.Errorf("decode push fec error (code %d)", res)
 	}
 	return nil
 }

@@ -189,6 +189,7 @@ void nexus_crypto_stream_drop(StreamingContext* ctx);
  */
 StreamingEncoder* nexus_encode_stream_init(int32_t mode);
 int32_t nexus_encode_stream_push(StreamingEncoder* ctx, const uint8_t* in_ptr, size_t in_len);
+int32_t nexus_encode_stream_push_fec(StreamingEncoder* ctx, const uint8_t* in_ptr, size_t in_len);
 int32_t nexus_encode_stream_pop_frame(StreamingEncoder* ctx, uint8_t** out_ptr, size_t* out_len);
 int32_t nexus_encode_stream_finalize(StreamingEncoder* ctx);
 void nexus_encoder_stream_drop(StreamingEncoder* ctx);
@@ -198,6 +199,7 @@ void nexus_encoder_stream_drop(StreamingEncoder* ctx);
  */
 StreamingDecoder* nexus_decode_stream_init(int32_t mode);
 int32_t nexus_decode_stream_push(StreamingDecoder* ctx, const uint8_t* in_ptr, size_t in_len);
+int32_t nexus_decode_stream_push_fec(StreamingDecoder* ctx, const uint8_t* in_ptr, size_t in_len);
 int32_t nexus_decode_stream_pop(StreamingDecoder* ctx, uint8_t** out_ptr, size_t* out_len);
 void nexus_decoder_stream_drop(StreamingDecoder* ctx);
 

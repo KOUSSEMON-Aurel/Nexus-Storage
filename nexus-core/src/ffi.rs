@@ -652,19 +652,38 @@ pub extern "C" fn nexus_decode_stream_pop(
     };
     if out_ptr.is_null() || out_len.is_null() { return NEXUS_ERR_NULL_PTR; }
 
-    let data = ctx.pop_data();
-    if data.is_empty() {
-        return 1; // Not an error, just no data available
+    match ctx.pop_data() {
+        data if !data.is_empty() => {
+            let len = data.len();
+            let ptr = Box::into_raw(data.into_boxed_slice()) as *mut u8;
+            unsafe {
+                *out_ptr = ptr;
+                *out_len = len;
+            }
+            NEXUS_OK
+        },
+        _ => 1, // No data
     }
+}
 
-    let len = data.len();
-    let ptr = Box::into_raw(data.into_boxed_slice()) as *mut u8;
+/// Explicit FEC version of stream push.
+#[unsafe(no_mangle)]
+pub extern "C" fn nexus_encode_stream_push_fec(
+    ctx_ptr: *mut StreamingEncoder,
+    in_ptr: *const u8,
+    in_len: usize,
+) -> i32 {
+    unsafe { nexus_encode_stream_push(ctx_ptr, in_ptr, in_len) }
+}
 
-    unsafe {
-        *out_ptr = ptr;
-        *out_len = len;
-    }
-    NEXUS_OK
+/// Explicit FEC version of stream push.
+#[unsafe(no_mangle)]
+pub extern "C" fn nexus_decode_stream_push_fec(
+    ctx_ptr: *mut StreamingDecoder,
+    in_ptr: *const u8,
+    in_len: usize,
+) -> i32 {
+    unsafe { nexus_decode_stream_push(ctx_ptr, in_ptr, in_len) }
 }
 
 #[unsafe(no_mangle)]

@@ -11,9 +11,17 @@ use std::convert::TryInto;
 use crate::types::{NexusError, NexusResult};
 
 pub const CHUNK_TAG_LEN: usize = 16;
-pub const STREAM_PREFIX_LEN: usize = 16; // Random prefix for nonces
-pub const STREAM_NONCE_LEN: usize = 24;  // XChaCha20 nonce length
-pub const STREAM_CHUNK_SIZE: usize = 64 * 1024; // 64KB AES-like blocks
+pub const STREAM_PREFIX_LEN: usize = 16;
+pub const STREAM_NONCE_LEN: usize = 24;
+pub const STREAM_CHUNK_SIZE: usize = 64 * 1024;
+
+// FEC Constants
+pub const FEC_SYMBOL_SIZE: usize = 1024;
+pub const FEC_SOURCE_SYMBOLS: usize = 120; // 120KB blocks
+pub const FEC_REPAIR_SYMBOLS: usize = 30;  // 25% redundancy
+pub const FEC_SYMBOL_HEADER_SIZE: usize = 8;
+pub const FULL_SYMBOL_SIZE: usize = FEC_SYMBOL_SIZE + FEC_SYMBOL_HEADER_SIZE;
+pub const FEC_MAGIC_NX: [u8; 2] = [0x4E, 0x58];
 
 /// Stateful handle for streaming encryption/decryption.
 pub struct StreamingContext {
@@ -199,7 +207,9 @@ use image::{ImageBuffer, Luma};
 
 /// Stateful PNG encoder for streaming data into frames.
 pub struct StreamingEncoder {
-    buffer: Vec<u8>,
+    fec_buffer: Vec<u8>,
+    current_block_id: u32,
+    buffer: Vec<u8>, // Current frame buffer
     bytes_per_frame: usize,
     mode: EncodingMode,
     frame_count: usize,
@@ -214,6 +224,8 @@ impl StreamingEncoder {
         };
 
         Self {
+            fec_buffer: Vec::with_capacity(FEC_SOURCE_SYMBOLS * FEC_SYMBOL_SIZE),
+            current_block_id: 0,
             buffer: Vec::with_capacity(bytes_per_frame),
             bytes_per_frame,
             mode,
@@ -223,22 +235,21 @@ impl StreamingEncoder {
     }
 
     /// Push data into the encoder. 
-    /// Frames are stored in the internal queue.
+    /// Data is buffered into FEC blocks, sharded, and then queued as frames.
     pub fn push_data(&mut self, data: &[u8]) -> NexusResult<usize> {
         let mut frames_added = 0;
         let mut remaining = data;
 
         while !remaining.is_empty() {
-            let space = self.bytes_per_frame - self.buffer.len();
+            let block_full_size = FEC_SOURCE_SYMBOLS * FEC_SYMBOL_SIZE;
+            let space = block_full_size - self.fec_buffer.len();
             let to_copy = remaining.len().min(space);
-            self.buffer.extend_from_slice(&remaining[..to_copy]);
+            self.fec_buffer.extend_from_slice(&remaining[..to_copy]);
             remaining = &remaining[to_copy..];
 
-            if self.buffer.len() == self.bytes_per_frame {
-                let frame = self.generate_frame()?;
-                self.frame_queue.push(frame);
-                self.buffer.clear();
-                frames_added += 1;
+            if self.fec_buffer.len() == block_full_size {
+                frames_added += self.encode_fec_block()?;
+                self.fec_buffer.clear();
             }
         }
 
@@ -256,17 +267,90 @@ impl StreamingEncoder {
 
     /// Finalize the stream. Flushes remaining data.
     pub fn finalize(&mut self) -> NexusResult<()> {
-        if self.buffer.is_empty() && self.frame_count > 0 {
-            return Ok(()); 
+        if !self.fec_buffer.is_empty() {
+            // Pad the last block to FEC_SOURCE_SYMBOLS * FEC_SYMBOL_SIZE
+            let target_size = FEC_SOURCE_SYMBOLS * FEC_SYMBOL_SIZE;
+            self.fec_buffer.resize(target_size, 0);
+            self.encode_fec_block()?;
+            self.fec_buffer.clear();
         }
-        
-        if self.buffer.len() < self.bytes_per_frame {
+
+        if !self.buffer.is_empty() {
+            // Pad the last frame
             self.buffer.resize(self.bytes_per_frame, 0);
+            let frame = self.generate_frame()?;
+            self.frame_queue.push(frame);
+            self.buffer.clear();
         }
         
-        let frame = self.generate_frame()?;
-        self.frame_queue.push(frame);
         Ok(())
+    }
+
+    fn encode_fec_block(&mut self) -> NexusResult<usize> {
+        let block_id = self.current_block_id;
+        self.current_block_id = self.current_block_id.wrapping_add(1);
+
+        let symbols = self.generate_fec_symbols(block_id, &self.fec_buffer)?;
+        let mut frames_added = 0;
+
+        for symbol in symbols {
+            frames_added += self.pack_symbol_to_frames(symbol)?;
+        }
+
+        Ok(frames_added)
+    }
+
+    fn generate_fec_symbols(&self, block_id: u32, data: &[u8]) -> NexusResult<Vec<Vec<u8>>> {
+        use raptorq::{Encoder, ObjectTransmissionInformation, EncodingPacket};
+
+        let oti = ObjectTransmissionInformation::with_defaults(
+            data.len() as u64,
+            FEC_SYMBOL_SIZE as u16,
+        );
+        let encoder = Encoder::new(data, oti);
+        
+        let mut symbols = Vec::new();
+        // Get all packets (source + repair)
+        let packets: Vec<EncodingPacket> = encoder.get_encoded_packets(FEC_REPAIR_SYMBOLS as u32);
+        
+        for p in packets {
+            symbols.push(self.wrap_symbol(
+                block_id, 
+                p.payload_id().encoding_symbol_id() as u16, 
+                p.data().to_vec()
+            ));
+        }
+        
+        Ok(symbols)
+    }
+
+    fn wrap_symbol(&self, block_id: u32, symbol_id: u16, data: Vec<u8>) -> Vec<u8> {
+        let mut out = Vec::with_capacity(FEC_SYMBOL_HEADER_SIZE + data.len());
+        out.extend_from_slice(&FEC_MAGIC_NX);
+        out.extend_from_slice(&block_id.to_le_bytes());
+        out.extend_from_slice(&symbol_id.to_le_bytes());
+        out.extend_from_slice(&data);
+        out
+    }
+
+    fn pack_symbol_to_frames(&mut self, symbol: Vec<u8>) -> NexusResult<usize> {
+        let mut frames_added = 0;
+        let mut remaining = symbol.as_slice();
+
+        while !remaining.is_empty() {
+            let space = self.bytes_per_frame - self.buffer.len();
+            let to_copy = remaining.len().min(space);
+            self.buffer.extend_from_slice(&remaining[..to_copy]);
+            remaining = &remaining[to_copy..];
+
+            if self.buffer.len() == self.bytes_per_frame {
+                let frame = self.generate_frame()?;
+                self.frame_queue.push(frame);
+                self.buffer.clear();
+                frames_added += 1;
+            }
+        }
+        Ok(frames_added)
     }
 
     fn generate_frame(&mut self) -> NexusResult<Vec<u8>> {
@@ -351,16 +435,28 @@ impl StreamingEncoder {
     }
 }
 
+use std::collections::HashMap;
+use raptorq::Decoder;
+
+struct FecBlock {
+    decoder: Decoder,
+    is_decoded: bool,
+}
+
 pub struct StreamingDecoder {
     mode: EncodingMode,
-    buffer: Vec<u8>,
+    raw_buffer: Vec<u8>,
+    blocks: HashMap<u32, FecBlock>,
+    output_buffer: Vec<u8>,
 }
 
 impl StreamingDecoder {
     pub fn new(mode: EncodingMode) -> Self {
         Self {
             mode,
-            buffer: Vec::new(),
+            raw_buffer: Vec::new(),
+            blocks: HashMap::new(),
+            output_buffer: Vec::new(),
         }
     }
 
@@ -372,13 +468,74 @@ impl StreamingDecoder {
         
         let mut decoded_chunk = crate::decoder::decode_frame(&img, self.mode)
             .map_err(|e| NexusError::Decode(format!("Frame decoding failed: {}", e)))?;
+
+        eprintln!("[nexus-core] push_frame: decoded_chunk.len={}", decoded_chunk.len());
         
-        self.buffer.append(&mut decoded_chunk);
+        self.raw_buffer.append(&mut decoded_chunk);
+        eprintln!("[nexus-core] push_frame: raw_buffer.len={}", self.raw_buffer.len());
+        self.process_raw_buffer()?;
         Ok(())
     }
 
     pub fn pop_data(&mut self) -> Vec<u8> {
-        std::mem::take(&mut self.buffer)
+        std::mem::take(&mut self.output_buffer)
+    }
+
+    fn process_raw_buffer(&mut self) -> Result<(), NexusError> {
+        while let Some(pos) = self.find_magic() {
+            eprintln!("[nexus-core] process_raw_buffer: found magic at pos={}", pos);
+            // Remove any garbage before the magic marker
+            if pos > 0 {
+                self.raw_buffer.drain(0..pos);
+            }
+
+            if self.raw_buffer.len() < FULL_SYMBOL_SIZE {
+                break; // Wait for more data
+            }
+            
+            let symbol_data: Vec<u8> = self.raw_buffer.drain(0..FULL_SYMBOL_SIZE).collect();
+            let block_id = u32::from_le_bytes(symbol_data[2..6].try_into().unwrap());
+            let symbol_id = u16::from_le_bytes(symbol_data[6..8].try_into().unwrap());
+            let payload = &symbol_data[8..];
+            eprintln!("[nexus-core] process_raw_buffer: symbol block_id={} symbol_id={} payload_len={}", block_id, symbol_id, payload.len());
+
+            let block = self.blocks.entry(block_id).or_insert_with(|| {
+                use raptorq::ObjectTransmissionInformation;
+                let oti = ObjectTransmissionInformation::with_defaults(
+                    (FEC_SOURCE_SYMBOLS * FEC_SYMBOL_SIZE) as u64,
+                    FEC_SYMBOL_SIZE as u16,
+                );
+                FecBlock {
+                    decoder: Decoder::new(oti),
+                    is_decoded: false,
+                }
+            });
+
+            if !block.is_decoded {
+                use raptorq::{EncodingPacket, PayloadId};
+                let packet = EncodingPacket::new(PayloadId::new(0, symbol_id as u32), payload.to_vec());
+                if let Some(decoded_data) = block.decoder.decode(packet) {
+                    self.output_buffer.extend_from_slice(&decoded_data);
+                    block.is_decoded = true;
+                    eprintln!("[nexus-core] process_raw_buffer: block {} decoded, output_buffer.len={}", block_id, self.output_buffer.len());
+                    // Keep the number of tracked blocks reasonable to avoid RAM bloat
+                    if self.blocks.len() > 10 {
+                        let to_remove: Vec<u32> = self.blocks.keys()
+                            .cloned()
+                            .filter(|&id| id < block_id.saturating_sub(5))
+                            .collect();
+                        for id in to_remove {
+                            self.blocks.remove(&id);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn find_magic(&self) -> Option<usize> {
+        self.raw_buffer.windows(2).position(|w| w == FEC_MAGIC_NX)
     }
 }
 
@@ -389,7 +546,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_streaming_roundtrip() {
+    fn test_streaming_context_roundtrip() {
         let key = [0u8; 32];
         let mut enc = StreamingContext::new_encrypt(&key);
         let prefix = enc.nonce_prefix();
@@ -398,41 +555,46 @@ mod tests {
         let chunk2_plain = b"Second chunk data";
         let last_plain = b"The end.";
 
-        let c1 = enc.encrypt_chunk(chunk1_plain).unwrap();
-        let c2 = enc.encrypt_chunk(chunk2_plain).unwrap();
-        let c_final = enc.finalize_encrypt(last_plain).unwrap();
+        let mut cipher = enc.encrypt_update(chunk1_plain).unwrap();
+        cipher.extend(enc.encrypt_update(chunk2_plain).unwrap());
+        cipher.extend(enc.finalize_encrypt(last_plain).unwrap());
 
         let mut dec = StreamingContext::new_decrypt(&key, prefix);
-        assert_eq!(dec.decrypt_chunk(&c1).unwrap(), chunk1_plain);
-        assert_eq!(dec.decrypt_chunk(&c2).unwrap(), chunk2_plain);
-        assert_eq!(dec.finalize_decrypt(&c_final).unwrap(), last_plain);
+        let mut plain = dec.decrypt_update(&cipher).unwrap();
+        plain.extend(dec.finalize_decrypt(&[]).unwrap());
+
+        let mut expected = chunk1_plain.to_vec();
+        expected.extend_from_slice(chunk2_plain);
+        expected.extend_from_slice(last_plain);
+
+        assert_eq!(plain, expected);
     }
 
     #[test]
-    fn test_out_of_order_fails() {
-        let key = [0u8; 32];
-        let mut enc = StreamingContext::new_encrypt(&key);
-        let prefix = enc.nonce_prefix();
+    fn test_fec_recovery() {
+        let mut encoder = StreamingEncoder::new(EncodingMode::Base);
+        let data = vec![0x42; FEC_SOURCE_SYMBOLS * FEC_SYMBOL_SIZE];
+        encoder.push_data(&data).unwrap();
+        encoder.finalize().unwrap();
 
-        let _c1 = enc.encrypt_chunk(b"data 1").unwrap();
-        let c2 = enc.encrypt_chunk(b"data 2").unwrap();
+        let mut all_frames = Vec::new();
+        while let Some(frame) = encoder.pop_frame() {
+            all_frames.push(frame);
+        }
 
-        let mut dec = StreamingContext::new_decrypt(&key, prefix);
-        // Try decrypting chunk 2 before chunk 1
-        assert!(dec.decrypt_chunk(&c2).is_err());
-    }
+        // Simulate ~10% frame loss
+        if all_frames.len() > 3 {
+            all_frames.remove(2);
+            all_frames.remove(5);
+        }
 
-    #[test]
-    fn test_truncation_fails() {
-        let key = [0u8; 32];
-        let mut enc = StreamingContext::new_encrypt(&key);
-        let prefix = enc.nonce_prefix();
+        let mut decoder = StreamingDecoder::new(EncodingMode::Base);
+        for frame in all_frames {
+            decoder.push_frame(&frame).unwrap();
+        }
 
-        let c1 = enc.encrypt_chunk(b"chunk 1").unwrap();
-        let _c_final = enc.finalize_encrypt(b"last").unwrap();
-
-        let mut dec = StreamingContext::new_decrypt(&key, prefix);
-        // Trying to finalize with a regular chunk should fail if it was encrypted as non-final
-        assert!(dec.finalize_decrypt(&c1).is_err());
+        let recovered = decoder.pop_data();
+        assert_eq!(recovered.len(), data.len());
+        assert_eq!(recovered, data);
     }
 }

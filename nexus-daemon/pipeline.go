@@ -30,7 +30,7 @@ func (nc *NexusCore) NewStreamingNexusWriter(key []byte, mode int, handler Frame
 	}
 
 	// 3. Inject the crypto header (NoncePrefix) as the first chunk
-	if _, err := encoder.Push(crypto.NoncePrefix); err != nil {
+	if _, err := encoder.PushFEC(crypto.NoncePrefix); err != nil {
 		crypto.Close()
 		encoder.Close()
 		return nil, fmt.Errorf("failed to inject pipeline header: %w", err)
@@ -57,7 +57,7 @@ func (sw *StreamingNexusWriter) Write(p []byte) (int, error) {
 	}
 
 	// 2. Push ciphertext to the encoder
-	_, err = sw.encoder.Push(ciphertext)
+	_, err = sw.encoder.PushFEC(ciphertext)
 	if err != nil {
 		return 0, fmt.Errorf("pipeline encoding failed: %w", err)
 	}
@@ -102,7 +102,7 @@ func (sw *StreamingNexusWriter) Close() error {
 
 	// 2. Push final ciphertext
 	if len(lastCiphertext) > 0 {
-		_, err = sw.encoder.Push(lastCiphertext)
+		_, err = sw.encoder.PushFEC(lastCiphertext)
 		if err != nil {
 			return fmt.Errorf("failed to push final ciphertext: %w", err)
 		}

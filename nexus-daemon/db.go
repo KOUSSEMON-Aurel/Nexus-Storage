@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"strings"
@@ -19,22 +21,22 @@ type Database struct {
 }
 
 type FileRecord struct {
-	ID                int64
-	Path              string
-	VideoID           string
-	Size              int64
-	Hash              string
-	Key               string
-	LastUpdate        string
-	Starred           bool
-	DeletedAt         *string
-	ParentID          *int64
-	SHA256            string
-	FileKey           string // V3: per-file encryption key (hex-encoded, encrypted with master)
-	IsArchive         bool   // V3: true if the payload is a .tar archive
-	HasCustomPassword bool   // V5: true if file has optional custom encryption password
+	ID                 int64
+	Path               string
+	VideoID            string
+	Size               int64
+	Hash               string
+	Key                string
+	LastUpdate         string
+	Starred            bool
+	DeletedAt          *string
+	ParentID           *int64
+	SHA256             string
+	FileKey            string // V3: per-file encryption key (hex-encoded, encrypted with master)
+	IsArchive          bool   // V3: true if the payload is a .tar archive
+	HasCustomPassword  bool   // V5: true if file has optional custom encryption password
 	CustomPasswordHint string
-	Mode              string // V6: encoding mode (base, high)
+	Mode               string // V6: encoding mode (base, high)
 }
 
 type FolderRecord struct {
@@ -99,7 +101,7 @@ func (d *Database) Init(dbPath string) error {
 	runMigrate("add_sha256", `ALTER TABLE files ADD COLUMN sha256 TEXT`)
 	runMigrate("create_meta_sync", `CREATE TABLE IF NOT EXISTS meta_sync (key TEXT PRIMARY KEY, value TEXT, last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`)
 	runMigrate("create_quota_log", `CREATE TABLE IF NOT EXISTS quota_log (date TEXT PRIMARY KEY, units INTEGER DEFAULT 0)`)
-	
+
 	// Check for FTS5 support
 	hasFTS5 := false
 	rows, _ := db.Query("PRAGMA compile_options")
@@ -129,7 +131,6 @@ func (d *Database) Init(dbPath string) error {
 	} else {
 		log.Printf("⚠️  SQLite FTS5 module not found. Advanced search will be disabled.")
 	}
-
 
 	runMigrate("create_shards", `CREATE TABLE IF NOT EXISTS shards (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -170,7 +171,7 @@ func (d *Database) Init(dbPath string) error {
 		recovery_packet_drive_id TEXT,
 		created_at TEXT DEFAULT CURRENT_TIMESTAMP
 	)`)
-	
+
 	// Migration: Add recovery_packet_drive_id column if it doesn't exist
 	runMigrate("add_recovery_packet_drive_id", `
 		ALTER TABLE recovery_state ADD COLUMN recovery_packet_drive_id TEXT;
@@ -193,10 +194,10 @@ func (d *Database) Init(dbPath string) error {
 	// V5 Migrations (Optional password-based encryption)
 	runMigrate("add_has_custom_password", `ALTER TABLE files ADD COLUMN has_custom_password BOOLEAN DEFAULT 0`)
 	runMigrate("add_custom_password_hint", `ALTER TABLE files ADD COLUMN custom_password_hint TEXT DEFAULT ''`)
-	
+
 	// V6 Migrations (Encoding Mode persistence)
 	runMigrate("add_mode_column", `ALTER TABLE files ADD COLUMN mode TEXT DEFAULT 'base'`)
-	
+
 	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('manifest_version', '0')`)
 	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('last_push_lsn', '0')`)
 	d.db.Exec(`INSERT OR IGNORE INTO kv_store (key, value) VALUES ('last_push_hash', '')`)
@@ -307,7 +308,7 @@ func (d *Database) MergeManifest(driveManifestPath string) error {
 	d.db.Exec(`ALTER TABLE cloud.files ADD COLUMN mode TEXT DEFAULT 'base'`)
 
 	// 2. Merge Folders (Simplified level-by-level)
-	for i := 0; i < 5; i++ { 
+	for i := 0; i < 5; i++ {
 		_, err = d.db.Exec(`
 			INSERT OR IGNORE INTO folders (name, parent_id)
 			SELECT cf.name, lf_parent.id
@@ -359,7 +360,7 @@ func (d *Database) MergeManifest(driveManifestPath string) error {
 		  AND (SELECT last_update FROM cloud_merge WHERE cloud_merge.path = files.path) > files.last_update
 		  AND files.deleted_at IS NULL
 	`)
-	
+
 	// 5. Insert new files
 	_, err = d.db.Exec(`
 		INSERT INTO files (path, video_id, size, hash, key, starred, deleted_at, last_update, parent_id, sha256, file_key, is_archive, mode)
@@ -380,10 +381,9 @@ func (d *Database) MergeManifest(driveManifestPath string) error {
 		JOIN cloud.files cf ON cs.file_id = cf.id
 		JOIN files f ON f.path = cf.path
 	`)
-	
+
 	return err
 }
-
 
 func (d *Database) GetDailyQuota() int {
 	pt := d.getPT()
@@ -798,6 +798,91 @@ func (d *Database) PermanentDelete(id int64) error {
 	return nil
 }
 
+func (d *Database) GetSyncStats() (map[string]int, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	stats := make(map[string]int)
+
+	var files, folders, tasks int
+	err := d.db.QueryRow("SELECT COUNT(*) FROM files").Scan(&files)
+	if err != nil {
+		return nil, err
+	}
+	err = d.db.QueryRow("SELECT COUNT(*) FROM folders").Scan(&folders)
+	if err != nil {
+		return nil, err
+	}
+	err = d.db.QueryRow("SELECT COUNT(*) FROM tasks").Scan(&tasks)
+	if err != nil {
+		return nil, err
+	}
+
+	stats["files"] = files
+	stats["folders"] = folders
+	stats["tasks"] = tasks
+	return stats, nil
+}
+
+func (d *Database) GetLastModified() (string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	var last string
+	// Format to ISO8601 to match Dart
+	err := d.db.QueryRow("SELECT COALESCE(strftime('%Y-%m-%dT%H:%M:%SZ', MAX(last_update)), '1970-01-01T00:00:00Z') FROM files").Scan(&last)
+	return last, err
+}
+
+func (d *Database) CalculateLogicalHash() (string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	var lines []string
+
+	// Files
+	rows, err := d.db.Query("SELECT id, last_update FROM files ORDER BY id")
+	if err != nil {
+		return "", err
+	}
+	for rows.Next() {
+		var id int64
+		var lastUpdate string
+		rows.Scan(&id, &lastUpdate)
+		lines = append(lines, fmt.Sprintf("file:%d:%s", id, lastUpdate))
+	}
+	rows.Close()
+
+	// Folders
+	rows, err = d.db.Query("SELECT id FROM folders ORDER BY id")
+	if err != nil {
+		return "", err
+	}
+	for rows.Next() {
+		var id int64
+		rows.Scan(&id)
+		lines = append(lines, fmt.Sprintf("folder:%d", id))
+	}
+	rows.Close()
+
+	// Tasks
+	rows, err = d.db.Query("SELECT id, created_at FROM tasks ORDER BY id")
+	if err != nil {
+		return "", err
+	}
+	for rows.Next() {
+		var id string
+		var createdAt string
+		rows.Scan(&id, &createdAt)
+		lines = append(lines, fmt.Sprintf("task:%s:%s", id, createdAt))
+	}
+	rows.Close()
+
+	content := strings.Join(lines, "\n")
+	h := sha256.New()
+	h.Write([]byte(content))
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
 // ─── Sync Support ─────────────────────────────────────────────────────────────
 
 func (d *Database) IntegrityCheck() error {
@@ -813,15 +898,19 @@ func (d *Database) IntegrityCheck() error {
 }
 
 func (d *Database) Checkpoint() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	// wal_checkpoint(RESTART) = flush to disk + reset WAL log
-	// Then wal_checkpoint(TRUNCATE) = truncate WAL file to zero
-	// This is more reliable than single TRUNCATE
 	if _, err := d.db.Exec("PRAGMA wal_checkpoint(RESTART)"); err != nil {
 		return fmt.Errorf("checkpoint restart failed: %w", err)
 	}
+
+	// wal_checkpoint(TRUNCATE) = truncate WAL file to zero
 	if _, err := d.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
 		return fmt.Errorf("checkpoint truncate failed: %w", err)
 	}
+
 	return nil
 }
 
@@ -884,14 +973,14 @@ func (d *Database) HasFailedSyncs() (bool, error) {
 func (d *Database) CleanupTrash(days int) ([]string, error) {
 	d.mu.Lock()
 	threshold := time.Now().AddDate(0, 0, -days).Format("2006-01-02 15:04:05")
-	
+
 	// Find VideoIDs to also queue cloud deletion
 	rows, err := d.db.Query(`SELECT video_id FROM files WHERE deleted_at < ? AND deleted_at IS NOT NULL`, threshold)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var videoIDs []string
 	for rows.Next() {
 		var vid string
@@ -989,10 +1078,10 @@ func (d *Database) ToggleStar(id int64, starred bool) error {
 }
 
 type Stats struct {
-	FileCount   int64 `json:"file_count"`
-	TotalSize   int64 `json:"total_size"`
+	FileCount    int64 `json:"file_count"`
+	TotalSize    int64 `json:"total_size"`
 	StarredCount int64 `json:"starred_count"`
-	TrashCount  int64 `json:"trash_count"`
+	TrashCount   int64 `json:"trash_count"`
 }
 
 func (d *Database) GetStats() (Stats, error) {
