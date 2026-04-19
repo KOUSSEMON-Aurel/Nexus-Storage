@@ -1123,12 +1123,12 @@ export default function Dashboard() {
               </AnimatePresence>
             </div>
 
-            {/* Detail panel */}
+            {/* Detail panel (show only for single selection). Width is responsive on large screens. */}
             <AnimatePresence>
-              {(selectedIds.size > 0) && (
+              {(selectedIds.size === 1) && (
                 <motion.div
                   initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: 280, opacity: 1 }}
+                  animate={{ width: "clamp(280px, 22vw, 420px)", opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
                   transition={{ duration: 0.2, ease: "easeInOut" }}
                   style={{ borderLeft: `1px solid ${c.border}`, overflow: "hidden", flexShrink: 0 }}
@@ -2261,7 +2261,8 @@ function MultiSelectToolbar({
   dark: boolean 
 }) {
   const count = selectedIds.size;
-  if (count === 0) return null;
+  // Only show the bottom multi-select toolbar when more than one item is selected
+  if (count <= 1) return null;
 
   return (
     <AnimatePresence>
