@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,6 +35,7 @@ type Task struct {
 	Status               string    `json:"status"`
 	Progress             float64   `json:"progress"`
 	CreatedAt            time.Time `json:"createdAt"`
+	CompletedAt          time.Time `json:"completedAt,omitempty"` // Timestamp when task finished (success or error)
 	ParentID             *int64    `json:"parentId"`
 	SHA256               string    `json:"sha256,omitempty"`
 	Password             string    `json:"password,omitempty"`
@@ -93,7 +95,7 @@ func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManage
 	q.cache = cache
 	ensureYtDlp()
 
-	// Load pending tasks from DB
+	// Load pending tasks from DB (but skip failed uploads — don't retry them)
 	rows, err := db.GetPendingTasks()
 	if err == nil {
 		defer rows.Close()
@@ -103,6 +105,12 @@ func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManage
 			err := rows.Scan(&t.ID, &tType, &t.FilePath, &t.Mode, &t.IsManifest, &t.Status, &t.Progress, &t.CreatedAt, &t.ParentID, &t.SHA256)
 			if err == nil {
 				t.Type = TaskType(tType)
+				// Skip uploads that previously failed — do not resume them automatically
+				if tType == int(TaskUpload) && strings.Contains(t.Status, "Error") {
+					log.Printf("⏭️  Skipping failed upload task %s (do not retry): %s", t.ID, t.Status)
+					db.DeleteTask(t.ID) // Remove from DB entirely
+					continue
+				}
 				q.tasks[t.ID] = t
 				log.Printf("⏳ Resuming pending task %s", t.ID)
 				q.taskChan <- t // Add to sequential worker
@@ -112,6 +120,9 @@ func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManage
 
 	// Start the single sequential worker
 	go q.worker()
+
+	// Start task cleanup goroutine: auto-remove completed/error tasks after 30 seconds
+	go q.cleanupCompletedTasks()
 }
 
 // V4 Security: MasterKey session management (RAM-only)
@@ -292,6 +303,29 @@ func (q *TaskQueue) worker() {
 	}
 }
 
+// cleanupCompletedTasks periodically removes tasks that completed (success or error) more than 30 seconds ago.
+// This prevents the GUI from constantly re-displaying old notifications.
+func (q *TaskQueue) cleanupCompletedTasks() {
+	ticker := time.NewTicker(10 * time.Second) // Check every 10 seconds
+	defer ticker.Stop()
+
+	for range ticker.C {
+		q.mu.Lock()
+		now := time.Now()
+		for taskID, t := range q.tasks {
+			// If task is completed or has an error, and 30s have passed, remove it
+			if !t.CompletedAt.IsZero() && now.Sub(t.CompletedAt) > 30*time.Second {
+				if strings.Contains(t.Status, "Completed") || strings.Contains(t.Status, "Error") {
+					log.Printf("🧹 Cleaning up old task %s (status: %s, age: %v)", taskID, t.Status, now.Sub(t.CompletedAt))
+					q.db.DeleteTask(taskID)
+					delete(q.tasks, taskID)
+				}
+			}
+		}
+		q.mu.Unlock()
+	}
+}
+
 func (q *TaskQueue) updateTaskState(t *Task) {
 	q.db.SaveTask(t.ID, int(t.Type), t.FilePath, t.Mode, t.IsManifest, t.Status, t.Progress, t.CreatedAt, t.ParentID, t.SHA256)
 }
@@ -325,15 +359,17 @@ func (q *TaskQueue) processTask(t *Task) {
 
 	if err != nil {
 		t.Status = fmt.Sprintf("Error: %v", err)
+		t.CompletedAt = time.Now() // Mark time of error for cleanup
 		q.updateTaskState(t)
 		log.Printf("❌ Task %s failed: %v", t.ID, err)
 	} else {
 		t.Status = "Completed"
 		t.Progress = 100
-		q.db.DeleteTask(t.ID) 
-		delete(q.tasks, t.ID) // Remove from in-memory map
+		t.CompletedAt = time.Now() // Mark time of completion for cleanup
+		q.updateTaskState(t)
 		log.Printf("✅ Task %s completed successfully", t.ID)
 	}
+	// Tasks will be auto-cleaned 30s after completion by cleanupCompletedTasks()
 }
 
 func (q *TaskQueue) handleUpload(t *Task) error {
@@ -561,6 +597,13 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 			if len(encrypted) < end { end = len(encrypted) }
 			log.Printf("[%s] [ENC] Encrypted shard %d size=%d start=%x end=%x", t.ID, i+1, len(encrypted), encrypted[:start], encrypted[len(encrypted)-end:])
 		}
+        // Debug: write full hex dump of encrypted blob for offline inspection
+        if len(encrypted) > 0 {
+            _ = os.MkdirAll("/tmp/nexus-debug", 0755)
+            encPath := fmt.Sprintf("/tmp/nexus-debug/%s-shard-%d-enc.hex", t.ID, i+1)
+            _ = os.WriteFile(encPath, []byte(hex.EncodeToString(encrypted)), 0644)
+            log.Printf("[%s] [debug] Wrote encrypted hex dump: %s", t.ID, encPath)
+        }
 
 		t.Status = fmt.Sprintf("Encoding Shard %d/%d", i+1, numShards)
 		apiMode := 0 // Base
@@ -584,10 +627,35 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		}
 
 		t.Status = fmt.Sprintf("FFmpeg Shard %d/%d", i+1, numShards)
+		// Choose output container/codec based on mode. For `high` prefer WebM/VP9 to
+		// minimize intermediate re-encoding on YouTube and better preserve luma levels.
 		outputVideo := filepath.Join(tempDir, "upload.mp4")
+		if t.Mode == "high" {
+			outputVideo = filepath.Join(tempDir, "upload.webm")
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-		cmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-framerate", "30", "-i", filepath.Join(tempDir, "frame_%06d.png"),
-			"-c:v", "libx264", "-pix_fmt", "gray", "-crf", "18", "-g", "1", "-x264-params", "scm=1", outputVideo)
+		// Build ffmpeg args depending on mode
+		ffArgs := []string{"-y", "-framerate", "30", "-i", filepath.Join(tempDir, "frame_%06d.png"), "-g", "1"}
+		if t.Mode == "high" {
+			// Use VP9 lossless to avoid pixel distortion. libvpx-vp9 preserves luma well.
+			ffArgs = append(ffArgs,
+				"-c:v", "libvpx-vp9",
+				"-pix_fmt", "yuv420p",
+				"-lossless", "1",
+				"-b:v", "0",
+			)
+		} else {
+			// Base mode: use H.264 as before
+			ffArgs = append(ffArgs,
+				"-c:v", "libx264",
+				"-pix_fmt", "gray",
+				"-crf", "18",
+			)
+			// Keep x264 special params for intra behavior
+			ffArgs = append(ffArgs, "-x264-params", "scm=1")
+		}
+		ffArgs = append(ffArgs, outputVideo)
+		cmd := exec.CommandContext(ctx, "ffmpeg", ffArgs...)
 		if _, err := cmd.CombinedOutput(); err != nil {
 			cancel()
 			os.RemoveAll(tempDir)
@@ -868,15 +936,30 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 			t.Status = fmt.Sprintf("Downloading Shard %d/%d", i+1, len(shardIDs))
 			q.updateTaskState(t)
 
-			videoFile := filepath.Join(tempDir, fmt.Sprintf("download_%d.mkv", i))
+			// Use a template so yt-dlp appends the correct extension for the native container
+			videoTemplate := filepath.Join(tempDir, fmt.Sprintf("download_%d.%%(ext)s", i))
 			framesDir := filepath.Join(tempDir, fmt.Sprintf("frames_%d", i))
 			os.MkdirAll(framesDir, 0755)
 
 			ytURL := "https://www.youtube.com/watch?v=" + vID
-			dlCmd := exec.Command("yt-dlp", "-f", "bestvideo", "--merge-output-format", "mkv", "-o", videoFile, ytURL)
+			// yt-dlp: prefer bestvideo + bestaudio (mux by yt-dlp) so we get native codec/container
+			format := "bestvideo+bestaudio/best"
+			if t.Mode == "high" {
+				// Request best 4K video+audio; will typically pick WebM/VP9 video + opus audio
+				format = "bestvideo[height>=2160]+bestaudio/best"
+			}
+			log.Printf("[%s] ⬇️  yt-dlp format selection: %s (mode=%s)", t.ID, format, t.Mode)
+			dlCmd := exec.Command("yt-dlp", "-f", format, "-o", videoTemplate, ytURL)
 			if out, err := dlCmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("yt-dlp failed: %v\nOutput: %s", err, string(out))
 			}
+
+			// Find the actual downloaded file (yt-dlp appends the proper extension)
+			matches, _ := filepath.Glob(filepath.Join(tempDir, fmt.Sprintf("download_%d.*", i)))
+			if len(matches) == 0 {
+				return fmt.Errorf("yt-dlp did not produce a download for shard %d", i)
+			}
+			videoFile := matches[0]
 
 			t.Status = fmt.Sprintf("Extracting Shard %d/%d", i+1, len(shardIDs))
 			q.updateTaskState(t)
@@ -925,6 +1008,12 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 				if len(rawData) < end { end = len(rawData) }
 				log.Printf("[%s] [DEC] Raw shard %d size=%d start=%x end=%x", t.ID, i+1, len(rawData), rawData[:start], rawData[len(rawData)-end:])
 			}
+
+				// Debug: write full hex dump of downloaded/decoded blob for offline inspection
+				_ = os.MkdirAll("/tmp/nexus-debug", 0755)
+				decPath := fmt.Sprintf("/tmp/nexus-debug/%s-shard-%d-dec.hex", t.ID, i+1)
+				_ = os.WriteFile(decPath, []byte(hex.EncodeToString(rawData)), 0644)
+				log.Printf("[%s] [debug] Wrote downloaded hex dump: %s", t.ID, decPath)
 			decrypted, err = q.core.DecryptWithKey(rawData, rawFileKey)
 		} else {
 			log.Printf("[%s] 🔐 Shard %d: Decrypting with encryptionSecret (fallback)", t.ID, i+1)

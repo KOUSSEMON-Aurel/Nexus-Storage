@@ -113,10 +113,21 @@ pub fn decrypt_with_key(blob: &[u8], key_bytes: &[u8; KEY_LEN]) -> NexusResult<V
     let cipher = XChaCha20Poly1305::new_from_slice(key_bytes)
         .map_err(|e| NexusError::Crypto(e.to_string()))?;
     let nonce = XNonce::from_slice(nonce_bytes);
-
-    cipher
-        .decrypt(nonce, ciphertext)
-        .map_err(|_| NexusError::Crypto("decryption failed — wrong key or corrupted data".into()))
+    match cipher.decrypt(nonce, ciphertext) {
+        Ok(plain) => Ok(plain),
+        Err(_) => {
+            // Diagnostic: log nonce and authentication tag for investigation
+            let tag_hex = if ciphertext.len() >= 16 {
+                hex::encode(&ciphertext[ciphertext.len()-16..])
+            } else {
+                "<short-ciphertext>".to_string()
+            };
+            let nonce_hex = hex::encode(nonce_bytes);
+            eprintln!("[nexus-core][crypto] decrypt_with_key FAILED: nonce={} tag={} blob_len={} key_sample={}",
+                nonce_hex, tag_hex, blob.len(), &hex::encode(&key_bytes[..8]));
+            Err(NexusError::Crypto("decryption failed — wrong key or corrupted data".into()))
+        }
+    }
 }
 
 /// Generate a cryptographically random 32-byte file key.
