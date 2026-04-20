@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:disable_battery_optimization/disable_battery_optimization.dart';
 import 'dart:io';
@@ -44,6 +45,7 @@ void main() async {
     // Validation at startup (Rule 8)
     await Future.wait([
       _requestPermissions(),
+      _initNotificationChannels(),
       DatabaseService().database,
       SettingsService().init(),
       AuthService().signInSilently(),
@@ -96,11 +98,45 @@ void _initForegroundTask() {
     ),
     foregroundTaskOptions: ForegroundTaskOptions(
       eventAction: ForegroundTaskEventAction.nothing(),
-      autoRunOnBoot: true,
+      autoRunOnBoot: false,
       allowWakeLock: true,
       allowWifiLock: true,
     ),
   );
+}
+
+/// Creates the Android notification channels needed for progress and completion notifications.
+/// Must be called after [FlutterLocalNotificationsPlugin] is initialized.
+Future<void> _initNotificationChannels() async {
+  const initSettings = InitializationSettings(
+    android: AndroidInitializationSettings('@mipmap/launcher_icon'),
+  );
+  final plugin = FlutterLocalNotificationsPlugin();
+  await plugin.initialize(settings: initSettings);
+
+  final androidImpl = plugin
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+  await androidImpl?.createNotificationChannel(
+    const AndroidNotificationChannel(
+      'nexus_upload_channel',
+      'Nexus Transferts',
+      description: 'Progression des transferts Nexus (upload/download).',
+      importance: Importance.low,
+      showBadge: false,
+    ),
+  );
+
+  await androidImpl?.createNotificationChannel(
+    const AndroidNotificationChannel(
+      'nexus_final_channel',
+      'Nexus Tâches Terminées',
+      description: 'Notifications de fin de transfert Nexus.',
+      importance: Importance.high,
+    ),
+  );
+
+  AppLogger.info('Notification channels created.');
 }
 
 Future<void> _requestPermissions() async {
@@ -394,41 +430,127 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _startBackgroundUpload(File file, String name, String password) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
+    final notifId = taskId.hashCode;
     AppLogger.info('NexusDebug: Starting direct async upload for $name, taskId: $taskId');
     
-    // Contournement Android 14 ForegroundService limitation
+    // Restauration du ForegroundService pour empêcher l'OS de geler l'application
+    // Indispensable sur Android 13/14 (systèmes Griffin/Hiber)
     try {
+      if (!await FlutterForegroundTask.isRunningService) {
+        await FlutterForegroundTask.startService(
+          notificationTitle: 'Nexus : Sécurisation en cours...',
+          notificationText: 'Préparation du fichier : $name',
+          callback: null, // Callback non nécessaire en mode direct
+        );
+      }
+      
       final nexus = NexusService();
       await nexus.encodeAndUpload(file, password, explicitTaskId: taskId);
       DatabaseService().notifyChange();
+      
+      await FlutterForegroundTask.stopService();
+      // Dismiss progress notification and show final success
+      await FlutterLocalNotificationsPlugin().cancel(id: notifId);
+      await FlutterLocalNotificationsPlugin().show(
+        id: notifId + 1,
+        title: '✅ Upload terminé',
+        body: 'Fichier sécurisé : $name',
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'nexus_final_channel', 'Nexus Tâches Terminées',
+            importance: Importance.high,
+            priority: Priority.high,
+            autoCancel: true,
+          ),
+        ),
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ Upload Complete: $name'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('✅ Upload Complete: $name'), backgroundColor: Colors.green));
       }
     } catch (e) {
       AppLogger.error('Upload Error: $e');
+      // Dismiss progress notification and show final failure
+      await FlutterLocalNotificationsPlugin().cancel(id: notifId);
+      await FlutterLocalNotificationsPlugin().show(
+        id: notifId + 1,
+        title: '❌ Upload échoué',
+        body: '$name — ${e.toString().split('\n').first}',
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'nexus_final_channel', 'Nexus Tâches Terminées',
+            importance: Importance.high,
+            priority: Priority.high,
+            autoCancel: true,
+          ),
+        ),
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Upload Failed: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Upload Failed: $e'), backgroundColor: Colors.red));
       }
     }
   }
 
   Future<void> _startBackgroundDownload(FileRecord record) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
+    final notifId = taskId.hashCode;
     final fileName = record.path.split('/').last;
     AppLogger.info('NexusDebug: Starting direct async download for $fileName, taskId: $taskId');
     
-    // Contournement Android 14 ForegroundService limitation
+    // Restauration du ForegroundService pour empêcher l'OS de geler l'application
     try {
+      if (!await FlutterForegroundTask.isRunningService) {
+        await FlutterForegroundTask.startService(
+          notificationTitle: 'Nexus : Récupération en cours...',
+          notificationText: 'Téléchargement de $fileName',
+          callback: null,
+        );
+      }
+      
       final nexus = NexusService();
       await nexus.downloadAndDecrypt(record, record.key, explicitTaskId: taskId);
       DatabaseService().notifyChange();
+      
+      await FlutterForegroundTask.stopService();
+      // Dismiss progress notification and show final success
+      await FlutterLocalNotificationsPlugin().cancel(id: notifId);
+      await FlutterLocalNotificationsPlugin().show(
+        id: notifId + 1,
+        title: '✅ Download terminé',
+        body: 'Sauvegardé dans /Download/NexusStorage/$fileName',
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'nexus_final_channel', 'Nexus Tâches Terminées',
+            importance: Importance.high,
+            priority: Priority.high,
+            autoCancel: true,
+          ),
+        ),
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ Download Complete: $fileName'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('✅ Download Complete: $fileName'), backgroundColor: Colors.green));
       }
     } catch (e) {
       AppLogger.error('Download Error: $e');
+      await FlutterLocalNotificationsPlugin().cancel(id: notifId);
+      await FlutterLocalNotificationsPlugin().show(
+        id: notifId + 1,
+        title: '❌ Download échoué',
+        body: '$fileName — ${e.toString().split('\n').first}',
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'nexus_final_channel', 'Nexus Tâches Terminées',
+            importance: Importance.high,
+            priority: Priority.high,
+            autoCancel: true,
+          ),
+        ),
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Download Failed: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Download Failed: $e'), backgroundColor: Colors.red));
       }
     }
   }

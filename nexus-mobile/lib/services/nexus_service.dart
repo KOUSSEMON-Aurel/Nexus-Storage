@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:ffmpeg_kit_flutter_new/ffprobe_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit_config.dart';
 import '../ffi/nexus_bindings.dart';
@@ -16,13 +17,14 @@ import 'sync_service.dart';
 import '../models/file_record.dart';
 import 'logger_service.dart';
 import '../utils/exceptions.dart';
+import '../core/task_config.dart';
 
 class NexusService {
   final NexusCoreBindings _native = NexusLoader.bindings;
   final DatabaseService _db = DatabaseService();
   final YouTubeService _youtube = YouTubeService();
   DateTime _lastRefreshTime = DateTime.fromMillisecondsSinceEpoch(0);
-  static const bool keepFramesForDebug = true;
+  static const bool keepFramesForDebug = false;
 
   Future<void> _updateStatus(String taskId, double progress, String status, {String? fileName}) async {
     await _db.updateTaskProgress(taskId, progress, status);
@@ -36,6 +38,31 @@ class NexusService {
       if (now.difference(_lastRefreshTime).inMilliseconds > 1500 || status == 'completed' || status.startsWith('Failed')) {
         await _db.checkpointWAL();
         FlutterForegroundTask.sendDataToMain('refresh');
+        _lastRefreshTime = now;
+      }
+    } else {
+      // Fallback for when we're running in Android 14 direct mode
+      final plugin = FlutterLocalNotificationsPlugin();
+      await plugin.show(
+        id: taskId.hashCode,
+        title: fileName != null ? 'Nexus: Transfer $fileName' : 'Nexus active task',
+        body: '$status (${(progress * 100).toInt()}%)',
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'nexus_upload_channel',
+            'Nexus Transferts',
+            importance: Importance.low,
+            priority: Priority.low,
+            showProgress: true,
+            maxProgress: 100,
+            onlyAlertOnce: true,
+          ),
+        ),
+      );
+      
+      final now = DateTime.now();
+      if (now.difference(_lastRefreshTime).inMilliseconds > 1500 || status == 'completed' || status.startsWith('Failed')) {
+        await _db.checkpointWAL();
         _lastRefreshTime = now;
       }
     }
@@ -167,13 +194,18 @@ class NexusService {
             final padFile = File('${framesDir.path}/frame_${j.toString().padLeft(6, '0')}.png');
             await padFile.writeAsBytes(lastFrameData);
           }
+          frameCount = 90;
         }
       }
 
+      final taskConfig = await TaskConfig.forDevice();
+      
       await _updateStatus(taskId, 0.6, 'Assembling video...', fileName: fileName);
       
       videoFile = File('${framesDir.path}/out.mp4');
-      final ffmpegCommand = '-framerate 30 -i ${framesDir.path}/frame_%06d.png -c:v libx264 -pix_fmt yuv420p -y ${videoFile.path}';
+      // Using libx264 with crf 12 and High profile for a balance of quality and standard compliance
+      final swCommand = '-threads ${taskConfig.ffmpegThreads} -framerate 30 -i ${framesDir.path}/frame_%06d.png -c:v libx264 -crf 12 -preset ${taskConfig.ffmpegPreset} -profile:v high -level 4.1 -pix_fmt yuv420p -movflags +faststart -y ${videoFile.path}';
+      final hwCommand = '-threads ${taskConfig.ffmpegThreads} -framerate 30 -i ${framesDir.path}/frame_%06d.png -c:v h264_mediacodec -b:v 15M -profile:v high -pix_fmt yuv420p -movflags +faststart -y ${videoFile.path}';
       
       if (await FlutterForegroundTask.isRunningService) {
         FFmpegKitConfig.setSessionHistorySize(0);
@@ -181,12 +213,20 @@ class NexusService {
         FFmpegKitConfig.enableStatisticsCallback(null);
       }
       
-      final session = await FFmpegKit.execute(ffmpegCommand);
-      if (!ReturnCode.isSuccess(await session.getReturnCode())) {
-        final logs = await session.getLogs();
-        var logMsg = logs.map((l) => l.getMessage()).join('\n');
-        if (logMsg.length > 500) logMsg = logMsg.substring(0, 500);
-        throw NexusException('FFmpeg Assembly Failed: $logMsg');
+      AppLogger.info('NexusService: Trying hardware encode...');
+      var session = await FFmpegKit.execute(hwCommand);
+      var rc = await session.getReturnCode();
+      
+      if (!ReturnCode.isSuccess(rc)) {
+        AppLogger.warn('NexusService: Hardware encode failed. Falling back to software encode: $swCommand');
+        session = await FFmpegKit.execute(swCommand);
+        rc = await session.getReturnCode();
+        if (!ReturnCode.isSuccess(rc)) {
+          final logs = await session.getLogs();
+          var logMsg = logs.map((l) => l.getMessage()).join('\n');
+          if (logMsg.length > 500) logMsg = logMsg.substring(0, 500);
+          throw NexusException('FFmpeg Assembly Failed: $logMsg');
+        }
       }
 
       final videoId = await _youtube.uploadVideo(

@@ -14,6 +14,9 @@ class YouTubeService {
   final AuthService _auth = AuthService();
   final yt_explode.YoutubeExplode _yt = yt_explode.YoutubeExplode();
 
+  /// Chunk size for resumable YouTube upload (5 MB — minimum allowed by YouTube API).
+  static const int _chunkSize = 5 * 1024 * 1024;
+
   Future<String?> uploadVideo({
     required File videoFile,
     required String title,
@@ -23,71 +26,82 @@ class YouTubeService {
     final token = await _auth.getAccessToken();
     if (token == null) return null;
 
-    // Resumable upload start
+    final totalBytes = await videoFile.length();
+
+    // 1. Initialize resumable upload session
     final metadata = {
       'snippet': {
         'title': title,
         'description': description,
-        'categoryId': '22', // People & Blogs
+        'categoryId': '22',
       },
       'status': {
-        'privacyStatus': 'unlisted', // Most secure for storage
+        'privacyStatus': 'unlisted',
         'selfDeclaredMadeForKids': false,
       }
     };
 
-    final response = await http.post(
+    final initResponse = await http.post(
       Uri.parse('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status'),
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json; charset=UTF-8',
-        'X-Upload-Content-Length': videoFile.lengthSync().toString(),
-        'X-Upload-Content-Type': 'video/*',
+        'X-Upload-Content-Length': totalBytes.toString(),
+        'X-Upload-Content-Type': 'video/mp4',
       },
       body: jsonEncode(metadata),
     );
 
-    if (response.statusCode != 200) {
-      AppLogger.error('Upload initialization failed: ${response.body}');
+    if (initResponse.statusCode != 200) {
+      AppLogger.error('Upload initialization failed: ${initResponse.body}');
       return null;
     }
 
-    final uploadUrl = response.headers['location'];
-    if (uploadUrl == null) return null;
+    final uploadUrl = initResponse.headers['location'];
+    if (uploadUrl == null) {
+      AppLogger.error('Upload URL missing from response headers');
+      return null;
+    }
 
-    // Actual upload in chunks or full (Mobile is safer with smaller chunks if background, but let's do a basic stream for now)
-    final totalBytes = videoFile.lengthSync();
-    int sentBytes = 0;
+    AppLogger.info('YouTube resumable upload started. Total: ${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB');
 
-    final request = http.StreamedRequest('PUT', Uri.parse(uploadUrl));
-    request.headers['Content-Length'] = totalBytes.toString();
+    AppLogger.info('YouTube: Uploading via StreamedRequest (${totalBytes} bytes)...');
     
+    final request = http.StreamedRequest('PUT', Uri.parse(uploadUrl));
+    request.headers.addAll({
+      // Authorization header is removed as the uploadUrl is already a signed session URL
+      'Content-Type': 'video/mp4',
+      'Content-Length': totalBytes.toString(),
+      'Content-Range': 'bytes 0-${totalBytes - 1}/$totalBytes',
+    });
+    
+    int bytesSent = 0;
     final fileStream = videoFile.openRead();
+    
     fileStream.listen(
-      (chunk) {
-        request.sink.add(chunk);
-        sentBytes += chunk.length;
-        if (onProgress != null) {
-          onProgress(sentBytes / totalBytes);
-        }
+      (data) {
+        request.sink.add(data);
+        bytesSent += data.length;
+        onProgress?.call(bytesSent / totalBytes);
       },
-      onDone: () async {
-        await request.sink.close();
-      },
-      onError: (e) {
-        request.sink.addError(e);
-      },
-      cancelOnError: true,
+      onDone: () => request.sink.close(),
+      onError: (e) => request.sink.addError(e),
     );
 
-    final uploadResponse = await http.Response.fromStream(await request.send());
-    if (uploadResponse.statusCode == 200 || uploadResponse.statusCode == 201) {
-      final json = jsonDecode(uploadResponse.body);
-      return json['id'];
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final json = jsonDecode(response.body);
+      AppLogger.info('YouTube: Upload complete! Video ID: ${json['id']}');
+      return json['id'] as String?;
     } else {
-      AppLogger.error('Upload failed: ${uploadResponse.body}');
+      AppLogger.error('YouTube upload failed (${response.statusCode}): ${response.body}');
       return null;
     }
+
+    AppLogger.error('Upload loop exited without completing');
+    return null;
   }
 
   Future<bool> deleteVideo(String videoId) async {
