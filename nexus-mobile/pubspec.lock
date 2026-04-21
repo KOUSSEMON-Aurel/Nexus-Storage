@@ -61,10 +61,10 @@ packages:
     dependency: "direct main"
     description:
       name: background_fetch
-      sha256: f5f0a5774cbe5e71ce62a9daf7f01007d07b3ac0c1fea1ecb131a3c5a273ca38
+      sha256: "360697885b0a0d3d3045ee1e1dcce19486319b8cb9df2d0ef07518f737bebb31"
       url: "https://pub.dev"
     source: hosted
-    version: "1.5.1"
+    version: "1.6.2"
   boolean_selector:
     dependency: transitive
     description:
@@ -483,10 +483,10 @@ packages:
     dependency: transitive
     description:
       name: hooks
-      sha256: e79ed1e8e1929bc6ecb6ec85f0cb519c887aa5b423705ded0d0f2d9226def388
+      sha256: "025f060e86d2d4c3c47b56e33caf7f93bf9283340f26d23424ebcfccf34f621e"
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.2"
+    version: "1.0.3"
   html:
     dependency: transitive
     description:
@@ -887,6 +887,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.2.2"
+  record_use:
+    dependency: transitive
+    description:
+      name: record_use
+      sha256: "2551bd8eecfe95d14ae75f6021ad0248be5c27f138c2ec12fcb52b500b3ba1ed"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.6.0"
   shared_preferences:
     dependency: "direct main"
     description:
@@ -1040,10 +1048,10 @@ packages:
     dependency: transitive
     description:
       name: synchronized
-      sha256: c254ade258ec8282947a0acbbc90b9575b4f19673533ee46f2f6e9b3aeefd7c0
+      sha256: "63896c27e81b28f8cb4e69ead0d3e8f03f1d1e5fc531a3e579cabed6a2c7c9e5"
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.0"
+    version: "3.4.0+1"
   term_glyph:
     dependency: transitive
     description:
@@ -1168,10 +1176,10 @@ packages:
     dependency: transitive
     description:
       name: vm_service
-      sha256: "45caa6c5917fa127b5dbcfbd1fa60b14e583afdc08bfc96dda38886ca252eb60"
+      sha256: "046d3928e16fa4dc46e8350415661755ab759d9fc97fc21b5ab295f71e4f0499"
       url: "https://pub.dev"
     source: hosted
-    version: "15.0.2"
+    version: "15.1.0"
   watcher:
     dependency: transitive
     description:
@@ -1268,14 +1276,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.4"
-  _explode_dart:
+  youtube_explode_dart:
     dependency: "direct main"
     description:
       name: youtube_explode_dart
       sha256: "3d731d71df9901b1915bae806781df519cff32517e36db279f844ae619669e45"
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.5"youtube
+    version: "3.0.5"
 sdks:
   dart: ">=3.11.4 <4.0.0"
   flutter: ">=3.38.4"

@@ -36,9 +36,9 @@ void main() async {
   try {
     WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
     FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
-    
+
     AppLogger.info('Initializing Nexus Storage...');
-    
+
     _initForegroundTask();
     ThermalMonitor.start(); // Start thermal monitoring
 
@@ -60,26 +60,35 @@ void main() async {
   } catch (error, stackTrace) {
     AppLogger.error('CRITICAL STARTUP ERROR', error, stackTrace);
     FlutterNativeSplash.remove();
-    runApp(MaterialApp(
-      theme: AppTheme.darkTheme,
-      home: Scaffold(
-        body: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: AppColors.error, size: 64),
-              const SizedBox(height: AppSpacing.lg),
-              const Text('System Error', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(height: AppSpacing.md),
-              SelectableText(error.toString(), textAlign: TextAlign.center),
-              const SizedBox(height: AppSpacing.xl),
-              AppButton(label: 'Retry', onPressed: () => main()),
-            ],
+    runApp(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: AppColors.error,
+                  size: 64,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                const Text(
+                  'System Error',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                SelectableText(error.toString(), textAlign: TextAlign.center),
+                const SizedBox(height: AppSpacing.xl),
+                AppButton(label: 'Retry', onPressed: () => main()),
+              ],
+            ),
           ),
         ),
       ),
-    ));
+    );
   }
 }
 
@@ -109,13 +118,15 @@ void _initForegroundTask() {
 /// Must be called after [FlutterLocalNotificationsPlugin] is initialized.
 Future<void> _initNotificationChannels() async {
   const initSettings = InitializationSettings(
-    android: AndroidInitializationSettings('@mipmap/launcher_icon'),
+    android: AndroidInitializationSettings('@mipmap/ic_launcher'),
   );
   final plugin = FlutterLocalNotificationsPlugin();
   await plugin.initialize(settings: initSettings);
 
   final androidImpl = plugin
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >();
 
   await androidImpl?.createNotificationChannel(
     const AndroidNotificationChannel(
@@ -150,7 +161,7 @@ Future<void> _requestPermissions() async {
       // Android 11+ (API 30+)
       // manageExternalStorage is special: it doesn't show a runtime dialog but opens settings.
       if (!await Permission.manageExternalStorage.isGranted) {
-         await Permission.manageExternalStorage.request();
+        await Permission.manageExternalStorage.request();
       }
     } else {
       // Android 10 (API 29) and below: legacy storage is enough with Manifest flag
@@ -161,12 +172,14 @@ Future<void> _requestPermissions() async {
     await Permission.notification.request();
 
     // Bug #3: Battery Optimization Strategy
-    bool? isIgnoring = await FlutterForegroundTask.isIgnoringBatteryOptimizations;
+    bool? isIgnoring =
+        await FlutterForegroundTask.isIgnoringBatteryOptimizations;
     if (!isIgnoring) {
       await FlutterForegroundTask.requestIgnoreBatteryOptimization();
     }
-    
-    bool? isBatteryOptimizationDisabled = await DisableBatteryOptimization.isAllBatteryOptimizationDisabled;
+
+    bool? isBatteryOptimizationDisabled =
+        await DisableBatteryOptimization.isAllBatteryOptimizationDisabled;
     if (isBatteryOptimizationDisabled == false) {
       await DisableBatteryOptimization.showDisableBatteryOptimizationSettings();
     }
@@ -294,17 +307,26 @@ class _MainScreenState extends State<MainScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return services.SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      systemNavigationBarColor: isDark ? const Color(0xFF020617) : const Color(0xFFF8FAFC),
-      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor: isDark
+          ? const Color(0xFF020617)
+          : const Color(0xFFF8FAFC),
+      systemNavigationBarIconBrightness: isDark
+          ? Brightness.light
+          : Brightness.dark,
       statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       systemNavigationBarDividerColor: Colors.transparent,
     );
   }
 
-  void _showUploadPreview(BuildContext context, File file, String name, bool isDirectory) {
+  void _showUploadPreview(
+    BuildContext context,
+    File file,
+    String name,
+    bool isDirectory,
+  ) {
     String password = '';
     final lang = SettingsService().language.value;
-    
+
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -317,7 +339,9 @@ class _MainScreenState extends State<MainScreen> {
             scale: Tween<double>(begin: 0.9, end: 1.0).animate(anim1),
             child: Dialog(
               backgroundColor: Colors.transparent,
-              insetPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+              ),
               child: GlassCard(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 child: Column(
@@ -330,11 +354,16 @@ class _MainScreenState extends State<MainScreen> {
                           padding: const EdgeInsets.all(AppSpacing.sm),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMd,
+                            ),
                           ),
                           child: Icon(
-                            isDirectory ? Icons.folder_outlined : Icons.insert_drive_file_outlined, 
-                            color: AppColors.primary, size: 28
+                            isDirectory
+                                ? Icons.folder_outlined
+                                : Icons.insert_drive_file_outlined,
+                            color: AppColors.primary,
+                            size: 28,
                           ),
                         ),
                         const SizedBox(width: AppSpacing.md),
@@ -342,15 +371,25 @@ class _MainScreenState extends State<MainScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(L10n.get('upload', lang), style: Theme.of(context).textTheme.titleLarge),
-                              Text(name, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis),
+                              Text(
+                                L10n.get('upload', lang),
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              Text(
+                                name,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ],
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.xl),
-                    Text('DOUBLE ENCRYPTION (OPTIONAL)', style: Theme.of(context).textTheme.labelLarge),
+                    Text(
+                      'DOUBLE ENCRYPTION (OPTIONAL)',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
                     const SizedBox(height: AppSpacing.sm),
                     TextField(
                       obscureText: true,
@@ -359,8 +398,17 @@ class _MainScreenState extends State<MainScreen> {
                         hintText: 'Passphrase for extra security',
                         filled: true,
                         fillColor: Colors.white.withValues(alpha: 0.05),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd), borderSide: BorderSide.none),
-                        prefixIcon: const Icon(Icons.lock_outline, size: 20, color: AppColors.primary),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
+                          borderSide: BorderSide.none,
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.lock_outline,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xl),
@@ -369,7 +417,10 @@ class _MainScreenState extends State<MainScreen> {
                         Expanded(
                           child: TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
@@ -414,7 +465,10 @@ class _MainScreenState extends State<MainScreen> {
         ),
         content: Text(L10n.get('please_connect_google', lang)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Cancel'),
+          ),
           AppButton(
             label: 'Connect',
             isFullWidth: false,
@@ -428,11 +482,17 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Future<void> _startBackgroundUpload(File file, String name, String password) async {
+  Future<void> _startBackgroundUpload(
+    File file,
+    String name,
+    String password,
+  ) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
     final notifId = taskId.hashCode;
-    AppLogger.info('NexusDebug: Starting direct async upload for $name, taskId: $taskId');
-    
+    AppLogger.info(
+      'NexusDebug: Starting direct async upload for $name, taskId: $taskId',
+    );
+
     // Restauration du ForegroundService pour empêcher l'OS de geler l'application
     // Indispensable sur Android 13/14 (systèmes Griffin/Hiber)
     try {
@@ -443,11 +503,11 @@ class _MainScreenState extends State<MainScreen> {
           callback: null, // Callback non nécessaire en mode direct
         );
       }
-      
+
       final nexus = NexusService();
       await nexus.encodeAndUpload(file, password, explicitTaskId: taskId);
       DatabaseService().notifyChange();
-      
+
       await FlutterForegroundTask.stopService();
       // Dismiss progress notification and show final success
       await FlutterLocalNotificationsPlugin().cancel(id: notifId);
@@ -457,7 +517,8 @@ class _MainScreenState extends State<MainScreen> {
         body: 'Fichier sécurisé : $name',
         notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails(
-            'nexus_final_channel', 'Nexus Tâches Terminées',
+            'nexus_final_channel',
+            'Nexus Tâches Terminées',
             importance: Importance.high,
             priority: Priority.high,
             autoCancel: true,
@@ -466,28 +527,43 @@ class _MainScreenState extends State<MainScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Upload Complete: $name'), backgroundColor: Colors.green));
+          SnackBar(
+            content: Text('✅ Upload Complete: $name'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       AppLogger.error('Upload Error: $e');
+      print('NEXUS_UPLOAD_CRITICAL_ERROR: $e');
       // Dismiss progress notification and show final failure
-      await FlutterLocalNotificationsPlugin().cancel(id: notifId);
-      await FlutterLocalNotificationsPlugin().show(
-        id: notifId + 1,
-        title: '❌ Upload échoué',
-        body: '$name — ${e.toString().split('\n').first}',
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'nexus_final_channel', 'Nexus Tâches Terminées',
-            importance: Importance.high,
-            priority: Priority.high,
-            autoCancel: true,
+      try {
+        await FlutterLocalNotificationsPlugin().cancel(id: notifId);
+        await FlutterLocalNotificationsPlugin().show(
+          id: notifId + 1,
+          title: '❌ Upload échoué',
+          body: '$name — ${e.toString().split('\n').first}',
+          notificationDetails: const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'nexus_final_channel',
+              'Nexus Tâches Terminées',
+              importance: Importance.high,
+              priority: Priority.high,
+              autoCancel: true,
+              icon: '@mipmap/ic_launcher',
+            ),
           ),
-        ),
-      );
+        );
+      } catch (notifErr) {
+        print('NEXUS_UPLOAD: Failed to show error notification: $notifErr');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Upload Failed: $e'), backgroundColor: Colors.red));
+          SnackBar(
+            content: Text('❌ Upload Failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -496,8 +572,10 @@ class _MainScreenState extends State<MainScreen> {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
     final notifId = taskId.hashCode;
     final fileName = record.path.split('/').last;
-    AppLogger.info('NexusDebug: Starting direct async download for $fileName, taskId: $taskId');
-    
+    AppLogger.info(
+      'NexusDebug: Starting direct async download for $fileName, taskId: $taskId',
+    );
+
     // Restauration du ForegroundService pour empêcher l'OS de geler l'application
     try {
       if (!await FlutterForegroundTask.isRunningService) {
@@ -507,11 +585,15 @@ class _MainScreenState extends State<MainScreen> {
           callback: null,
         );
       }
-      
+
       final nexus = NexusService();
-      await nexus.downloadAndDecrypt(record, record.key, explicitTaskId: taskId);
+      await nexus.downloadAndDecrypt(
+        record,
+        record.key,
+        explicitTaskId: taskId,
+      );
       DatabaseService().notifyChange();
-      
+
       await FlutterForegroundTask.stopService();
       // Dismiss progress notification and show final success
       await FlutterLocalNotificationsPlugin().cancel(id: notifId);
@@ -521,7 +603,8 @@ class _MainScreenState extends State<MainScreen> {
         body: 'Sauvegardé dans /Download/NexusStorage/$fileName',
         notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails(
-            'nexus_final_channel', 'Nexus Tâches Terminées',
+            'nexus_final_channel',
+            'Nexus Tâches Terminées',
             importance: Importance.high,
             priority: Priority.high,
             autoCancel: true,
@@ -530,7 +613,11 @@ class _MainScreenState extends State<MainScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Download Complete: $fileName'), backgroundColor: Colors.green));
+          SnackBar(
+            content: Text('✅ Download Complete: $fileName'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       AppLogger.error('Download Error: $e');
@@ -541,7 +628,8 @@ class _MainScreenState extends State<MainScreen> {
         body: '$fileName — ${e.toString().split('\n').first}',
         notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails(
-            'nexus_final_channel', 'Nexus Tâches Terminées',
+            'nexus_final_channel',
+            'Nexus Tâches Terminées',
             importance: Importance.high,
             priority: Priority.high,
             autoCancel: true,
@@ -550,7 +638,11 @@ class _MainScreenState extends State<MainScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Download Failed: $e'), backgroundColor: Colors.red));
+          SnackBar(
+            content: Text('❌ Download Failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -558,17 +650,15 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return AnnotatedRegion<services.SystemUiOverlayStyle>(
       value: _getSystemUIStyle(context),
       child: Scaffold(
         body: Stack(
           children: [
             // Theme-aware background
-            Container(
-              color: AppColors.getBackground(context),
-            ),
-            
+            Container(color: AppColors.getBackground(context)),
+
             // Background Blobs for Glassmorphisme (Design Rule)
             Positioned(
               top: -100,
@@ -578,7 +668,9 @@ class _MainScreenState extends State<MainScreen> {
                 height: 300,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primary.withValues(alpha: isDark ? 0.15 : 0.08),
+                  color: AppColors.primary.withValues(
+                    alpha: isDark ? 0.15 : 0.08,
+                  ),
                 ),
               ),
             ),
@@ -590,14 +682,14 @@ class _MainScreenState extends State<MainScreen> {
                 height: 250,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.secondary.withValues(alpha: isDark ? 0.1 : 0.05),
+                  color: AppColors.secondary.withValues(
+                    alpha: isDark ? 0.1 : 0.05,
+                  ),
                 ),
               ),
             ),
-            
-            SafeArea(
-              child: FilesPage(onDownload: _startBackgroundDownload),
-            ),
+
+            SafeArea(child: FilesPage(onDownload: _startBackgroundDownload)),
 
             // Speed Dial FAB
             Positioned.fill(
@@ -615,7 +707,7 @@ class _MainScreenState extends State<MainScreen> {
                         'File': Icons.insert_drive_file_outlined,
                         'Camera': Icons.camera_alt_outlined,
                         'Folder': Icons.folder_open_outlined,
-                      }
+                      },
                     },
                     onActionTap: (action) async {
                       if (action == L10n.get('settings', lang)) {
@@ -623,26 +715,43 @@ class _MainScreenState extends State<MainScreen> {
                       } else if (action == L10n.get('activity', lang)) {
                         _pushSmooth(const TasksPage());
                       } else if (action == 'File') {
-                          FilePickerResult? result = await FilePicker.pickFiles();
-                          if (result != null && mounted) {
-                            if (!context.mounted) return;
-                            File file = File(result.files.single.path!);
-                            _showUploadPreview(context, file, result.files.single.name, false);
-                          }
+                        FilePickerResult? result = await FilePicker.pickFiles();
+                        if (result != null && mounted) {
+                          if (!context.mounted) return;
+                          File file = File(result.files.single.path!);
+                          _showUploadPreview(
+                            context,
+                            file,
+                            result.files.single.name,
+                            false,
+                          );
+                        }
                       } else if (action == 'Camera') {
                         final ImagePicker imagePicker = ImagePicker();
-                        final XFile? photo = await imagePicker.pickImage(source: ImageSource.camera);
+                        final XFile? photo = await imagePicker.pickImage(
+                          source: ImageSource.camera,
+                        );
                         if (photo != null && mounted) {
                           if (!context.mounted) return;
                           File file = File(photo.path);
-                          _showUploadPreview(context, file, file.path.split('/').last, false);
+                          _showUploadPreview(
+                            context,
+                            file,
+                            file.path.split('/').last,
+                            false,
+                          );
                         }
                       } else if (action == 'Folder') {
                         String? path = await FilePicker.getDirectoryPath();
                         if (path != null && mounted) {
                           if (!context.mounted) return;
                           File file = File(path);
-                          _showUploadPreview(context, file, path.split('/').last, true);
+                          _showUploadPreview(
+                            context,
+                            file,
+                            path.split('/').last,
+                            true,
+                          );
                         }
                       }
                     },

@@ -1,4 +1,5 @@
 import org.gradle.api.tasks.compile.JavaCompile
+import com.android.build.gradle.BaseExtension
 
 allprojects {
     repositories {
@@ -20,6 +21,26 @@ subprojects {
     tasks.withType<JavaCompile> {
         sourceCompatibility = "17"
         targetCompatibility = "17"
+    }
+
+    afterEvaluate {
+        if (project.plugins.hasPlugin("com.android.application") || 
+            project.plugins.hasPlugin("com.android.library")) {
+            configure<BaseExtension> {
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
+            }
+        }
+        
+        if (project.plugins.hasPlugin("kotlin-android")) {
+            tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+                compilerOptions {
+                    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                }
+            }
+        }
     }
 }
 
