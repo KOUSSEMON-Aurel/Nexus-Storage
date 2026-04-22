@@ -273,10 +273,19 @@ jobs:
           TAG_NAME="app-v${VERSION}"
           
           echo "Uploading to release tag: $TAG_NAME"
+          # Rename Android artifacts to match desktop naming convention
+          cd ./nexus-mobile/build/app/outputs/flutter-apk/
+          for f in app-*-release.apk; do
+            arch=$(echo $f | sed 's/app-//;s/-release.apk//')
+            mv "$f" "nexus_${VERSION}_${arch}.apk"
+          done
+          cd -
+          mv ./nexus-mobile/build/app/outputs/bundle/release/app-release.aab ./nexus-mobile/build/app/outputs/bundle/release/nexus_${VERSION}.aab
+
           # Retry a few times in case the release isn't created yet by the desktop job
           for i in {1..5}; do
             # Upload APKs
-            gh release upload "$TAG_NAME" ./nexus-mobile/build/app/outputs/flutter-apk/app-*.apk --clobber && \
+            gh release upload "$TAG_NAME" ./nexus-mobile/build/app/outputs/flutter-apk/nexus_*.apk --clobber && \
             # Upload AAB
-            gh release upload "$TAG_NAME" ./nexus-mobile/build/app/outputs/bundle/release/app-release.aab --clobber && break || sleep 30
+            gh release upload "$TAG_NAME" ./nexus-mobile/build/app/outputs/bundle/release/nexus_*.aab --clobber && break || sleep 30
           done
