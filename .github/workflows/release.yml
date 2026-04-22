@@ -229,22 +229,26 @@ jobs:
           TAG_NAME="app-v${{ steps.tauri.outputs.appVersion }}"
           gh release upload "$TAG_NAME" "$APPIMAGE_NAME" --clobber
 
-      # ─── ÉTAPE 8 : Build Android APK (Uniquement sur Linux) ───────────────
+  build-android:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Setup Java (Android)
-        if: matrix.platform == 'linux'
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: '17'
 
       - name: Setup Flutter (Android)
-        if: matrix.platform == 'linux'
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
       - name: Build Android APK
-        if: matrix.platform == 'linux'
         working-directory: ./nexus-mobile
         run: |
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
@@ -263,9 +267,15 @@ jobs:
           flutter build apk --release --split-per-abi
 
       - name: Upload Android APKs
-        if: matrix.platform == 'linux'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="app-v${{ steps.tauri.outputs.appVersion }}"
-          gh release upload "$TAG_NAME" ./nexus-mobile/build/app/outputs/flutter-apk/app-*.apk --clobber
+          # Read version from nexus-gui/src-tauri/tauri.conf.json to match desktop release tag
+          VERSION=$(jq -r .version nexus-gui/src-tauri/tauri.conf.json)
+          TAG_NAME="app-v${VERSION}"
+          
+          echo "Uploading to release tag: $TAG_NAME"
+          # Retry a few times in case the release isn't created yet by the desktop job
+          for i in {1..5}; do
+            gh release upload "$TAG_NAME" ./nexus-mobile/build/app/outputs/flutter-apk/app-*.apk --clobber && break || sleep 30
+          done
