@@ -22,7 +22,7 @@ class _SettingsPageState extends State<SettingsPage> {
   final DatabaseService _db = DatabaseService();
   final SettingsService _settings = SettingsService();
   bool _isLoading = false;
-  
+
   // Storage retention
   double _trashRetention = 30;
 
@@ -35,7 +35,9 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _loadRetention() async {
     final retentionValue = await _db.getKV('trash_retention');
     if (mounted) {
-      setState(() => _trashRetention = double.tryParse(retentionValue ?? '30') ?? 30);
+      setState(
+        () => _trashRetention = double.tryParse(retentionValue ?? '30') ?? 30,
+      );
     }
   }
 
@@ -56,15 +58,16 @@ class _SettingsPageState extends State<SettingsPage> {
               icon: Icon(Icons.arrow_back_rounded, color: textPrimary),
               onPressed: () => Navigator.pop(context),
             ),
-            title: Text(L10n.get('settings', lang), style: TextStyle(color: textPrimary)),
+            title: Text(
+              L10n.get('settings', lang),
+              style: TextStyle(color: textPrimary),
+            ),
             centerTitle: true,
           ),
           body: Stack(
             children: [
               // Subtle background gradient
-              Container(
-                color: AppColors.getBackground(context),
-              ),
+              Container(color: AppColors.getBackground(context)),
 
               // Harmonized Background Blobs (matching MainScreen)
               Positioned(
@@ -75,7 +78,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   height: 300,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.primary.withValues(alpha: isDark ? 0.12 : 0.05),
+                    color: AppColors.primary.withValues(
+                      alpha: isDark ? 0.12 : 0.05,
+                    ),
                   ),
                 ),
               ),
@@ -87,11 +92,13 @@ class _SettingsPageState extends State<SettingsPage> {
                   height: 200,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.secondary.withValues(alpha: isDark ? 0.08 : 0.03),
+                    color: AppColors.secondary.withValues(
+                      alpha: isDark ? 0.08 : 0.03,
+                    ),
                   ),
                 ),
               ),
-              
+
               SafeArea(
                 child: ListView(
                   padding: const EdgeInsets.all(AppSpacing.lg),
@@ -143,13 +150,18 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildAccountCard(String lang) {
     final textSecondary = AppColors.getTextSecondary(context);
-    
+
     return StreamBuilder<GoogleSignInAccount?>(
       stream: _auth.userStream,
+      initialData: _auth.currentUser,
       builder: (context, snapshot) {
         final isConnected = _auth.isAuthenticated || snapshot.hasData;
-        final photoUrl = _auth.isAuthenticated ? _auth.userPhotoUrl : snapshot.data?.photoUrl;
-        final name = _auth.isAuthenticated ? _auth.userName : snapshot.data?.displayName;
+        final photoUrl = _auth.isAuthenticated
+            ? _auth.userPhotoUrl
+            : snapshot.data?.photoUrl;
+        final name = _auth.isAuthenticated
+            ? _auth.userName
+            : snapshot.data?.displayName;
 
         return GlassCard(
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -159,13 +171,24 @@ class _SettingsPageState extends State<SettingsPage> {
               Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 2),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    width: 2,
+                  ),
                 ),
                 child: CircleAvatar(
                   radius: 28,
                   backgroundColor: AppColors.getSurfaceElevated(context),
-                  backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-                  child: photoUrl == null ? Icon(Icons.person_rounded, color: textSecondary, size: 32) : null,
+                  backgroundImage: photoUrl != null
+                      ? NetworkImage(photoUrl)
+                      : null,
+                  child: photoUrl == null
+                      ? Icon(
+                          Icons.person_rounded,
+                          color: textSecondary,
+                          size: 32,
+                        )
+                      : null,
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -175,7 +198,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   children: [
                     Text(
                       isConnected ? (name ?? 'Connected') : 'Google Account',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
                       isConnected ? 'Cloud Sync Active' : 'Offline access only',
@@ -192,7 +218,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 label: isConnected ? 'Logout' : 'Connect',
                 isFullWidth: false,
                 isLoading: _isLoading,
-                backgroundColor: isConnected ? AppColors.error.withValues(alpha: 0.1) : AppColors.primary,
+                backgroundColor: isConnected
+                    ? AppColors.error.withValues(alpha: 0.1)
+                    : AppColors.primary,
                 onPressed: () async {
                   setState(() => _isLoading = true);
                   try {
@@ -214,8 +242,10 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildDisplayOptions(String lang) {
-    final dividerColor = Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.black12;
-    
+    final dividerColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white10
+        : Colors.black12;
+
     return GlassCard(
       padding: EdgeInsets.zero,
       borderRadius: AppSpacing.radiusLg,
@@ -228,7 +258,13 @@ class _SettingsPageState extends State<SettingsPage> {
               valueListenable: _settings.themeMode,
               builder: (context, mode, _) {
                 String label = mode.name.toUpperCase();
-                return Text(label, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold));
+                return Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                );
               },
             ),
             onTap: () => _showThemeDialog(context),
@@ -237,7 +273,13 @@ class _SettingsPageState extends State<SettingsPage> {
           _buildCompactTile(
             icon: Icons.language_rounded,
             title: L10n.get('language', lang),
-            trailing: Text(_settings.language.value.toUpperCase(), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            trailing: Text(
+              _settings.language.value.toUpperCase(),
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             onTap: () => _showLanguageDialog(context),
           ),
           Divider(height: 1, color: dividerColor),
@@ -255,7 +297,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   },
                   activeThumbColor: AppColors.primary,
                 );
-              }
+              },
             ),
           ),
         ],
@@ -273,17 +315,28 @@ class _SettingsPageState extends State<SettingsPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(L10n.get('auto_empty', lang), style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text('${_trashRetention.round()} days', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+              Text(
+                L10n.get('auto_empty', lang),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(
+                '${_trashRetention.round()} days',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           Slider(
             value: _trashRetention,
-            min: 1, max: 90,
+            min: 1,
+            max: 90,
             activeColor: AppColors.primary,
             inactiveColor: AppColors.getSurfaceElevated(context),
             onChanged: (val) => setState(() => _trashRetention = val),
-            onChangeEnd: (val) => _db.setKV('trash_retention', val.round().toString()),
+            onChangeEnd: (val) =>
+                _db.setKV('trash_retention', val.round().toString()),
           ),
           const SizedBox(height: AppSpacing.sm),
           AppButton(
@@ -307,13 +360,19 @@ class _SettingsPageState extends State<SettingsPage> {
               const Icon(Icons.cloud_sync_rounded, color: AppColors.primary),
               const SizedBox(width: AppSpacing.md),
               const Expanded(
-                child: Text('Cloud Database Sync', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(
+                  'Cloud Database Sync',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
               FutureBuilder<String?>(
                 future: _db.getKV('manifest_version'),
                 builder: (context, snapshot) => Text(
                   'LSN: ${snapshot.data ?? "0"}',
-                  style: TextStyle(fontSize: 10, color: AppColors.getTextSecondary(context)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: AppColors.getTextSecondary(context),
+                  ),
                 ),
               ),
             ],
@@ -329,11 +388,19 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildCompactTile({required IconData icon, required String title, required Widget trailing, VoidCallback? onTap}) {
+  Widget _buildCompactTile({
+    required IconData icon,
+    required String title,
+    required Widget trailing,
+    VoidCallback? onTap,
+  }) {
     final textSecondary = AppColors.getTextSecondary(context);
     return ListTile(
       leading: Icon(icon, color: textSecondary, size: 22),
-      title: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+      ),
       trailing: trailing,
       onTap: onTap,
     );
@@ -349,23 +416,43 @@ class _SettingsPageState extends State<SettingsPage> {
               color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
             ),
-            child: const Icon(Icons.stars_rounded, color: AppColors.primary, size: 32),
+            child: const Icon(
+              Icons.stars_rounded,
+              color: AppColors.primary,
+              size: 32,
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
-          const Text('Nexus Storage', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-          Text('v5.4.0 Titanium', style: TextStyle(color: AppColors.getTextSecondary(context), fontSize: 13)),
+          const Text(
+            'Nexus Storage',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+          Text(
+            'v5.4.0 Titanium',
+            style: TextStyle(
+              color: AppColors.getTextSecondary(context),
+              fontSize: 13,
+            ),
+          ),
           const SizedBox(height: AppSpacing.lg),
           TextButton.icon(
             icon: const Icon(Icons.open_in_new_rounded, size: 16),
             label: Text(L10n.get('view_on_github', lang)),
-            onPressed: () => launchUrl(Uri.parse('https://github.com/KOUSSEMON-Aurel/Nexus-Storage')),
+            onPressed: () => launchUrl(
+              Uri.parse('https://github.com/KOUSSEMON-Aurel/Nexus-Storage'),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard({required BuildContext context, required IconData icon, required String title, required String description}) {
+  Widget _buildInfoCard({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
     return GlassCard(
       padding: const EdgeInsets.all(AppSpacing.md),
       borderRadius: AppSpacing.radiusMd,
@@ -378,9 +465,22 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(description, style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context), height: 1.4)),
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.getTextSecondary(context),
+                    height: 1.4,
+                  ),
+                ),
               ],
             ),
           ),
@@ -394,7 +494,12 @@ class _SettingsPageState extends State<SettingsPage> {
       padding: const EdgeInsets.only(left: 4, bottom: 12),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey, letterSpacing: 1.2),
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Colors.grey,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
@@ -402,41 +507,62 @@ class _SettingsPageState extends State<SettingsPage> {
   void _showThemeDialog(BuildContext context) {
     final lang = _settings.language.value;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
-        final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.xl;
+        final bottomPad =
+            MediaQuery.of(context).viewPadding.bottom + AppSpacing.xl;
         return GlassCard(
-          customBorderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+          customBorderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusLg),
+          ),
           padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, bottomPad),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 40, height: 4,
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.black12, 
-                  borderRadius: BorderRadius.circular(2)
+                  color: isDark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              Text(L10n.get('theme', lang), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: AppSpacing.md),
-              ...['system', 'light', 'dark'].map((t) => ListTile(
-                leading: Icon(
-                  t == 'system' ? Icons.brightness_auto_rounded : (t == 'light' ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
-                  color: AppColors.primary,
+              Text(
+                L10n.get('theme', lang),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
-                title: Text(t.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w600)),
-                trailing: _settings.themeMode.value == _settings.parseTheme(t) ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
-                onTap: () {
-                  _settings.updateTheme(t);
-                  Navigator.pop(context);
-                },
-              )),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ...['system', 'light', 'dark'].map(
+                (t) => ListTile(
+                  leading: Icon(
+                    t == 'system'
+                        ? Icons.brightness_auto_rounded
+                        : (t == 'light'
+                              ? Icons.light_mode_rounded
+                              : Icons.dark_mode_rounded),
+                    color: AppColors.primary,
+                  ),
+                  title: Text(
+                    t.toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  trailing: _settings.themeMode.value == _settings.parseTheme(t)
+                      ? const Icon(Icons.check_circle, color: AppColors.primary)
+                      : null,
+                  onTap: () {
+                    _settings.updateTheme(t);
+                    Navigator.pop(context);
+                  },
+                ),
+              ),
             ],
           ),
         );
@@ -449,13 +575,20 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(L10n.get('empty_trash_now', lang)),
-        content: const Text('Are you sure you want to permanently delete all items in trash?'),
+        content: const Text(
+          'Are you sure you want to permanently delete all items in trash?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Trash emptied')));
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Trash emptied')));
             },
             child: const Text('Empty', style: TextStyle(color: Colors.red)),
           ),
@@ -469,38 +602,60 @@ class _SettingsPageState extends State<SettingsPage> {
   void _showLanguageDialog(BuildContext context) {
     final lang = _settings.language.value;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
-        final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.xl;
+        final bottomPad =
+            MediaQuery.of(context).viewPadding.bottom + AppSpacing.xl;
         return GlassCard(
-          customBorderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+          customBorderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusLg),
+          ),
           padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, bottomPad),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 40, height: 4,
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.black12, 
-                  borderRadius: BorderRadius.circular(2)
+                  color: isDark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              Text(L10n.get('language', lang), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                L10n.get('language', lang),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: AppSpacing.md),
-              ...['auto', 'fr', 'en'].map((l) => ListTile(
-                leading: const Icon(Icons.language_rounded, color: AppColors.primary),
-                title: Text(l == 'auto' ? 'Auto (System)' : (l == 'fr' ? 'Français' : 'English'), style: const TextStyle(fontWeight: FontWeight.w600)),
-                trailing: _settings.language.value == l ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
-                onTap: () {
-                  _settings.updateLanguage(l);
-                  Navigator.pop(context);
-                },
-              )),
+              ...['auto', 'fr', 'en'].map(
+                (l) => ListTile(
+                  leading: const Icon(
+                    Icons.language_rounded,
+                    color: AppColors.primary,
+                  ),
+                  title: Text(
+                    l == 'auto'
+                        ? 'Auto (System)'
+                        : (l == 'fr' ? 'Français' : 'English'),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  trailing: _settings.language.value == l
+                      ? const Icon(Icons.check_circle, color: AppColors.primary)
+                      : null,
+                  onTap: () {
+                    _settings.updateLanguage(l);
+                    Navigator.pop(context);
+                  },
+                ),
+              ),
             ],
           ),
         );
