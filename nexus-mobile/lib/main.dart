@@ -7,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:disable_battery_optimization/disable_battery_optimization.dart';
 import 'dart:io';
 
 import 'package:nexus_mobile/services/database_service.dart';
@@ -118,7 +117,7 @@ void _initForegroundTask() {
 /// Must be called after [FlutterLocalNotificationsPlugin] is initialized.
 Future<void> _initNotificationChannels() async {
   const initSettings = InitializationSettings(
-    android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+    android: AndroidInitializationSettings('@mipmap/launcher_icon'),
   );
   final plugin = FlutterLocalNotificationsPlugin();
   await plugin.initialize(settings: initSettings);
@@ -156,33 +155,13 @@ Future<void> _requestPermissions() async {
     final androidInfo = await deviceInfo.androidInfo;
     final sdkInt = androidInfo.version.sdkInt;
 
-    // Bug #1 & #4 refined: Keep only what is strictly necessary for writing to Download/
-    if (sdkInt >= 30) {
-      // Android 11+ (API 30+)
-      // manageExternalStorage is special: it doesn't show a runtime dialog but opens settings.
-      if (!await Permission.manageExternalStorage.isGranted) {
-        await Permission.manageExternalStorage.request();
-      }
-    } else {
+    if (sdkInt < 30) {
       // Android 10 (API 29) and below: legacy storage is enough with Manifest flag
       await Permission.storage.request();
     }
 
     // Common permissions
     await Permission.notification.request();
-
-    // Bug #3: Battery Optimization Strategy
-    bool? isIgnoring =
-        await FlutterForegroundTask.isIgnoringBatteryOptimizations;
-    if (!isIgnoring) {
-      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
-    }
-
-    bool? isBatteryOptimizationDisabled =
-        await DisableBatteryOptimization.isAllBatteryOptimizationDisabled;
-    if (isBatteryOptimizationDisabled == false) {
-      await DisableBatteryOptimization.showDisableBatteryOptimizationSettings();
-    }
   }
 }
 
@@ -550,7 +529,7 @@ class _MainScreenState extends State<MainScreen> {
               importance: Importance.high,
               priority: Priority.high,
               autoCancel: true,
-              icon: '@mipmap/ic_launcher',
+              icon: '@mipmap/launcher_icon',
             ),
           ),
         );
