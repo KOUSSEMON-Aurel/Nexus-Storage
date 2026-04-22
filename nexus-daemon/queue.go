@@ -342,7 +342,7 @@ func (q *TaskQueue) processTask(t *Task) {
 	q.updateTaskState(t)
 	q.mu.Unlock()
 
-	log.Printf("🚀 Starting task %s (%v)", t.ID, t.Type)
+	log.Printf("🚀 Starting task %s (%v)", Shorten(t.ID, 8), t.Type)
 
 	var err error
 	switch t.Type {
@@ -361,13 +361,13 @@ func (q *TaskQueue) processTask(t *Task) {
 		t.Status = fmt.Sprintf("Error: %v", err)
 		t.CompletedAt = time.Now() // Mark time of error for cleanup
 		q.updateTaskState(t)
-		log.Printf("❌ Task %s failed: %v", t.ID, err)
+		log.Printf("❌ Task %s failed: %v", Shorten(t.ID, 8), err)
 	} else {
 		t.Status = "Completed"
 		t.Progress = 100
 		t.CompletedAt = time.Now() // Mark time of completion for cleanup
 		q.updateTaskState(t)
-		log.Printf("✅ Task %s completed successfully", t.ID)
+		log.Printf("✅ Task %s completed successfully", Shorten(t.ID, 8))
 	}
 	// Tasks will be auto-cleaned 30s after completion by cleanupCompletedTasks()
 }
@@ -510,7 +510,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	}
 	// Diagnostic: log a short sample of the generated raw file key for debugging
 	if len(rawFileKey) >= 8 {
-		log.Printf("[%s] [debug] Generated rawFileKey len=%d start=%x end=%x", t.ID, len(rawFileKey), rawFileKey[:8], rawFileKey[len(rawFileKey)-8:])
+		log.Printf("[%s] [debug] Generated rawFileKey len=%d start=%x end=%x", Shorten(t.ID, 8), len(rawFileKey), Shorten(string(rawFileKey), 8), rawFileKey[len(rawFileKey)-8:])
 	} else {
 		log.Printf("[%s] [debug] Generated rawFileKey len=%d", t.ID, len(rawFileKey))
 	}
@@ -591,15 +591,11 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		}
 		// Diagnostic: log encrypted blob size and sample bytes to help trace corruption
 		if len(encrypted) > 0 {
-			start := 8
-			if len(encrypted) < start {
-				start = len(encrypted)
-			}
 			end := 8
 			if len(encrypted) < end {
 				end = len(encrypted)
 			}
-			log.Printf("[%s] [ENC] Encrypted shard %d size=%d start=%x end=%x", t.ID, i+1, len(encrypted), encrypted[:start], encrypted[len(encrypted)-end:])
+			log.Printf("[%s] [debug] Encrypted shard size=%d start=%x end=%x", Shorten(t.ID, 8), len(encrypted), Shorten(string(encrypted), 8), encrypted[len(encrypted)-8:])
 		}
 		// Debug: write full hex dump of encrypted blob for offline inspection
 		if len(encrypted) > 0 {
@@ -797,7 +793,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 					isArchive = true
 				}
 				hasCustomPassword := t.Password != "" || t.CustomEncryptPassword != ""
-				q.db.SaveFileWithKey(filepath.Base(t.FilePath), response.Id, totalSize, t.SHA256[:16], "default-key", t.ParentID, t.SHA256, storedFileKeyHex, isArchive, hasCustomPassword, t.Mode)
+				q.db.SaveFileWithKey(filepath.Base(t.FilePath), response.Id, totalSize, Shorten(t.SHA256, 16), "default-key", t.ParentID, t.SHA256, storedFileKeyHex, isArchive, hasCustomPassword, t.Mode)
 			}
 			fileRecord, _ := q.db.GetFileByHash(t.SHA256)
 			if fileRecord != nil {

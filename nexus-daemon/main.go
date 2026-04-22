@@ -82,6 +82,14 @@ func has(name string) bool {
 	return findBinary(name) != ""
 }
 
+// Shorten safely slices a string to a maximum length without panicking.
+func Shorten(s string, length int) string {
+	if len(s) < length {
+		return s
+	}
+	return s[:length]
+}
+
 func main() {
 	configDir := getConfigDir()
 	dbPath := flag.String("db", filepath.Join(configDir, "nexus.db"), "Path to the SQLite database")

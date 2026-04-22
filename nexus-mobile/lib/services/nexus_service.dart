@@ -1,5 +1,7 @@
 import 'dart:ffi';
 import 'package:flutter/services.dart' hide Size;
+import 'package:crypto/crypto.dart';
+import 'package:convert/convert.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
@@ -240,8 +242,11 @@ class NexusService {
       Uint8List? lastFrameData;
 
       final sw = Stopwatch()..start();
+      final sha256Sink = AccumulatorSink<Digest>();
+      final sha256Input = sha256.startChunkedConversion(sha256Sink);
 
       await for (final chunk in inputFile.openRead()) {
+        sha256Input.add(chunk);
         assert(chunk.length <= maxChunkSize, 'Chunk too large for FFI buffer');
         reusableChunkPtr.asTypedList(chunk.length).setAll(0, chunk);
 
@@ -426,15 +431,18 @@ class NexusService {
 
       AppLogger.info('NEXUS_PERF: YouTube Upload: ${sw.elapsedMilliseconds}ms');
 
+      sha256Input.close();
+      final fileSha256 = sha256Sink.events.single.toString();
+
       final record = FileRecord(
         path: fileName,
         videoId: videoId,
         size: fileSize,
-        hash: 'streaming-hash-placeholder',
+        hash: fileSha256.substring(0, 16),
         key: password,
         lastUpdate: DateTime.now().toIso8601String(),
         starred: false,
-        sha256: '',
+        sha256: fileSha256,
         fileKey: '',
         isArchive: false,
         hasCustomPassword: password.isNotEmpty,

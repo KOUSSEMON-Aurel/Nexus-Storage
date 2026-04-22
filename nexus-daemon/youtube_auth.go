@@ -108,7 +108,7 @@ func (m *YouTubeManager) TryLoadToken() bool {
 	}
 
 	if googleSub != "" {
-		log.Printf("✅ Google sub loaded: %s (auto-encryption enabled)", googleSub[:8]+"...")
+		log.Printf("✅ Google sub loaded: %s (auto-encryption enabled)", Shorten(googleSub, 8)+"...")
 	} else {
 		log.Printf("❌ CRITICAL ERROR: Google sub file not found!")
 		log.Printf("   Old token is incompatible. Removing token and forcing re-authentication...")
@@ -438,7 +438,7 @@ func (m *YouTubeManager) StartLoginServer() error {
 				json.NewDecoder(resp.Body).Decode(&userInfo)
 				if id, ok := userInfo["id"].(string); ok {
 					googleSub = id
-					log.Printf("✅ Google sub fetched via UserInfo API: %s", id[:8]+"...")
+					log.Printf("✅ Google sub fetched via UserInfo API: %s", Shorten(id, 8)+"...")
 				}
 			}
 

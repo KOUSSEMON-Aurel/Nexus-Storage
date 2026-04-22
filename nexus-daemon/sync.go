@@ -393,7 +393,7 @@ func (s *SyncManager) PushDBToDrive() (err error) {
 		if downloadedBinarySHA != manifest.BinarySHA {
 			log.Printf("❌ CRITICAL: Push corruption detected! Binary SHA mismatch on Drive.")
 			os.Remove(verifyPath)
-			return fmt.Errorf("push verification failed: binary sha mismatch (manifest: %s, remote: %s)", manifest.BinarySHA[:8], downloadedBinarySHA[:8])
+			return fmt.Errorf("push verification failed: binary sha mismatch (manifest: %s, remote: %s)", Shorten(manifest.BinarySHA, 8), Shorten(downloadedBinarySHA, 8))
 		}
 		log.Printf("✅ Post-push binary SHA matched manifest.")
 	}
@@ -414,7 +414,7 @@ func (s *SyncManager) PushDBToDrive() (err error) {
 	if downloadedLogicalHash != logicalHash {
 		log.Printf("❌ CRITICAL: Push corruption detected! Logical hash mismatch on Drive.")
 		os.Remove(verifyPath)
-		return fmt.Errorf("push verification failed: logical hash mismatch (local: %s, remote: %s)", logicalHash[:8], downloadedLogicalHash[:8])
+		return fmt.Errorf("push verification failed: logical hash mismatch (local: %s, remote: %s)", Shorten(logicalHash, 8), Shorten(downloadedLogicalHash, 8))
 	}
 	log.Printf("✅ Push verification successful (logical hash matched).")
 
@@ -428,7 +428,7 @@ func (s *SyncManager) PushDBToDrive() (err error) {
 	// 9. Clear Pending Sync
 	s.db.ClearPendingSync()
 
-	log.Printf("✅ DB successfully push to Drive (LSN %d, Hash %s)", localLSN, logicalHash[:8])
+	log.Printf("✅ DB successfully push to Drive (LSN %d, Hash %s)", localLSN, Shorten(logicalHash, 8))
 	return nil
 }
 
@@ -541,10 +541,10 @@ func (s *SyncManager) PullDBFromDrive(force bool) (err error) {
 		// This handles transitions between different hashing versions or platform-specific timestamp variations.
 		localLSN, _ := s.db.GetLocalLSN()
 		if localLSN == 0 {
-			log.Printf("⚠️  Initial pull: Hash mismatch detected (%s vs %s), but allowing because local DB is empty. Integrity check will satisfy safety.", downloadedHash[:8], remoteManifest.LogicalHash[:8])
+			log.Printf("⚠️  Initial pull: Hash mismatch detected (%s vs %s), but allowing because local DB is empty. Integrity check will satisfy safety.", Shorten(downloadedHash, 8), Shorten(remoteManifest.LogicalHash, 8))
 		} else {
 			os.Remove(verifyPath)
-			return fmt.Errorf("downloaded logical hash (%s) does not match manifest (%s). Corruption suspected", downloadedHash[:8], remoteManifest.LogicalHash[:8])
+			return fmt.Errorf("downloaded logical hash (%s) does not match manifest (%s). Corruption suspected", Shorten(downloadedHash, 8), Shorten(remoteManifest.LogicalHash, 8))
 		}
 	}
 
@@ -756,7 +756,7 @@ func (s *SyncManager) getRemoteManifestWithContext(ctx context.Context) (*SyncMa
 		// Archive older duplicates (keep index 0)
 		for i := 1; i < len(fileList.Files); i++ {
 			dupID := fileList.Files[i].Id
-			archiveName := fmt.Sprintf("nexus-sync.json.dup.%s.%s", time.Now().UTC().Format("20060102T150405Z"), dupID[:8])
+			archiveName := fmt.Sprintf("nexus-sync.json.dup.%s.%s", time.Now().UTC().Format("20060102T150405Z"), Shorten(dupID, 8))
 			copyMeta := &drive.File{Name: archiveName}
 			if folderID != "" {
 				copyMeta.Parents = []string{folderID}

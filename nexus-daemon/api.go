@@ -331,7 +331,7 @@ func (s *APIServer) handleDownload(w http.ResponseWriter, r *http.Request) {
 		fileRecord, _ = s.queue.db.GetFileByVideoID(req.VideoID)
 		if fileRecord != nil {
 			sha256 = fileRecord.SHA256
-			log.Printf("📝 Lookup SHA256 from VideoID: %s → %s", req.VideoID[:8], sha256[:8])
+			log.Printf("📝 Lookup SHA256 from VideoID: %s → %s", Shorten(req.VideoID, 8), Shorten(sha256, 8))
 		}
 	} else if sha256 != "" {
 		fileRecord, _ = s.queue.db.GetFileByHash(sha256)
