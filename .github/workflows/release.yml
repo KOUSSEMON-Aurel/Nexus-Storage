@@ -226,6 +226,7 @@ jobs:
           gh release upload "$TAG_NAME" "$APPIMAGE_NAME" --clobber
 
   build-android:
+    needs: build
     permissions:
       contents: write
     runs-on: ubuntu-latest
