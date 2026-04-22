@@ -1098,3 +1098,41 @@ func (d *Database) GetStats() (Stats, error) {
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 // (scanFile and scanFiles were unused and removed in V3)
+func (d *Database) FlushWAL() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, err := d.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+	return err
+}
+
+// Wipe clears all user data from the database and resets LSN tracking.
+func (d *Database) Wipe() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	log.Println("🧹 Wiping local database...")
+
+	tables := []string{
+		"files",
+		"folders",
+		"shards",
+		"tasks",
+		"tombstones",
+		"pending_sync",
+		"recovery_state",
+		"kv_store",
+	}
+
+	for _, table := range tables {
+		query := fmt.Sprintf("DELETE FROM %s", table)
+		if _, err := d.db.Exec(query); err != nil {
+			return fmt.Errorf("failed to wipe table %s: %w", table, err)
+		}
+	}
+
+	// Double check FTS5 tables if they exist
+	_, _ = d.db.Exec("DELETE FROM files_fts")
+
+	log.Println("✅ Local database wiped successfully.")
+	return nil
+}

@@ -64,7 +64,7 @@ func NewYouTubeManager() *YouTubeManager {
 	config, err := google.ConfigFromJSON(b,
 		"https://www.googleapis.com/auth/youtube.force-ssl",
 		"https://www.googleapis.com/auth/monitoring.read",
-		drive.DriveFileScope,
+		drive.DriveScope,
 		"openid", // ← REQUIRED for id_token (contains 'sub' claim)
 	)
 	if err != nil {

@@ -65,7 +65,7 @@ func (s *APIServer) Start(port int) {
 	// V4 Recovery
 	mux.HandleFunc("/api/recovery/backup", s.handleRecoveryBackup)
 	mux.HandleFunc("/api/recovery/restore", s.handleRecoveryRestore)
-	
+
 	mux.HandleFunc("/api/quota", s.handleQuota)
 	mux.HandleFunc("/api/quota/live", s.handleQuotaLiveToggle)
 	mux.HandleFunc("/api/quota/limit", s.handleQuotaLimit)
@@ -85,7 +85,7 @@ func (s *APIServer) Start(port int) {
 
 	handler := corsMiddleware(mux)
 	fmt.Printf("🌐 API Server starting on http://localhost:%d\n", port)
-	
+
 	// Pre-warm quota cache after a delay to ensure YouTube auth is ready
 	go func() {
 		// Wait 3 seconds for auth to complete and scope validation
@@ -100,7 +100,7 @@ func (s *APIServer) Start(port int) {
 			log.Printf("⚠️  Quota cache pre-warm: live monitoring not available")
 		}
 	}()
-	
+
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), handler))
 }
 
@@ -158,7 +158,7 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 		}
 		s.queue.RequestManifestBackup()
 		jsonOK(w, map[string]string{"status": "deleted"})
-		
+
 	// POST /api/files/{id}/evict -> "Free up space" (clear from local cache but keep in DB)
 	case action == "evict" && r.Method == http.MethodPost:
 		f, _ := s.db.GetFileByID(id)
@@ -167,7 +167,9 @@ func (s *APIServer) handleFileByID(w http.ResponseWriter, r *http.Request) {
 			currParent := f.ParentID
 			for currParent != nil {
 				folder, _ := s.db.GetFolderByID(*currParent)
-				if folder == nil { break }
+				if folder == nil {
+					break
+				}
 				path = filepath.Join(folder.Name, path)
 				currParent = folder.ParentID
 			}
@@ -416,7 +418,7 @@ func (s *APIServer) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{
 		"authenticated": s.ytManager.authed,
 		"user":          s.ytManager.user,
-		"googleSub":     s.ytManager.googleSub,  // Permanent unique Google user ID (debug/monitoring)
+		"googleSub":     s.ytManager.googleSub, // Permanent unique Google user ID (debug/monitoring)
 	})
 }
 
@@ -427,10 +429,10 @@ func (s *APIServer) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	// Run login in background to not block API
 	go s.ytManager.StartLoginServer()
-	
+
 	url := s.ytManager.GetAuthURL()
 	go openBrowser(url)
-	
+
 	jsonOK(w, map[string]string{"status": "login_flow_started", "url": url})
 }
 
@@ -441,7 +443,7 @@ func (s *APIServer) handleSecurity(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	// Return active security protocols to dynamically feed the frontend
 	type Protocol struct {
 		Name   string `json:"name"`
@@ -468,7 +470,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS, PROPFIND, MKCOL, MOVE, COPY, PROPPATCH, LOCK, UNLOCK")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Depth, If-Modified-Since, User-Agent, X-Expected-Entity-Length, Pragma, Cache-Control")
-		
+
 		if r.Method == "OPTIONS" {
 			// Do not intercept OPTIONS for vfs so the net/vfs
 			// handler can inject DAV: 1, 2 and Allow capabilities.
@@ -477,7 +479,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 				return
 			}
 		}
-		
+
 		next.ServeHTTP(w, r)
 	})
 }
@@ -512,7 +514,7 @@ func (s *APIServer) handleStudio(w http.ResponseWriter, r *http.Request) {
 		// Exact working format provided by the user
 		url = fmt.Sprintf("https://studio.youtube.com/channel/%s/videos/upload?filter=%%5B%%5D&sort=%%7B%%22columnType%%22%%3A%%22date%%22%%2C%%22sortOrder%%22%%3A%%22DESCENDING%%22%%7D", channelID)
 	}
-	
+
 	go openBrowser(url)
 	jsonOK(w, map[string]string{"status": "browser-launched", "url": url})
 }
@@ -537,6 +539,9 @@ func (s *APIServer) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.ytManager.Logout()
+	if err := s.db.Wipe(); err != nil {
+		log.Printf("⚠️  Failed to wipe database on logout: %v", err)
+	}
 	jsonOK(w, map[string]any{"status": "logged_out"})
 }
 
@@ -575,7 +580,7 @@ func (s *APIServer) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 	s.queue.SetMasterKeyHex(req.MasterKeyHex)
 
 	jsonOK(w, map[string]any{
-		"status": "session_active",
+		"status":  "session_active",
 		"message": "Master key loaded into session. Valid until logout.",
 	})
 }
@@ -591,7 +596,7 @@ func (s *APIServer) handleSessionEnd(w http.ResponseWriter, r *http.Request) {
 	s.queue.ClearMasterKeyHex()
 
 	jsonOK(w, map[string]any{
-		"status": "session_ended",
+		"status":  "session_ended",
 		"message": "Master key cleared from memory.",
 	})
 }
@@ -637,10 +642,10 @@ func (s *APIServer) handlePasswordChange(w http.ResponseWriter, r *http.Request)
 	}
 
 	jsonOK(w, map[string]any{
-		"status": "success",
+		"status":        "success",
 		"files_rotated": count,
-		"new_revision": newRev,
-		"message": fmt.Sprintf("✅ Password changed successfully. %d files re-encrypted. Manifest backed up.", count),
+		"new_revision":  newRev,
+		"message":       fmt.Sprintf("✅ Password changed successfully. %d files re-encrypted. Manifest backed up.", count),
 	})
 }
 
@@ -679,7 +684,7 @@ func (s *APIServer) handleRecoveryBackup(w http.ResponseWriter, r *http.Request)
 	}
 
 	jsonOK(w, map[string]any{
-		"status": "backup_queued",
+		"status":  "backup_queued",
 		"message": "Manifest backup initiated. Check Drive shortly.",
 	})
 }
@@ -721,16 +726,16 @@ func (s *APIServer) handleRecoveryRestore(w http.ResponseWriter, r *http.Request
 	}
 
 	jsonOK(w, map[string]any{
-		"status": "restored",
+		"status":     "restored",
 		"file_count": len(manifest.Files),
-		"message": fmt.Sprintf("Restored %d files from Drive backup", len(manifest.Files)),
+		"message":    fmt.Sprintf("Restored %d files from Drive backup", len(manifest.Files)),
 	})
 }
 
 func (s *APIServer) handleQuota(w http.ResponseWriter, r *http.Request) {
 	// Check for force parameter
 	forceLive := r.URL.Query().Get("force") == "true"
-	
+
 	used := s.db.GetDailyQuota()
 	limitStr, ok := s.db.GetKV("quota_limit")
 	limit := 10000
@@ -745,9 +750,9 @@ func (s *APIServer) handleQuota(w http.ResponseWriter, r *http.Request) {
 	if val, ok := s.db.GetKV("enable_live_quota"); ok && val == "false" {
 		enableLiveQuota = false
 	}
-	
+
 	source := "local"
-	
+
 	// Check cache - only call live quota if cache is older than 5 minutes and enabled
 	s.quotaCacheMu.Lock()
 	cacheValid := enableLiveQuota && !forceLive && time.Since(s.quotaCacheTime) < 5*time.Minute && s.quotaCacheTime.After(time.Now().Add(-24*time.Hour)) && s.quotaCacheTime.After(time.Time{})
@@ -756,7 +761,7 @@ func (s *APIServer) handleQuota(w http.ResponseWriter, r *http.Request) {
 		source = "cached"
 	}
 	s.quotaCacheMu.Unlock()
-	
+
 	// Try real-time monitoring if not using valid cache and enabled
 	if !cacheValid && enableLiveQuota {
 		liveUsed, hasLive := s.ytManager.GetLiveQuota()
@@ -788,24 +793,24 @@ func (s *APIServer) handleQuotaLiveToggle(w http.ResponseWriter, r *http.Request
 		jsonOK(w, map[string]any{"enabled": enabled})
 		return
 	}
-	
+
 	if r.Method == http.MethodPost {
 		// Toggle status
 		current := "true"
 		if val, ok := s.db.GetKV("enable_live_quota"); ok && val == "false" {
 			current = "false"
 		}
-		
+
 		newValue := "false"
 		if current == "false" {
 			newValue = "true"
 		}
-		
+
 		if err := s.db.SetKV("enable_live_quota", newValue); err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
 		}
-		
+
 		// Clear cache when disabling
 		if newValue == "false" {
 			s.quotaCacheMu.Lock()
@@ -813,11 +818,11 @@ func (s *APIServer) handleQuotaLiveToggle(w http.ResponseWriter, r *http.Request
 			s.quotaCacheTime = time.Time{}
 			s.quotaCacheMu.Unlock()
 		}
-		
+
 		jsonOK(w, map[string]any{"enabled": newValue == "true"})
 		return
 	}
-	
+
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
@@ -852,7 +857,7 @@ func (s *APIServer) handleCloudSync(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("🔄 Manual cloud sync requested via API (action: %s)...", req.Action)
-	
+
 	var err error
 	switch req.Action {
 	case "pull":
@@ -885,7 +890,7 @@ func (s *APIServer) handleCloudSync(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	log.Printf("✅ Manual cloud sync completed.")
 	jsonOK(w, map[string]any{"status": "ok", "message": "Cloud sync completed successfully"})
 }
@@ -905,7 +910,6 @@ func (s *APIServer) handleQuotaLimit(w http.ResponseWriter, r *http.Request) {
 	s.db.SetKV("quota_limit", fmt.Sprintf("%d", req.Limit))
 	jsonOK(w, map[string]any{"status": "ok", "limit": req.Limit})
 }
-
 
 func (s *APIServer) handleTrashSettings(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
