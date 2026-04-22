@@ -1264,7 +1264,8 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 		q.updateTaskState(t)
 		decompressed, err := q.core.Decompress(decrypted)
 		if err != nil {
-			return fmt.Errorf("decompression failed: %w", err)
+			log.Printf("[%s] ℹ️ Payload decompression skipped/failed (likely mobile uncompressed upload): %v", t.ID, err)
+			decompressed = decrypted
 		}
 
 		// Simple heuristic: if the original path didn't have an extension but it's a tarball, extract it.
