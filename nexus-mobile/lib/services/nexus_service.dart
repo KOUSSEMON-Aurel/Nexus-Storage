@@ -485,10 +485,17 @@ class NexusService {
     }
   }
 
+  static final Map<String, Uint8List> _keyCache = {};
+
   /// Utility to derive a 32-byte key from a password string.
   Future<Uint8List> _deriveKeyFromPassword(String password) async {
     final googleSub = _auth.googleSub ?? '';
     final combinedPassword = googleSub + password;
+
+    if (_keyCache.containsKey(combinedPassword)) {
+      AppLogger.info('NexusService: Using cached key for derivation');
+      return _keyCache[combinedPassword]!;
+    }
 
     if (combinedPassword.isEmpty) {
       AppLogger.warn(
@@ -523,6 +530,8 @@ class NexusService {
         outPtrPtr.value.asTypedList(outLenPtr.value),
       );
       _native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
+
+      _keyCache[combinedPassword] = result;
       return result;
     } finally {
       malloc.free(passPtr);
