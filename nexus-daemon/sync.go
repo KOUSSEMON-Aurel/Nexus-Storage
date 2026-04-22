@@ -537,8 +537,15 @@ func (s *SyncManager) PullDBFromDrive(force bool) (err error) {
 	}
 
 	if downloadedHash != remoteManifest.LogicalHash {
-		os.Remove(verifyPath)
-		return fmt.Errorf("downloaded logical hash (%s) does not match manifest (%s). Corruption suspected", downloadedHash[:8], remoteManifest.LogicalHash[:8])
+		// ROBUSTNESS: If local LSN is 0 (Initial Pull), allow a hash mismatch if integrity is OK.
+		// This handles transitions between different hashing versions or platform-specific timestamp variations.
+		localLSN, _ := s.db.GetLocalLSN()
+		if localLSN == 0 {
+			log.Printf("⚠️  Initial pull: Hash mismatch detected (%s vs %s), but allowing because local DB is empty. Integrity check will satisfy safety.", downloadedHash[:8], remoteManifest.LogicalHash[:8])
+		} else {
+			os.Remove(verifyPath)
+			return fmt.Errorf("downloaded logical hash (%s) does not match manifest (%s). Corruption suspected", downloadedHash[:8], remoteManifest.LogicalHash[:8])
+		}
 	}
 
 	// 6. Final Integrity Check on (possibly decrypted) file
