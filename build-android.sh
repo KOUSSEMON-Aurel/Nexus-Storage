@@ -47,7 +47,7 @@ build_target "arm64-v8a" "aarch64-linux-android" "aarch64-linux-android"
 
 # Try to build 32-bit architectures (may need extra flags or be skipped if incompatible)
 echo "🦀 Compiling nexus-core → Android armeabi-v7a (with NEON fix)..."
-RUSTFLAGS="-C target-feature=+neon" build_target "armeabi-v7a" "armv7-linux-androideabi" "armv7a-linux-androideabi"
+build_target "armeabi-v7a" "armv7-linux-androideabi" "armv7a-linux-androideabi"
 
 build_target "x86" "i686-linux-android" "i686-linux-android"
 

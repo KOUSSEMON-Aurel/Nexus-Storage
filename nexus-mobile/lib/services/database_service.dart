@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart' as crypto;
 import '../models/file_record.dart';
 import 'logger_service.dart';
@@ -22,6 +23,33 @@ class DatabaseService {
 
   Future<String> getDatabasePath() async {
     return join(await getDatabasesPath(), 'nexus.db');
+  }
+
+  Future<int> incrementLSN() async {
+    final currentLSNStr = await getKV('manifest_version') ?? '0';
+    final newLSN = int.parse(currentLSNStr) + 1;
+    await setKV('manifest_version', newLSN.toString());
+    AppLogger.info('LSN incremented to $newLSN');
+    return newLSN;
+  }
+
+  Future<void> makeAtomicSnapshot(String targetPath) async {
+    await checkpointWAL();
+    final sourcePath = await getDatabasePath();
+    // On mobile, VACUUM INTO is not always available or performant enough
+    // We use a safe file copy after a WAL checkpoint
+    final sourceFile = File(sourcePath);
+    if (await sourceFile.exists()) {
+      await sourceFile.copy(targetPath);
+      AppLogger.info('Atomic snapshot created at $targetPath');
+    }
+  }
+
+  Future<bool> checkIntegrity() async {
+    final db = await database;
+    final res = await db.rawQuery('PRAGMA integrity_check');
+    final status = res.first.values.first.toString();
+    return status == 'ok';
   }
 
   Future<void> close() async {
@@ -102,7 +130,9 @@ class DatabaseService {
     ''');
 
     // 4. KV Store
-    await db.execute('CREATE TABLE kv_store (key TEXT PRIMARY KEY, value TEXT)');
+    await db.execute(
+      'CREATE TABLE kv_store (key TEXT PRIMARY KEY, value TEXT)',
+    );
 
     // 5. Meta Sync & Quota Log
     await db.execute('''
@@ -112,7 +142,9 @@ class DatabaseService {
         last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     ''');
-    await db.execute('CREATE TABLE quota_log (date TEXT PRIMARY KEY, units INTEGER DEFAULT 0)');
+    await db.execute(
+      'CREATE TABLE quota_log (date TEXT PRIMARY KEY, units INTEGER DEFAULT 0)',
+    );
 
     // 6. Tasks
     await db.execute('''
@@ -162,7 +194,9 @@ class DatabaseService {
 
     // 9. FTS5 Search Index (if possible, we'll try-catch it later or just assume it works on modern mobile)
     try {
-      await db.execute("CREATE VIRTUAL TABLE files_fts USING fts5(path, content='files', content_rowid='id')");
+      await db.execute(
+        "CREATE VIRTUAL TABLE files_fts USING fts5(path, content='files', content_rowid='id')",
+      );
       await db.execute('''
         CREATE TRIGGER files_ai AFTER INSERT ON files BEGIN
           INSERT INTO files_fts(rowid, path) VALUES (new.id, new.path);
@@ -220,6 +254,7 @@ class DatabaseService {
       file.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    await incrementLSN();
     notifyChange();
     return res;
   }
@@ -232,16 +267,19 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+    await incrementLSN();
     notifyChange();
   }
 
   Future<void> setKV(String key, String value) async {
     final db = await database;
-    await db.insert(
-      'kv_store',
-      {'key': key, 'value': value},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('kv_store', {
+      'key': key,
+      'value': value,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    if (key != 'manifest_version' && key != 'last_push_lsn') {
+      await incrementLSN();
+    }
   }
 
   Future<String?> getKV(String key) async {
@@ -265,21 +303,36 @@ class DatabaseService {
 
   Future<void> clearCompletedTasks() async {
     final db = await database;
-    await db.delete('tasks', where: "status = 'completed' or status LIKE 'Failed%'");
+    await db.delete(
+      'tasks',
+      where: "status = 'completed' or status LIKE 'Failed%'",
+    );
   }
 
   Future<List<Map<String, dynamic>>> getPendingTasks() async {
     final db = await database;
-    return await db.query('tasks', where: "status = 'pending' or status = 'failed'", orderBy: 'created_at ASC');
+    return await db.query(
+      'tasks',
+      where: "status = 'pending' or status = 'failed'",
+      orderBy: 'created_at ASC',
+    );
   }
 
   Future<void> insertTask(Map<String, dynamic> task) async {
     final db = await database;
-    await db.insert('tasks', task, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'tasks',
+      task,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
     notifyChange();
   }
 
-  Future<void> updateTaskProgress(String id, double progress, String status) async {
+  Future<void> updateTaskProgress(
+    String id,
+    double progress,
+    String status,
+  ) async {
     final db = await database;
     await db.update(
       'tasks',
@@ -292,25 +345,37 @@ class DatabaseService {
 
   Future<int> getTotalFileCount() async {
     final db = await database;
-    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM files WHERE deleted_at IS NULL'));
+    final count = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM files WHERE deleted_at IS NULL'),
+    );
     return count ?? 0;
   }
 
   Future<Map<String, int>> getSyncStats() async {
     final db = await database;
-    final files = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM files')) ?? 0;
-    final folders = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM folders')) ?? 0;
-    final tasks = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM tasks')) ?? 0;
-    return {
-      'files': files,
-      'folders': folders,
-      'tasks': tasks,
-    };
+    final files =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM files'),
+        ) ??
+        0;
+    final folders =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM folders'),
+        ) ??
+        0;
+    final tasks =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM tasks'),
+        ) ??
+        0;
+    return {'files': files, 'folders': folders, 'tasks': tasks};
   }
 
   Future<String?> getLastModified() async {
     final db = await database;
-    final res = await db.rawQuery('SELECT MAX(last_update) as last_modified FROM files');
+    final res = await db.rawQuery(
+      'SELECT MAX(last_update) as last_modified FROM files',
+    );
     if (res.isNotEmpty) {
       return res.first['last_modified'] as String?;
     }
@@ -328,7 +393,9 @@ class DatabaseService {
     final List<String> lines = [];
 
     // Files (id and last_update timestamp ensure content freshness)
-    final files = await db.rawQuery('SELECT id, last_update FROM files ORDER BY id');
+    final files = await db.rawQuery(
+      'SELECT id, last_update FROM files ORDER BY id',
+    );
     for (var r in files) {
       lines.add('file:${r['id']}:${r['last_update']}');
     }
@@ -340,7 +407,9 @@ class DatabaseService {
     }
 
     // Tasks (id and created_at)
-    final tasks = await db.rawQuery('SELECT id, created_at FROM tasks ORDER BY id');
+    final tasks = await db.rawQuery(
+      'SELECT id, created_at FROM tasks ORDER BY id',
+    );
     for (var r in tasks) {
       lines.add('task:${r['id']}:${r['created_at']}');
     }

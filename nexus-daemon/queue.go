@@ -27,18 +27,18 @@ const (
 )
 
 type Task struct {
-	ID                   string    `json:"id"`
-	Type                 TaskType  `json:"type"`
-	FilePath             string    `json:"filePath"`
-	Mode                 string    `json:"mode"`
-	IsManifest           bool      `json:"isManifest"`
-	Status               string    `json:"status"`
-	Progress             float64   `json:"progress"`
-	CreatedAt            time.Time `json:"createdAt"`
-	CompletedAt          time.Time `json:"completedAt,omitempty"` // Timestamp when task finished (success or error)
-	ParentID             *int64    `json:"parentId"`
-	SHA256               string    `json:"sha256,omitempty"`
-	Password             string    `json:"password,omitempty"`
+	ID                    string    `json:"id"`
+	Type                  TaskType  `json:"type"`
+	FilePath              string    `json:"filePath"`
+	Mode                  string    `json:"mode"`
+	IsManifest            bool      `json:"isManifest"`
+	Status                string    `json:"status"`
+	Progress              float64   `json:"progress"`
+	CreatedAt             time.Time `json:"createdAt"`
+	CompletedAt           time.Time `json:"completedAt,omitempty"` // Timestamp when task finished (success or error)
+	ParentID              *int64    `json:"parentId"`
+	SHA256                string    `json:"sha256,omitempty"`
+	Password              string    `json:"password,omitempty"`
 	CustomEncryptPassword string    `json:"customEncryptPassword,omitempty"` // Optional 2nd layer encryption
 }
 
@@ -55,8 +55,8 @@ type TaskQueue struct {
 	cache         *CacheManager
 	syncMgr       *SyncManager
 	// V4 Security: Master key (RAM-only, never persisted)
-	masterKeyHex  string
-	masterKeyMu   sync.RWMutex
+	masterKeyHex string
+	masterKeyMu  sync.RWMutex
 }
 
 func (q *TaskQueue) SetSyncManager(sm *SyncManager) {
@@ -162,11 +162,11 @@ func deriveKeyFromGoogleSub(googleSub string) string {
 	// PBKDF2: 100,000 iterations recommended by OWASP (2024)
 	// Output: 32 bytes (256 bits) for AES-256
 	derivedKey := pbkdf2.Key(
-		[]byte(googleSub),      // Input: permanent user ID
-		salt,                   // Input: fixed salt
-		100000,                 // Iterations: high for security
-		32,                     // Output length: 256 bits
-		sha256.New,             // HMAC function: SHA-256
+		[]byte(googleSub), // Input: permanent user ID
+		salt,              // Input: fixed salt
+		100000,            // Iterations: high for security
+		32,                // Output length: 256 bits
+		sha256.New,        // HMAC function: SHA-256
 	)
 
 	// Return as hex string for compatibility with existing encryption code
@@ -282,12 +282,12 @@ func (q *TaskQueue) RotatePassword(oldPassword, newPassword string) (int, int, e
 func (q *TaskQueue) AddTask(t *Task) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	// Prevent duplicate manifest tasks if one is already pending
 	if t.IsManifest {
 		for _, pending := range q.tasks {
 			if pending.IsManifest && (pending.Status == "Pending" || pending.Status == "Processing") {
-				return 
+				return
 			}
 		}
 	}
@@ -382,7 +382,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		// In production, you'd track daily quota consumption via database
 		log.Printf("⚠️  Quota guard: Recommend minimum %d units available. Proceed with caution if near limit.", quotaThreshold)
 	}
-	
+
 	t.Status = "Checking Deduplication"
 	q.updateTaskState(t)
 
@@ -418,7 +418,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		if _, err := tempTar.Write(tarData); err != nil {
 			return err
 		}
-		
+
 		totalSize = int64(len(tarData))
 		h.Write(tarData)
 		file = tempTar
@@ -428,7 +428,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 			return fmt.Errorf("could not open file: %w", err)
 		}
 		defer f.Close()
-		
+
 		totalSize = stat.Size()
 		if _, err := io.Copy(h, f); err != nil {
 			return err
@@ -460,7 +460,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	if t.IsManifest {
 		t.Status = "Uploading to Drive"
 		q.updateTaskState(t)
-		
+
 		dbFile, err := os.Open(t.FilePath)
 		if err != nil {
 			return fmt.Errorf("could not open manifest for drive upload: %w", err)
@@ -476,7 +476,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		t.Status = "Completed"
 		t.Progress = 100
 		q.updateTaskState(t)
-		
+
 		// Optional: Still clean up old YouTube manifests once
 		q.SweepOldManifests(driveID)
 		return nil
@@ -514,7 +514,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	} else {
 		log.Printf("[%s] [debug] Generated rawFileKey len=%d", t.ID, len(rawFileKey))
 	}
-	
+
 	// V4 Security: Use password priority:
 	// 1. Custom password provided by user
 	// 2. Active master key from session
@@ -528,7 +528,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		}
 		q.masterKeyMu.RUnlock()
 	}
-	
+
 	// If still no secret, derive from Google sub (new approach: no password needed!)
 	if encryptionSecret == "" && q.ytManager != nil {
 		googleSub := q.ytManager.GetGoogleSub()
@@ -538,11 +538,11 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 			log.Printf("ℹ️  Using auto-derived key from Google sub (user didn't provide password)")
 		}
 	}
-	
+
 	if encryptionSecret == "" {
 		return fmt.Errorf("no encryption secret available: user must be authenticated with Google")
 	}
-	
+
 	encryptedFileKeyBytes, err := q.core.Encrypt(rawFileKey, encryptionSecret)
 	if err != nil {
 		return fmt.Errorf("key encryption failed: %w", err)
@@ -564,7 +564,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		t.Status = fmt.Sprintf("Encrypting Shard %d/%d", i+1, numShards)
 		compressed, _ := q.core.Compress(data, 0)
 		var encrypted []byte
-		
+
 		if t.IsManifest {
 			// V4: Manifest DB backup uses masterKey (same as file_key encryption)
 			if encryptionSecret == "" {
@@ -582,7 +582,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 				}
 				log.Printf("[%s] 🔐 Applied custom password encryption (Layer 1)", t.ID)
 			}
-			
+
 			// Layer 2: Always encrypt with file-specific rawFileKey
 			encrypted, err = q.core.EncryptWithKey(encrypted, rawFileKey)
 		}
@@ -592,52 +592,49 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		// Diagnostic: log encrypted blob size and sample bytes to help trace corruption
 		if len(encrypted) > 0 {
 			start := 8
-			if len(encrypted) < start { start = len(encrypted) }
+			if len(encrypted) < start {
+				start = len(encrypted)
+			}
 			end := 8
-			if len(encrypted) < end { end = len(encrypted) }
+			if len(encrypted) < end {
+				end = len(encrypted)
+			}
 			log.Printf("[%s] [ENC] Encrypted shard %d size=%d start=%x end=%x", t.ID, i+1, len(encrypted), encrypted[:start], encrypted[len(encrypted)-end:])
 		}
-        // Debug: write full hex dump of encrypted blob for offline inspection
-        if len(encrypted) > 0 {
-            _ = os.MkdirAll("/tmp/nexus-debug", 0755)
-            encPath := fmt.Sprintf("/tmp/nexus-debug/%s-shard-%d-enc.hex", t.ID, i+1)
-            _ = os.WriteFile(encPath, []byte(hex.EncodeToString(encrypted)), 0644)
-            log.Printf("[%s] [debug] Wrote encrypted hex dump: %s", t.ID, encPath)
-        }
+		// Debug: write full hex dump of encrypted blob for offline inspection
+		if len(encrypted) > 0 {
+			_ = os.MkdirAll("/tmp/nexus-debug", 0755)
+			encPath := fmt.Sprintf("/tmp/nexus-debug/%s-shard-%d-enc.hex", t.ID, i+1)
+			_ = os.WriteFile(encPath, []byte(hex.EncodeToString(encrypted)), 0644)
+			log.Printf("[%s] [debug] Wrote encrypted hex dump: %s", t.ID, encPath)
+		}
 
-		t.Status = fmt.Sprintf("Encoding Shard %d/%d", i+1, numShards)
-		apiMode := 0 // Base
+		t.Status = fmt.Sprintf("Streaming Shard %d/%d", i+1, numShards)
+
+		width, height := 1280, 720
 		if t.Mode == "high" {
-			apiMode = 1 // High
-		}
-		tempDir, _ := os.MkdirTemp("", fmt.Sprintf("nexus-upload-%s-shard-%d", t.ID, i))
-		frameCount, err := q.core.EncodeToFrames(encrypted, tempDir, apiMode)
-		if err != nil {
-			os.RemoveAll(tempDir)
-			return err
+			width, height = 3840, 2160
 		}
 
-		if frameCount < 90 {
-			log.Printf("[%s] ⏳ Padding video to 90 frames...", t.ID)
-			lastFramePath := filepath.Join(tempDir, fmt.Sprintf("frame_%06d.png", frameCount))
-			lastFrameData, _ := os.ReadFile(lastFramePath)
-			for j := frameCount + 1; j <= 90; j++ {
-				os.WriteFile(filepath.Join(tempDir, fmt.Sprintf("frame_%06d.png", j)), lastFrameData, 0644)
-			}
-		}
-
-		t.Status = fmt.Sprintf("FFmpeg Shard %d/%d", i+1, numShards)
-		// Choose output container/codec based on mode. For `high` prefer WebM/VP9 to
-		// minimize intermediate re-encoding on YouTube and better preserve luma levels.
-		outputVideo := filepath.Join(tempDir, "upload.mp4")
+		outputVideo := filepath.Join(os.TempDir(), fmt.Sprintf("nexus-upload-%s-shard-%d.mp4", t.ID, i))
 		if t.Mode == "high" {
-			outputVideo = filepath.Join(tempDir, "upload.webm")
+			outputVideo = filepath.Join(os.TempDir(), fmt.Sprintf("nexus-upload-%s-shard-%d.webm", t.ID, i))
 		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-		// Build ffmpeg args depending on mode
-		ffArgs := []string{"-y", "-framerate", "30", "-i", filepath.Join(tempDir, "frame_%06d.png"), "-g", "1"}
+		defer cancel()
+
+		ffArgs := []string{
+			"-y",
+			"-f", "rawvideo",
+			"-pixel_format", "gray",
+			"-video_size", fmt.Sprintf("%dx%d", width, height),
+			"-framerate", "30",
+			"-i", "pipe:0",
+			"-g", "1",
+		}
+
 		if t.Mode == "high" {
-			// Use VP9 lossless to avoid pixel distortion. libvpx-vp9 preserves luma well.
 			ffArgs = append(ffArgs,
 				"-c:v", "libvpx-vp9",
 				"-pix_fmt", "yuv420p",
@@ -645,27 +642,116 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 				"-b:v", "0",
 			)
 		} else {
-			// Base mode: use H.264 as before
 			ffArgs = append(ffArgs,
 				"-c:v", "libx264",
-				"-pix_fmt", "gray",
+				"-pix_fmt", "yuv420p", // Standardize pix_fmt for YouTube
 				"-crf", "18",
+				"-x264-params", "scm=1",
 			)
-			// Keep x264 special params for intra behavior
-			ffArgs = append(ffArgs, "-x264-params", "scm=1")
 		}
 		ffArgs = append(ffArgs, outputVideo)
+
 		cmd := exec.CommandContext(ctx, "ffmpeg", ffArgs...)
-		if _, err := cmd.CombinedOutput(); err != nil {
-			cancel()
-			os.RemoveAll(tempDir)
-			return fmt.Errorf("ffmpeg failed: %w", err)
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			return fmt.Errorf("failed to create ffmpeg pipe: %w", err)
 		}
-		cancel()
+
+		errorChan := make(chan error, 1)
+		go func() {
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				errorChan <- fmt.Errorf("ffmpeg error: %v, output: %s", err, string(out))
+			}
+			close(errorChan)
+		}()
+
+		var lastFrame []byte
+		frameCount := 0
+
+		apiModeInt := 0
+		if t.Mode == "high" {
+			apiModeInt = 1
+		}
+
+		encoder, err := q.core.InitEncodeStream(apiModeInt)
+		if err != nil {
+			stdin.Close()
+			return err
+		}
+
+		// 1. Push encrypted data
+		if _, err := encoder.PushFEC(encrypted); err != nil {
+			encoder.Close()
+			stdin.Close()
+			return err
+		}
+
+		// 2. Pop any early frames
+		for {
+			frame, err := encoder.PopFrame()
+			if err != nil {
+				encoder.Close()
+				stdin.Close()
+				return err
+			}
+			if frame == nil {
+				break
+			}
+			if _, err := stdin.Write(frame); err != nil {
+				encoder.Close()
+				stdin.Close()
+				return err
+			}
+			lastFrame = frame
+			frameCount++
+		}
+
+		// 3. Finalize and pop remaining frames
+		if err := encoder.Finalize(); err != nil {
+			encoder.Close()
+			stdin.Close()
+			return err
+		}
+
+		for {
+			frame, err := encoder.PopFrame()
+			if err != nil {
+				encoder.Close()
+				stdin.Close()
+				return err
+			}
+			if frame == nil {
+				break
+			}
+			if _, err := stdin.Write(frame); err != nil {
+				encoder.Close()
+				stdin.Close()
+				return err
+			}
+			lastFrame = frame
+			frameCount++
+		}
+		encoder.Close()
+
+		// Padding to 90 frames (YouTube requirement for some processing triggers)
+		if frameCount < 90 && lastFrame != nil {
+			log.Printf("[%s] ⏳ Padding video stream to 90 frames...", t.ID)
+			for j := frameCount; j < 90; j++ {
+				if _, err := stdin.Write(lastFrame); err != nil {
+					break
+				}
+			}
+		}
+
+		stdin.Close()
+		if err := <-errorChan; err != nil {
+			return err
+		}
 
 		t.Status = fmt.Sprintf("YouTube Uploading Shard %d/%d", i+1, numShards)
 		if q.ytManager == nil || !q.ytManager.IsAuthenticated() {
-			os.RemoveAll(tempDir)
+			os.Remove(outputVideo)
 			return fmt.Errorf("youtube not authenticated")
 		}
 
@@ -675,7 +761,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		// Shards for regular files
 		title := fmt.Sprintf("NexusStorage - %s (Part %d/%d)", filepath.Base(t.FilePath), i+1, numShards)
 		desc := fmt.Sprintf("NEXUS_SHARD | SHA256: %s | Size: %d | Part: %d/%d", t.SHA256, len(data), i+1, numShards)
-		
+
 		if q.db.IsStealthMode() {
 			title = fmt.Sprintf("DATA_BLOCK_%s_P%d", t.SHA256[:8], i+1)
 			desc = "Autogenerated data block."
@@ -689,7 +775,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		call := ytService.Videos.Insert([]string{"snippet", "status"}, upload)
 		response, err := call.Media(uploadFile).Do()
 		uploadFile.Close()
-		os.RemoveAll(tempDir)
+		os.Remove(outputVideo)
 		if err != nil {
 			return fmt.Errorf("youtube upload failed: %w", err)
 		}
@@ -729,7 +815,7 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	t.Progress = 95
 	q.updateTaskState(t)
 	q.RequestManifestBackup()
-	
+
 	return nil
 }
 
@@ -775,7 +861,7 @@ func (q *TaskQueue) SweepOldManifests(newId string) {
 	// 1. Always update the local KV store first
 	q.db.SetKV("manifest_video_id", newId)
 
-	// 2. Intelligent Cleanup: Search for ANY video titled 'NEXUS_MANIFEST' 
+	// 2. Intelligent Cleanup: Search for ANY video titled 'NEXUS_MANIFEST'
 	// This cleans up "ghosts" even if the local DB was deleted or out of sync.
 	// Search for standard OR stealth manifests
 	call1 := ytService.Search.List([]string{"id", "snippet"}).Q("NEXUS_MANIFEST").Type("video").ForMine(true).MaxResults(50)
@@ -799,8 +885,12 @@ func (q *TaskQueue) SweepOldManifests(newId string) {
 	}
 
 	var allItems []*youtube.SearchResult
-	if resp1 != nil { allItems = append(allItems, resp1.Items...) }
-	if resp2 != nil { allItems = append(allItems, resp2.Items...) }
+	if resp1 != nil {
+		allItems = append(allItems, resp1.Items...)
+	}
+	if resp2 != nil {
+		allItems = append(allItems, resp2.Items...)
+	}
 
 	for _, item := range allItems {
 		id := item.Id.VideoId
@@ -838,7 +928,7 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 		}
 		q.masterKeyMu.RUnlock()
 	}
-	
+
 	// If still no secret, derive from Google sub (new approach: no password needed for download!)
 	if encryptionSecret == "" && q.ytManager != nil {
 		googleSub := q.ytManager.GetGoogleSub()
@@ -847,7 +937,7 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 			encryptionSecret = deriveKeyFromGoogleSub(googleSub)
 		}
 	}
-	
+
 	if encryptionSecret == "" {
 		return fmt.Errorf("no encryption secret available for download: user must be authenticated with Google")
 	}
@@ -857,13 +947,13 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 	var shardIDs []string
 	// If CustomEncryptPassword is provided, use it for decryption layer 1
 	needsCustomPassword := t.CustomEncryptPassword != ""
-	
+
 	if fileRecord != nil {
 		if fileRecord.Mode != "" {
 			t.Mode = fileRecord.Mode // V6: Override empty mode with database value
 		}
 		shardIDs, _ = q.db.GetShardsForFile(fileRecord.ID)
-		
+
 		// V3: Try to recover the per-file key
 		if fileRecord.FileKey != "" {
 			log.Printf("[%s] 🔍 Attempting to decrypt file_key (%d bytes hex)...", t.ID, len(fileRecord.FileKey))
@@ -1003,17 +1093,21 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 			// Diagnostic: log rawData size and samples
 			if len(rawData) > 0 {
 				start := 8
-				if len(rawData) < start { start = len(rawData) }
+				if len(rawData) < start {
+					start = len(rawData)
+				}
 				end := 8
-				if len(rawData) < end { end = len(rawData) }
+				if len(rawData) < end {
+					end = len(rawData)
+				}
 				log.Printf("[%s] [DEC] Raw shard %d size=%d start=%x end=%x", t.ID, i+1, len(rawData), rawData[:start], rawData[len(rawData)-end:])
 			}
 
-				// Debug: write full hex dump of downloaded/decoded blob for offline inspection
-				_ = os.MkdirAll("/tmp/nexus-debug", 0755)
-				decPath := fmt.Sprintf("/tmp/nexus-debug/%s-shard-%d-dec.hex", t.ID, i+1)
-				_ = os.WriteFile(decPath, []byte(hex.EncodeToString(rawData)), 0644)
-				log.Printf("[%s] [debug] Wrote downloaded hex dump: %s", t.ID, decPath)
+			// Debug: write full hex dump of downloaded/decoded blob for offline inspection
+			_ = os.MkdirAll("/tmp/nexus-debug", 0755)
+			decPath := fmt.Sprintf("/tmp/nexus-debug/%s-shard-%d-dec.hex", t.ID, i+1)
+			_ = os.WriteFile(decPath, []byte(hex.EncodeToString(rawData)), 0644)
+			log.Printf("[%s] [debug] Wrote downloaded hex dump: %s", t.ID, decPath)
 			decrypted, err = q.core.DecryptWithKey(rawData, rawFileKey)
 		} else {
 			log.Printf("[%s] 🔐 Shard %d: Decrypting with encryptionSecret (fallback)", t.ID, i+1)
@@ -1051,7 +1145,7 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 
 	// Post-processing: check if the downloaded file is a tar archive
 	outFile.Close()
-	
+
 	downloadedData, err := os.ReadFile(outPath)
 	if err == nil && len(downloadedData) > 512 {
 		// Tar headers have specific magic bytes at offset 257 ("ustar")

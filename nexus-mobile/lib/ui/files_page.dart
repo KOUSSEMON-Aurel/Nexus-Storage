@@ -17,6 +17,7 @@ import 'package:nexus_mobile/ui/widgets/skeleton_item.dart';
 import 'package:nexus_mobile/ui/settings_page.dart';
 import 'package:nexus_mobile/services/nexus_service.dart';
 import 'package:nexus_mobile/services/logger_service.dart';
+import 'package:nexus_mobile/services/sync_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class FilesPage extends StatefulWidget {
@@ -43,7 +44,7 @@ class _FilesPageState extends State<FilesPage> {
     'my-drive': 'my_drive',
     'recent': 'recent',
     'starred': 'starred',
-    'trash': 'trash'
+    'trash': 'trash',
   };
 
   StreamSubscription<void>? _dbSubscription;
@@ -66,7 +67,7 @@ class _FilesPageState extends State<FilesPage> {
     if (isInitial) {
       setState(() => _isLoading = true);
     }
-    
+
     try {
       final files = await _db.listFiles(category: _currentTab);
       if (mounted) {
@@ -120,9 +121,9 @@ class _FilesPageState extends State<FilesPage> {
   Future<void> _handleBulkAction(String action) async {
     final ids = _selectedIds.toList();
     _exitSelecting();
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       if (action == 'trash') {
         for (var id in ids) {
@@ -136,10 +137,15 @@ class _FilesPageState extends State<FilesPage> {
       } else if (action == 'restore') {
         final db = await _db.database;
         for (var id in ids) {
-          await db.update('files', {'deleted_at': null}, where: 'id = ?', whereArgs: [id]);
+          await db.update(
+            'files',
+            {'deleted_at': null},
+            where: 'id = ?',
+            whereArgs: [id],
+          );
         }
       } else if (action == 'star') {
-        // Toggle star for first item and apply to all? 
+        // Toggle star for first item and apply to all?
         // Better: toggle based on first item
         final first = _files.firstWhere((f) => f.id == ids.first);
         final newStarred = !first.starred;
@@ -149,10 +155,16 @@ class _FilesPageState extends State<FilesPage> {
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
-    
+
     _refreshFiles();
+    try {
+      SyncService().sync();
+    } catch (_) {}
   }
 
   @override
@@ -170,7 +182,9 @@ class _FilesPageState extends State<FilesPage> {
             backgroundColor: AppColors.surfaceElevated,
             color: AppColors.primary,
             child: CustomScrollView(
-              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
               slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.all(AppSpacing.md),
@@ -185,20 +199,30 @@ class _FilesPageState extends State<FilesPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  L10n.get(_tabs[_currentTab] ?? 'nexus', lang).toUpperCase(),
+                                  L10n.get(
+                                    _tabs[_currentTab] ?? 'nexus',
+                                    lang,
+                                  ).toUpperCase(),
                                   style: Theme.of(context).textTheme.labelLarge,
                                 ),
                                 const SizedBox(height: AppSpacing.sm),
                                 Text(
-                                  _isSelecting ? '${_selectedIds.length} Selected' : 'Overview', 
-                                  style: Theme.of(context).textTheme.displayLarge
+                                  _isSelecting
+                                      ? '${_selectedIds.length} Selected'
+                                      : 'Overview',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.displayLarge,
                                 ),
                               ],
                             ),
                           ),
                           if (_isSelecting)
                             IconButton(
-                              icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: AppColors.textSecondary,
+                              ),
                               onPressed: _exitSelecting,
                             ),
                         ],
@@ -223,24 +247,24 @@ class _FilesPageState extends State<FilesPage> {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
                     sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final file = _files[index];
-                          return TweenAnimationBuilder<double>(
-                            duration: Duration(milliseconds: 350 + (index * 60)),
-                            tween: Tween(begin: 0.0, end: 1.0),
-                            curve: Curves.easeOutCubic,
-                            builder: (context, value, child) => Transform.translate(
-                              offset: Offset(0, 24 * (1 - value)),
-                              child: Opacity(opacity: value, child: child),
-                            ),
-                            child: _buildFileItem(file, lang),
-                          );
-                        },
-                        childCount: _files.length,
-                      ),
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final file = _files[index];
+                        return TweenAnimationBuilder<double>(
+                          duration: Duration(milliseconds: 350 + (index * 60)),
+                          tween: Tween(begin: 0.0, end: 1.0),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, value, child) =>
+                              Transform.translate(
+                                offset: Offset(0, 24 * (1 - value)),
+                                child: Opacity(opacity: value, child: child),
+                              ),
+                          child: _buildFileItem(file, lang),
+                        );
+                      }, childCount: _files.length),
                     ),
                   ),
 
@@ -258,17 +282,44 @@ class _FilesPageState extends State<FilesPage> {
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.md),
       child: GlassCard(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
         borderRadius: AppSpacing.radiusMd,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             if (!isTrash) ...[
-              IconButton(onPressed: () => _handleBulkAction('star'), icon: const Icon(Icons.star_border_rounded, color: AppColors.primary)),
-              IconButton(onPressed: () => _handleBulkAction('trash'), icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error)),
+              IconButton(
+                onPressed: () => _handleBulkAction('star'),
+                icon: const Icon(
+                  Icons.star_border_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+              IconButton(
+                onPressed: () => _handleBulkAction('trash'),
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: AppColors.error,
+                ),
+              ),
             ] else ...[
-              IconButton(onPressed: () => _handleBulkAction('restore'), icon: const Icon(Icons.restore_page_rounded, color: AppColors.primary)),
-              IconButton(onPressed: () => _handleBulkAction('delete'), icon: const Icon(Icons.delete_forever_rounded, color: AppColors.error)),
+              IconButton(
+                onPressed: () => _handleBulkAction('restore'),
+                icon: const Icon(
+                  Icons.restore_page_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+              IconButton(
+                onPressed: () => _handleBulkAction('delete'),
+                icon: const Icon(
+                  Icons.delete_forever_rounded,
+                  color: AppColors.error,
+                ),
+              ),
             ],
             IconButton(
               onPressed: () async {
@@ -277,13 +328,16 @@ class _FilesPageState extends State<FilesPage> {
                   if (!mounted) return;
                   if (widget.onDownload != null) {
                     // Request battery optimization once before starting the batch if possible
-                    if (Platform.isAndroid && !await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
-                       await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+                    if (Platform.isAndroid &&
+                        !await FlutterForegroundTask
+                            .isIgnoringBatteryOptimizations) {
+                      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
                     }
                     widget.onDownload!(file);
                   } else {
-                    if (Platform.isAndroid && !await Permission.manageExternalStorage.isGranted) {
-                        await Permission.manageExternalStorage.request();
+                    if (Platform.isAndroid &&
+                        !await Permission.manageExternalStorage.isGranted) {
+                      await Permission.manageExternalStorage.request();
                     }
                     _nexus.downloadAndDecrypt(file, file.key);
                   }
@@ -291,11 +345,18 @@ class _FilesPageState extends State<FilesPage> {
                 if (!mounted) return;
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started for selected items')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Download started for selected items'),
+                    ),
+                  );
                 });
                 _exitSelecting();
-              }, 
-              icon: const Icon(Icons.download_rounded, color: AppColors.primary)
+              },
+              icon: const Icon(
+                Icons.download_rounded,
+                color: AppColors.primary,
+              ),
             ),
           ],
         ),
@@ -308,8 +369,9 @@ class _FilesPageState extends State<FilesPage> {
       stream: AuthService().userStream,
       initialData: AuthService().currentUser,
       builder: (context, snapshot) {
-        if (snapshot.hasData || AuthService().isAuthenticated) return const SizedBox.shrink();
-        
+        if (snapshot.hasData || AuthService().isAuthenticated)
+          return const SizedBox.shrink();
+
         return GlassCard(
           padding: const EdgeInsets.all(AppSpacing.md),
           borderRadius: AppSpacing.radiusMd,
@@ -329,7 +391,10 @@ class _FilesPageState extends State<FilesPage> {
                 isFullWidth: false,
                 backgroundColor: AppColors.warning.withValues(alpha: 0.2),
                 onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsPage()),
+                  );
                 },
               ),
             ],
@@ -352,13 +417,24 @@ class _FilesPageState extends State<FilesPage> {
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeOutCubic,
               margin: const EdgeInsets.only(right: AppSpacing.sm),
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 10,
+              ),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : AppColors.surfaceElevated,
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.surfaceElevated,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                boxShadow: isSelected 
-                  ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 4))] 
-                  : null,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                          blurRadius: 15,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
               ),
               child: Text(
                 L10n.get(entry.value, lang),
@@ -376,7 +452,7 @@ class _FilesPageState extends State<FilesPage> {
 
   Widget _buildFileItem(FileRecord file, String lang) {
     final bool isSelected = _selectedIds.contains(file.id);
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: GestureDetector(
@@ -397,7 +473,9 @@ class _FilesPageState extends State<FilesPage> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
             border: Border.all(
-              color: isSelected ? AppColors.primary : Colors.white.withValues(alpha: 0.1),
+              color: isSelected
+                  ? AppColors.primary
+                  : Colors.white.withValues(alpha: 0.1),
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -406,24 +484,36 @@ class _FilesPageState extends State<FilesPage> {
             borderRadius: AppSpacing.radiusMd,
             borderOpacity: 0,
             child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 6),
-              leading: isSelected 
-                ? Container(
-                    padding: const EdgeInsets.all(AppSpacing.sm),
-                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 20),
-                  )
-                : Container(
-                    padding: const EdgeInsets.all(AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 6,
+              ),
+              leading: isSelected
+                  ? Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    )
+                  : Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
+                        ),
+                      ),
+                      child: Icon(
+                        _getFileIcon(file.path),
+                        color: AppColors.primary,
+                      ),
                     ),
-                    child: Icon(
-                      _getFileIcon(file.path),
-                      color: AppColors.primary,
-                    ),
-                  ),
               title: Text(
                 file.path.split('/').last,
                 style: const TextStyle(fontWeight: FontWeight.w600),
@@ -436,10 +526,16 @@ class _FilesPageState extends State<FilesPage> {
                   style: const TextStyle(fontSize: 12),
                 ),
               ),
-              trailing: _isSelecting ? null : IconButton(
-                icon: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.textSecondary),
-                onPressed: () => _showFileOptions(file),
-              ),
+              trailing: _isSelecting
+                  ? null
+                  : IconButton(
+                      icon: const Icon(
+                        Icons.more_vert_rounded,
+                        size: 20,
+                        color: AppColors.textSecondary,
+                      ),
+                      onPressed: () => _showFileOptions(file),
+                    ),
             ),
           ),
         ),
@@ -449,11 +545,15 @@ class _FilesPageState extends State<FilesPage> {
 
   IconData _getFileIcon(String path) {
     final ext = path.split('.').last.toLowerCase();
-    if (['mp4', 'mov', 'avi', 'mkv'].contains(ext)) return Icons.videocam_outlined;
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext)) return Icons.image_outlined;
-    if (['mp3', 'aac', 'flac', 'wav'].contains(ext)) return Icons.audio_file_outlined;
+    if (['mp4', 'mov', 'avi', 'mkv'].contains(ext))
+      return Icons.videocam_outlined;
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext))
+      return Icons.image_outlined;
+    if (['mp3', 'aac', 'flac', 'wav'].contains(ext))
+      return Icons.audio_file_outlined;
     if (['pdf'].contains(ext)) return Icons.picture_as_pdf_outlined;
-    if (['zip', 'tar', 'gz', 'rar'].contains(ext)) return Icons.folder_zip_outlined;
+    if (['zip', 'tar', 'gz', 'rar'].contains(ext))
+      return Icons.folder_zip_outlined;
     return Icons.insert_drive_file_outlined;
   }
 
@@ -462,11 +562,21 @@ class _FilesPageState extends State<FilesPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.cloud_off_rounded, size: 80, color: AppColors.surfaceElevated),
+          const Icon(
+            Icons.cloud_off_rounded,
+            size: 80,
+            color: AppColors.surfaceElevated,
+          ),
           const SizedBox(height: AppSpacing.lg),
-          Text('No files found here', style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            'No files found here',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: AppSpacing.sm),
-          const Text('Upload some content or check other tabs.', style: TextStyle(color: AppColors.textSecondary)),
+          const Text(
+            'Upload some content or check other tabs.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
@@ -477,45 +587,72 @@ class _FilesPageState extends State<FilesPage> {
     // Rehausser le menu pour éviter la barre de navigation OS
     final bottomPad = MediaQuery.of(context).viewPadding.bottom + AppSpacing.xl;
 
-    showModalBottomSheet(      context: context,
+    showModalBottomSheet(
+      context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
         return GlassCard(
-          customBorderRadius: const BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+          customBorderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusLg),
+          ),
           padding: EdgeInsets.fromLTRB(0, AppSpacing.lg, 0, bottomPad),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
               const SizedBox(height: AppSpacing.md),
-              Text(file.path.split('/').last, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                file.path.split('/').last,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: AppSpacing.md),
               if (!isTrash) ...[
                 ListTile(
-                  leading: Icon(file.starred ? Icons.star_rounded : Icons.star_border_rounded, color: AppColors.primary),
-                  title: Text(file.starred ? 'Remove from Starred' : 'Add to Starred'),
+                  leading: Icon(
+                    file.starred
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    color: AppColors.primary,
+                  ),
+                  title: Text(
+                    file.starred ? 'Remove from Starred' : 'Add to Starred',
+                  ),
                   onTap: () {
                     Navigator.pop(context);
-                    _db.saveFile(file.copyWith(starred: !file.starred));
-                    _refreshFiles();
+                    _db.saveFile(file.copyWith(starred: !file.starred)).then((
+                      _,
+                    ) {
+                      _refreshFiles();
+                      try {
+                        SyncService().sync();
+                      } catch (_) {}
+                    });
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.download_rounded, color: AppColors.primary),
+                  leading: const Icon(
+                    Icons.download_rounded,
+                    color: AppColors.primary,
+                  ),
                   title: const Text('Download Offline'),
                   onTap: () async {
                     Navigator.pop(context);
-                    
+
                     // Request absolute path permission and battery optimization ignore for background stability
                     if (Platform.isAndroid) {
                       if (!await Permission.manageExternalStorage.isGranted) {
                         await Permission.manageExternalStorage.request();
                       }
-                      if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
+                      if (!await FlutterForegroundTask
+                          .isIgnoringBatteryOptimizations) {
                         await FlutterForegroundTask.requestIgnoreBatteryOptimization();
                       }
                     }
@@ -528,43 +665,77 @@ class _FilesPageState extends State<FilesPage> {
                     if (!mounted) return;
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started...')));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Download started...')),
+                      );
                     });
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                  leading: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: AppColors.error,
+                  ),
                   title: const Text('Move to Trash'),
                   onTap: () {
                     Navigator.pop(context);
-                    _db.softDelete(file.id!);
-                    _refreshFiles();
+                    _db.softDelete(file.id!).then((_) {
+                      _refreshFiles();
+                      try {
+                        SyncService().sync();
+                      } catch (_) {}
+                    });
                   },
                 ),
               ] else ...[
                 ListTile(
-                  leading: const Icon(Icons.restore_rounded, color: AppColors.primary),
+                  leading: const Icon(
+                    Icons.restore_rounded,
+                    color: AppColors.primary,
+                  ),
                   title: const Text('Restore File'),
                   onTap: () {
                     Navigator.pop(context);
-                    _db.database.then((db) => db.update('files', {'deleted_at': null}, where: 'id = ?', whereArgs: [file.id]));
-                    _refreshFiles();
+                    _db.database.then((db) async {
+                      await db.update(
+                        'files',
+                        {'deleted_at': null},
+                        where: 'id = ?',
+                        whereArgs: [file.id],
+                      );
+                      _refreshFiles();
+                      try {
+                        SyncService().sync();
+                      } catch (_) {}
+                    });
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.delete_forever_rounded, color: AppColors.error),
+                  leading: const Icon(
+                    Icons.delete_forever_rounded,
+                    color: AppColors.error,
+                  ),
                   title: const Text('Delete Permanently'),
                   onTap: () {
                     Navigator.pop(context);
-                    _db.database.then((db) => db.delete('files', where: 'id = ?', whereArgs: [file.id]));
-                    _refreshFiles();
+                    _db.database.then((db) async {
+                      await db.delete(
+                        'files',
+                        where: 'id = ?',
+                        whereArgs: [file.id],
+                      );
+                      _refreshFiles();
+                      try {
+                        SyncService().sync();
+                      } catch (_) {}
+                    });
                   },
                 ),
               ],
             ],
           ),
         );
-      }
+      },
     );
   }
 }

@@ -24,6 +24,21 @@ class MainActivity: FlutterActivity() {
                 result.notImplemented()
             }
         }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "nexus/media").setMethodCallHandler {
+            call, result ->
+            if (call.method == "scanFile") {
+                val path = call.argument<String>("path")
+                if (path != null) {
+                    android.media.MediaScannerConnection.scanFile(this, arrayOf(path), null) { _, _ -> }
+                    result.success(null)
+                } else {
+                    result.error("INVALID_ARGUMENT", "Path is null", null)
+                }
+            } else {
+                result.notImplemented()
+            }
+        }
     }
 
     private fun getCpuTemp(): Double? {

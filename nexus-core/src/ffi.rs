@@ -636,7 +636,10 @@ pub extern "C" fn nexus_decode_stream_push(
 
     match ctx.push_frame(data) {
         Ok(_) => NEXUS_OK,
-        Err(_) => NEXUS_ERR_DECODE,
+        Err(e) => {
+            eprintln!("[nexus-core] nexus_decode_stream_push ERROR: {:?}", e);
+            NEXUS_ERR_DECODE
+        }
     }
 }
 

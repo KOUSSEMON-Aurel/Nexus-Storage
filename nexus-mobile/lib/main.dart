@@ -535,7 +535,7 @@ class _MainScreenState extends State<MainScreen> {
       }
     } catch (e) {
       AppLogger.error('Upload Error: $e');
-      print('NEXUS_UPLOAD_CRITICAL_ERROR: $e');
+      AppLogger.error('NEXUS_UPLOAD_CRITICAL_ERROR: $e');
       // Dismiss progress notification and show final failure
       try {
         await FlutterLocalNotificationsPlugin().cancel(id: notifId);
@@ -555,7 +555,9 @@ class _MainScreenState extends State<MainScreen> {
           ),
         );
       } catch (notifErr) {
-        print('NEXUS_UPLOAD: Failed to show error notification: $notifErr');
+        AppLogger.warn(
+          'NEXUS_UPLOAD: Failed to show error notification: $notifErr',
+        );
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

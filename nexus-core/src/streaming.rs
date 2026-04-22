@@ -12,13 +12,13 @@ use crate::types::{NexusError, NexusResult};
 
 pub const CHUNK_TAG_LEN: usize = 16;
 pub const STREAM_PREFIX_LEN: usize = 16;
-pub const STREAM_NONCE_LEN: usize = 24;
-pub const STREAM_CHUNK_SIZE: usize = 64 * 1024;
+pub const STREAM_CHUNK_SIZE: usize = 128 * 1024;
+pub const STREAM_NONCE_LEN: usize = 24; // XChaCha20: 16 prefix + 8 counter
 
 // FEC Constants
 pub const FEC_SYMBOL_SIZE: usize = 1024;
-pub const FEC_SOURCE_SYMBOLS: usize = 120; // 120KB blocks
-pub const FEC_REPAIR_SYMBOLS: usize = 30;  // 25% redundancy
+pub const FEC_SOURCE_SYMBOLS: usize = 180; // 180KB blocks (more efficient RaptorQ)
+pub const FEC_REPAIR_SYMBOLS: usize = 20;  // ~11% redundancy (optimized for speed/safety balance)
 pub const FEC_SYMBOL_HEADER_SIZE: usize = 8;
 pub const FULL_SYMBOL_SIZE: usize = FEC_SYMBOL_SIZE + FEC_SYMBOL_HEADER_SIZE;
 pub const FEC_MAGIC_NX: [u8; 2] = [0x4E, 0x58];
@@ -213,7 +213,7 @@ pub struct StreamingEncoder {
     bytes_per_frame: usize,
     mode: EncodingMode,
     frame_count: usize,
-    frame_queue: Vec<Vec<u8>>,
+    frame_queue: std::collections::VecDeque<Vec<u8>>,
 }
 
 impl StreamingEncoder {
@@ -230,7 +230,7 @@ impl StreamingEncoder {
             bytes_per_frame,
             mode,
             frame_count: 0,
-            frame_queue: Vec::new(),
+            frame_queue: std::collections::VecDeque::new(),
         }
     }
 
@@ -258,11 +258,7 @@ impl StreamingEncoder {
 
     /// Pop a generated frame from the queue.
     pub fn pop_frame(&mut self) -> Option<Vec<u8>> {
-        if self.frame_queue.is_empty() {
-            None
-        } else {
-            Some(self.frame_queue.remove(0))
-        }
+        self.frame_queue.pop_front()
     }
 
     /// Finalize the stream. Flushes remaining data.
@@ -279,7 +275,7 @@ impl StreamingEncoder {
             // Pad the last frame
             self.buffer.resize(self.bytes_per_frame, 0);
             let frame = self.generate_frame()?;
-            self.frame_queue.push(frame);
+            self.frame_queue.push_back(frame);
             self.buffer.clear();
         }
         
@@ -345,7 +341,7 @@ impl StreamingEncoder {
 
             if self.buffer.len() == self.bytes_per_frame {
                 let frame = self.generate_frame()?;
-                self.frame_queue.push(frame);
+                self.frame_queue.push_back(frame);
                 self.buffer.clear();
                 frames_added += 1;
             }
@@ -371,12 +367,7 @@ impl StreamingEncoder {
 
         self.frame_count += 1;
 
-        let mut png_data = Vec::new();
-        let mut cursor = std::io::Cursor::new(&mut png_data);
-        img.write_to(&mut cursor, image::ImageFormat::Png)
-            .map_err(|e| NexusError::Encode(e.to_string()))?;
-        
-        Ok(png_data)
+        Ok(img.into_raw())
     }
 
     fn fill_base_frame(&self, img: &mut ImageBuffer<Luma<u8>, Vec<u8>>) -> NexusResult<()> {
@@ -461,10 +452,17 @@ impl StreamingDecoder {
     }
 
     pub fn push_frame(&mut self, frame_data: &[u8]) -> Result<(), NexusError> {
-        let cursor = std::io::Cursor::new(frame_data);
-        let img = image::load(cursor, image::ImageFormat::Png)
-            .map_err(|e| NexusError::Decode(format!("Failed to load PNG frame: {}", e)))?
-            .into_luma8();
+        let (w, h) = match self.mode {
+            EncodingMode::Base => (crate::encoder::BASE_WIDTH, crate::encoder::BASE_HEIGHT),
+            EncodingMode::High => (crate::encoder::HIGH_WIDTH, crate::encoder::HIGH_HEIGHT),
+        };
+        
+        if frame_data.len() != (w * h) as usize {
+            return Err(NexusError::Decode(format!("Invalid raw frame size: got {}, expected {}", frame_data.len(), w * h)));
+        }
+
+        let img = image::ImageBuffer::<image::Luma<u8>, Vec<u8>>::from_raw(w, h, frame_data.to_vec())
+            .ok_or_else(|| NexusError::Decode("Failed to create ImageBuffer from raw pixels".to_string()))?;
         
         let mut decoded_chunk = crate::decoder::decode_frame(&img, self.mode)
             .map_err(|e| NexusError::Decode(format!("Frame decoding failed: {}", e)))?;
