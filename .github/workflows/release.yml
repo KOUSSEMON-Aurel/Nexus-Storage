@@ -176,6 +176,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           projectPath: './nexus-gui'
           args: '--target ${{ matrix.tauri_rust_target }}'
@@ -222,3 +228,33 @@ jobs:
           echo "Upload vers GitHub Release..."
           TAG_NAME="app-v${{ steps.tauri.outputs.appVersion }}"
           gh release upload "$TAG_NAME" "$APPIMAGE_NAME" --clobber
+
+      # ─── ÉTAPE 8 : Build Android APK (Uniquement sur Linux) ───────────────
+      - name: Setup Java (Android)
+        if: matrix.platform == 'linux'
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter (Android)
+        if: matrix.platform == 'linux'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Build Android APK
+        if: matrix.platform == 'linux'
+        working-directory: ./nexus-mobile
+        run: |
+          flutter pub get
+          # Génère un APK universel et les ABI séparés (app-arm64-v8a-release.apk, etc.)
+          flutter build apk --release --split-per-abi
+
+      - name: Upload Android APKs
+        if: matrix.platform == 'linux'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="app-v${{ steps.tauri.outputs.appVersion }}"
+          gh release upload "$TAG_NAME" ./nexus-mobile/build/app/outputs/flutter-apk/app-*.apk --clobber

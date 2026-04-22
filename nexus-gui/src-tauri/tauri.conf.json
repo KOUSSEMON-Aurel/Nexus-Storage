@@ -33,6 +33,12 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "macOS": {
+      "signingIdentity": null,
+      "notarization": {
+        "active": false
+      }
+    },
     "externalBin": [
       "bin/nexus-daemon",
       "bin/ffmpeg",
