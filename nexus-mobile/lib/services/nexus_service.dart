@@ -18,6 +18,7 @@ import '../ffi/nexus_loader.dart';
 import 'database_service.dart';
 import 'youtube_service.dart';
 import 'sync_service.dart';
+import 'package:nexus_mobile/services/auth_service.dart';
 import '../models/file_record.dart';
 import 'logger_service.dart';
 import '../utils/exceptions.dart';
@@ -29,6 +30,7 @@ class NexusService {
   final NexusCoreBindings _native = NexusLoader.bindings;
   final DatabaseService _db = DatabaseService();
   final YouTubeService _youtube = YouTubeService();
+  final AuthService _auth = AuthService();
   DateTime _lastRefreshTime = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastProgressUpdate = DateTime.fromMillisecondsSinceEpoch(0);
   static const bool keepFramesForDebug = false;
@@ -485,7 +487,22 @@ class NexusService {
 
   /// Utility to derive a 32-byte key from a password string.
   Future<Uint8List> _deriveKeyFromPassword(String password) async {
-    final passPtr = password.toNativeUtf8().cast<Char>();
+    final googleSub = _auth.googleSub ?? '';
+    final combinedPassword = googleSub + password;
+
+    if (combinedPassword.isEmpty) {
+      AppLogger.warn(
+        'NexusService: Both googleSub and password are empty during derivation',
+      );
+    } else if (password.isNotEmpty) {
+      AppLogger.info(
+        'NexusService: Using double-encryption (googleSub + custom password)',
+      );
+    } else {
+      AppLogger.info('NexusService: Using googleSub as default master key');
+    }
+
+    final passPtr = combinedPassword.toNativeUtf8().cast<Char>();
     final outPtrPtr = malloc<Pointer<Uint8>>();
     final outLenPtr = malloc<Size>();
     final salt = Uint8List(16)..fillRange(0, 16, 0x42);
@@ -663,33 +680,26 @@ class NexusService {
         'NexusService: Target resolution: $targetWidth x $targetHeight',
       );
 
-      final ffmpegCommand =
-          '-i "${videoFile.path}" -vf "scale=$targetWidth:$targetHeight:force_original_aspect_ratio=increase:flags=neighbor,crop=$targetWidth:$targetHeight,format=gray" -f rawvideo -pix_fmt gray -r 30 -color_range pc -y $pipePath';
+      final ffmpegArgs = [
+        '-i',
+        videoFile.path,
+        '-vf',
+        'scale=$targetWidth:$targetHeight:force_original_aspect_ratio=increase:flags=neighbor,crop=$targetWidth:$targetHeight,format=gray',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'gray',
+        '-r',
+        '30',
+        '-color_range',
+        'pc',
+        '-y',
+        pipePath,
+      ];
+
       AppLogger.info(
-        'NexusService: Running Native FFmpeg command (pipe): $ffmpegCommand',
+        'NexusService: Running Native FFmpeg command array: $ffmpegArgs',
       );
-
-      int i = 0;
-
-      // Enable logs for download as well to catch decoding/scaling errors
-      FFmpegKitConfig.enableLogCallback((log) {
-        final msg = log.getMessage();
-        final lowerMsg = msg.toLowerCase();
-        if (lowerMsg.contains('error') ||
-            lowerMsg.contains('fail') ||
-            lowerMsg.contains('invalid')) {
-          AppLogger.error('[ffmpeg-download] $msg');
-        } else if (i % 50 == 0) {
-          // Log occasionally to avoid spamming
-          AppLogger.info('[ffmpeg-download] $msg');
-        }
-      });
-
-      final startTime = DateTime.now();
-      final sessionPromise = FFmpegKit.executeAsync(ffmpegCommand);
-
-      AppLogger.info('NexusService: Reading frames from FFmpeg pipe...');
-      final pipeStream = File(pipePath).openRead();
 
       await _updateStatus(
         taskId,
@@ -721,6 +731,28 @@ class NexusService {
       }
       ios = await finalFile.open(mode: FileMode.write);
       AppLogger.info('NexusService: Output file opened: ${finalFile.path}');
+
+      int i = 0;
+
+      // Enable logs for download as well to catch decoding/scaling errors
+      FFmpegKitConfig.enableLogCallback((log) {
+        final msg = log.getMessage();
+        final lowerMsg = msg.toLowerCase();
+        if (lowerMsg.contains('error') ||
+            lowerMsg.contains('fail') ||
+            lowerMsg.contains('invalid')) {
+          AppLogger.error('[ffmpeg-download] $msg');
+        } else if (i % 50 == 0) {
+          // Log occasionally to avoid spamming
+          AppLogger.info('[ffmpeg-download] $msg');
+        }
+      });
+
+      final startTime = DateTime.now();
+      final sessionPromise = FFmpegKit.executeWithArgumentsAsync(ffmpegArgs);
+
+      AppLogger.info('NexusService: Reading frames from FFmpeg pipe...');
+      final pipeStream = File(pipePath).openRead();
 
       bool initializedCrypto = false;
       Uint8List nonceBuffer = Uint8List(0);

@@ -50,7 +50,8 @@ func (s *APIServer) Start(port int) {
 	mux.HandleFunc("/api/trash", s.handleTrash)
 
 	// Background tasks & stats
-	mux.HandleFunc("/api/tasks", s.handleTasks)
+	mux.HandleFunc("/api/tasks", s.handleTasks)       // GET /api/tasks (List all)
+	mux.HandleFunc("/api/tasks/", s.handleTaskAction) // /api/tasks/{id} (DELETE)
 	mux.HandleFunc("/api/stats", s.handleStats)
 	mux.HandleFunc("/api/security", s.handleSecurity)
 
@@ -367,6 +368,26 @@ func (s *APIServer) handleTasks(w http.ResponseWriter, r *http.Request) {
 	s.queue.mu.Lock()
 	defer s.queue.mu.Unlock()
 	jsonOK(w, s.queue.tasks)
+}
+
+func (s *APIServer) handleTaskAction(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
+	if id == "" {
+		http.Error(w, "Task ID required", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodDelete:
+		log.Printf("🗑️  API: Deleting task %s", id)
+		if err := s.queue.RemoveTask(id); err != nil {
+			httpError(w, err, http.StatusNotFound)
+			return
+		}
+		jsonOK(w, map[string]string{"status": "deleted", "id": id})
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // ─── /api/stats ───────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Plus, HardDrive, Shield, Clock, Star, Trash2,
+import {
+  Search, Plus, HardDrive, Shield, Clock, Star, Trash2,
   Grid3X3, List, FileText, FileImage, Archive, Lock,
   X, MoreVertical, Moon, Sun, CloudLightning, ChevronRight,
   Upload, Minus, Square, RefreshCw, Check, Settings,
@@ -86,7 +87,7 @@ interface AuthStatus {
 function mapBackendToFile(bf: BackendFile): NFile {
   const name = bf.Path.split(/[/\\]/).pop() || bf.Path;
   const ext = name.split('.').pop()?.toLowerCase();
-  
+
   let type: NFile["type"] = "archive";
   if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext || "")) type = "image";
   else if (["pdf", "txt", "doc", "docx", "odt", "md"].includes(ext || "")) type = "doc";
@@ -123,11 +124,11 @@ function formatSize(bytes: number): string {
 
 // Each file type gets a distinct icon, background color, and icon color
 const TYPE_CONFIG = {
-  archive: { icon: Archive,     bg: "#FEF3C7", color: "#D97706" },
-  image:   { icon: FileImage,   bg: "#FCE7F3", color: "#DB2777" },
-  doc:     { icon: FileText,    bg: "#DBEAFE", color: "#2563EB" },
-  key:     { icon: Lock,        bg: "#D1FAE5", color: "#059669" },
-  video:   { icon: FileText,    bg: "#EDE9FE", color: "#7C3AED" },
+  archive: { icon: Archive, bg: "#FEF3C7", color: "#D97706" },
+  image: { icon: FileImage, bg: "#FCE7F3", color: "#DB2777" },
+  doc: { icon: FileText, bg: "#DBEAFE", color: "#2563EB" },
+  key: { icon: Lock, bg: "#D1FAE5", color: "#059669" },
+  video: { icon: FileText, bg: "#EDE9FE", color: "#7C3AED" },
 };
 
 // ─── App ─────────────────────────────────────────────────────────────────────
@@ -137,7 +138,7 @@ export default function Dashboard() {
   const [section, setSection] = useState<Section>("my-drive");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [search, setSearch] = useState("");
-  
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<NFile | null>(null); // Keep for DetailPanel context
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
@@ -147,7 +148,7 @@ export default function Dashboard() {
   const [pendingDownloadFile, setPendingDownloadFile] = useState<NFile | null>(null);
   const [downloadPassword, setDownloadPassword] = useState("");
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" | "info" } | null>(null);
-  
+
   const [dbFiles, setDbFiles] = useState<NFile[]>([]);
   const [tasks, setTasks] = useState<Record<string, BackendTask>>({});
   const [stats, setStats] = useState<Stats>({ file_count: 0, total_size: 0 });
@@ -275,7 +276,7 @@ export default function Dashboard() {
     const connectLSNWatch = () => {
       try {
         eventSource = new EventSource(`${API_BASE}/lsn/watch`);
-        
+
         eventSource.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
@@ -335,23 +336,23 @@ export default function Dashboard() {
       // 1. Core Readiness (API + Auth)
       try {
         const fetchOpts: RequestInit = { cache: "no-store", headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" } };
-        
+
         // Wait for basic stats (API ready)
         const statsRes = await fetch(`${API_BASE}/stats`, fetchOpts);
         if (!statsRes.ok) throw new Error("Backend not available");
-        
+
         // CRITICAL: Fetch Auth status BEFORE lifting splash
         const authRes = await fetch(`${API_BASE}/auth/status?_t=${Date.now()}`, fetchOpts);
         if (authRes.ok) {
-           const authData = await authRes.json();
-           if (!unmount) setAuth(authData);
+          const authData = await authRes.json();
+          if (!unmount) setAuth(authData);
         }
 
         // Fetch first batch of files for skeletons
         const filesRes = await fetch(section === "trash" ? `${API_BASE}/trash` : `${API_BASE}/files`, fetchOpts);
         if (filesRes.ok && !unmount) {
-           const data: BackendFile[] = await filesRes.json();
-           setDbFiles(data.map(mapBackendToFile));
+          const data: BackendFile[] = await filesRes.json();
+          setDbFiles(data.map(mapBackendToFile));
         }
 
         // 2. Handle Splash Logic
@@ -366,7 +367,7 @@ export default function Dashboard() {
         // Minimum delay (2s) to show the premium splash screen on first load
         const elapsed = Date.now() - startTime;
         const wait = Math.max(0, 2000 - elapsed);
-        
+
         setTimeout(() => {
           if (!unmount) {
             setIsAppReady(true);
@@ -378,9 +379,9 @@ export default function Dashboard() {
 
       } catch (err) {
         if (!unmount) {
-           console.log("Waiting for backend...", err);
-           // Retry after 1s
-           setTimeout(initialize, 1000);
+          console.log("Waiting for backend...", err);
+          // Retry after 1s
+          setTimeout(initialize, 1000);
         }
       }
     };
@@ -404,7 +405,7 @@ export default function Dashboard() {
           fetch(`${API_BASE}/quota`, fetchOpts),
           fetch(`${API_BASE}/mount/status`, fetchOpts)
         ]);
-        
+
         if (tasksRes.ok) setTasks(await tasksRes.json());
         if (statsRes.ok) setStats(await statsRes.json());
         if (quotaRes.ok) setQuota(await quotaRes.json());
@@ -472,7 +473,7 @@ export default function Dashboard() {
   useEffect(() => {
     const handleKeys = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      
+
       // Ctrl/Cmd + A (Select All)
       if ((e.ctrlKey || e.metaKey) && e.key === "a") {
         e.preventDefault();
@@ -480,7 +481,7 @@ export default function Dashboard() {
         setSelectedIds(new Set(allIds));
         if (dbFiles.length > 0) setSelected(dbFiles[dbFiles.length - 1]);
       }
-      
+
       // Escape (Clear Selection)
       if (e.key === "Escape") {
         setSelectedIds(new Set());
@@ -498,13 +499,13 @@ export default function Dashboard() {
       if (path) {
         setUploadOpen(false);
         showToast(isFolder ? "Archiving & starting upload..." : "Starting upload...", "info");
-        
+
         const res = await fetch(`${API_BASE}/upload`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            path, 
-            mode, 
+          body: JSON.stringify({
+            path,
+            mode,
             password: password || "" // Password is optional, empty string if not provided
           })
         });
@@ -531,11 +532,11 @@ export default function Dashboard() {
 
     const mouseEvent = e as React.MouseEvent;
     const isShift = mouseEvent?.shiftKey;
-    const isCtrl = mouseEvent?.ctrlKey || mouseEvent?.metaKey || selectionMode || interactionMode === 'selection';
+    const isCtrl = mouseEvent?.ctrlKey || mouseEvent?.metaKey || selectionMode || interactionMode === 'selection' || persistentCheckboxes;
 
     setSelectedIds(prev => {
       const next = new Set(prev);
-      
+
       if (isShift && lastSelectedId) {
         // Range Selection
         const currentIdx = dbFiles.findIndex(f => f.id === file.id);
@@ -566,7 +567,7 @@ export default function Dashboard() {
     if (ids.length === 0) return;
 
     showToast(`Processing ${ids.length} items...`, "info");
-    
+
     const results = await Promise.allSettled(ids.map(async id => {
       const file = dbFiles.find(f => f.id === id);
       if (!file) return;
@@ -613,7 +614,7 @@ export default function Dashboard() {
           setDownloadPasswordOpen(true);
           return;
         }
-        
+
         showToast("Starting download...", "success");
         const payload = {
           video_id: file.videoID,
@@ -642,7 +643,7 @@ export default function Dashboard() {
             }
             setDownloadPasswordOpen(true);
           } else {
-             showToast("Download failed", "error");
+            showToast("Download failed", "error");
           }
         } else {
           showToast("Download failed", "error");
@@ -736,7 +737,7 @@ export default function Dashboard() {
 
     if (section === "trash") return f.deleted;
     if (f.deleted) return false;
-    
+
     if (section === "starred") return f.starred;
     return true;
   });
@@ -750,634 +751,634 @@ export default function Dashboard() {
 
   const SECTION_LABELS: Record<Section, string> = {
     "my-drive": "My Drive",
-    recent:     "Recent",
-    starred:    "Starred",
-    security:   "Security",
-    trash:      "Trash",
+    recent: "Recent",
+    starred: "Starred",
+    security: "Security",
+    trash: "Trash",
   };
 
   return (
     <>
       <SplashScreen b={isAppReady} loading={isInitialLoading} c={c} />
-      <div 
+      <div
         data-tauri-drag-region
-        style={{ 
-          background: c.bgApp, 
-          color: c.textPrimary, 
-          fontFamily: "'Inter', system-ui, sans-serif", 
-          height: "100vh", 
-          display: "flex", 
-          flexDirection: "column", 
+        style={{
+          background: c.bgApp,
+          color: c.textPrimary,
+          fontFamily: "'Inter', system-ui, sans-serif",
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
           overflow: "hidden",
           boxShadow: "0 0 40px rgba(0,0,0,0.15)",
           border: `1px solid ${c.border}`,
           borderRadius: 0
         }}
       >
-      
-      {/* ━━━━ HEADER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <header
-        data-tauri-drag-region
-        style={{
-          height: 64,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 24px",
-          gap: 16,
-          background: c.bgApp,
-          flexShrink: 0,
-          cursor: "default",
-          zIndex: 50,
-        }}
-      >
-        {/* Logo - 256px to match sidebar. Settings gear placed right of logo for quick access */}
-        <div style={{ width: 256, display: "flex", alignItems: "center", gap: 10, flexShrink: 0, userSelect: "none" }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-            <div style={{ width: 40, height: 40, borderRadius: "var(--radius-md)", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: 'none' }}>
-              <CloudLightning size={22} color="white" />
-            </div>
-            <span style={{ fontSize: 22, fontWeight: 400, color: c.textPrimary, letterSpacing: -0.3, pointerEvents: 'none' }}>Nexus</span>
-          </div>
-          <button
-            onClick={() => navigate('/settings')}
-            title="Settings"
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: "var(--radius-sm)",
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: c.textPrimary
-            }}
-          >
-            <Settings size={18} />
-          </button>
-        </div>
 
-        {/* Search - FTS5 Optimized */}
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, background: c.bgSearch, borderRadius: "var(--radius-xl)", padding: "0 20px", height: 46 }}>
-          <Search size={20} color={c.textSecondary} style={{ flexShrink: 0, pointerEvents: "none" }} />
-          <input
-            type="text"
-            placeholder="Search across thousands of shards (V2 Instant)..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{
-              flex: 1,
-              background: "transparent",
-              border: "none",
-              outline: "none",
-              fontSize: 16,
-              color: c.textPrimary,
-              lineHeight: "1.5",
-              pointerEvents: "auto",
-            }}
-          />
-        </div>
-
-        {/* Actions on the right */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <IconBtn onClick={() => setDark(!dark)} title="Toggle theme" dark={dark}>
-            {dark ? <Sun size={20} /> : <Moon size={20} />}
-          </IconBtn>
-          {/* Avatar */}
-          <div 
-            onClick={() => setAccountOpen(true)}
-            style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 14, fontWeight: 600, marginLeft: 8, cursor: "pointer", pointerEvents: "auto" }}>
-            {auth.authenticated ? auth.user.charAt(0).toUpperCase() : "!"}
-          </div>
-          <div style={{ pointerEvents: "auto", display: "flex", alignItems: "center", gap: 4 }}>
-            <IconBtn onClick={() => getCurrentWindow().minimize()} title="Minimize" dark={dark}>
-              <Minus size={20} />
-            </IconBtn>
-            <IconBtn onClick={async () => await getCurrentWindow().toggleMaximize()} title="Maximize" dark={dark}>
-              <Square size={16} />
-            </IconBtn>
-            <IconBtn onClick={() => getCurrentWindow().close()} title="Close" dark={dark}>
-              <X size={20} />
-            </IconBtn>
-          </div>
-        </div>
-      </header>
-
-      {/* ━━━━ BODY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      {!auth.authenticated ? (
-        <SignInView c={c} />
-      ) : (
-        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        
-        {/* ━━━━ SIDEBAR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <aside 
+        {/* ━━━━ HEADER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <header
           data-tauri-drag-region
-          style={{ 
-          width: 256, flexShrink: 0, 
-          background: c.bgApp,
-          display: "flex", flexDirection: "column", paddingTop: 16, paddingBottom: 16, overflow: "hidden",
-        }}>
-          
-          {/* New Button */}
-          <div style={{ padding: "0 16px 16px" }}>
+          style={{
+            height: 64,
+            display: "flex",
+            alignItems: "center",
+            padding: "0 24px",
+            gap: 16,
+            background: c.bgApp,
+            flexShrink: 0,
+            cursor: "default",
+            zIndex: 50,
+          }}
+        >
+          {/* Logo - 256px to match sidebar. Settings gear placed right of logo for quick access */}
+          <div style={{ width: 256, display: "flex", alignItems: "center", gap: 10, flexShrink: 0, userSelect: "none" }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+              <div style={{ width: 40, height: 40, borderRadius: "var(--radius-md)", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: 'none' }}>
+                <CloudLightning size={22} color="white" />
+              </div>
+              <span style={{ fontSize: 22, fontWeight: 400, color: c.textPrimary, letterSpacing: -0.3, pointerEvents: 'none' }}>Nexus</span>
+            </div>
             <button
-              onClick={() => setUploadOpen(true)}
+              onClick={() => navigate('/settings')}
+              title="Settings"
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "14px 20px",
-                borderRadius: "var(--radius-lg)",
-                background: c.bgSurface,
-                border: "none",
-                boxShadow: c.btnShadow,
-                cursor: "pointer",
-                fontSize: 14,
-                fontWeight: 500,
-                color: c.textPrimary,
-                width: "100%",
-                transition: "box-shadow 0.15s",
+                width: 40,
+                height: 40,
+                borderRadius: "var(--radius-sm)",
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: c.textPrimary
               }}
             >
-              <Plus size={20} color="#1A73E8" />
-              New
+              <Settings size={18} />
             </button>
           </div>
 
-          {/* Nav */}
-          <nav style={{ flex: 1, padding: "0 8px", display: "flex", flexDirection: "column", gap: 2 }}>
-            {[
-              { id: "my-drive" as Section, icon: HardDrive, label: "My Drive" },
-              { id: "recent"   as Section, icon: Clock,     label: "Recent" },
-              { id: "starred"  as Section, icon: Star,      label: "Starred" },
-            ].map(item => (
-              <NavItem key={item.id} item={item} active={section === item.id} onClick={() => { setSection(item.id); setSelected(null); }} c={c} />
-            ))}
-
-            <div style={{ height: 1, background: c.border, margin: "8px 8px" }} />
-
-            {[
-              { id: "security" as Section, icon: Shield, label: "Security Hub" },
-              { id: "trash"    as Section, icon: Trash2, label: "Trash" },
-            ].map(item => (
-              <NavItem key={item.id} item={item} active={section === item.id} onClick={() => { setSection(item.id); setSelected(null); }} c={c} />
-            ))}
-
-            <div style={{ height: 1, background: c.border, margin: "8px 8px" }} />
-
-            <div
-              onClick={async () => {
-                try {
-                  await fetch(`${API_BASE}/studio`);
-                } catch (e) {
-                  console.error("Studio link failed", e);
-                }
-              }}
+          {/* Search - FTS5 Optimized */}
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, background: c.bgSearch, borderRadius: "var(--radius-xl)", padding: "0 20px", height: 46 }}>
+            <Search size={20} color={c.textSecondary} style={{ flexShrink: 0, pointerEvents: "none" }} />
+            <input
+              type="text"
+              placeholder="Search across thousands of shards (V2 Instant)..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
               style={{
-                display: "flex", alignItems: "center", gap: 14,
-                padding: "9px 16px", borderRadius: 24,
+                flex: 1,
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                fontSize: 16,
                 color: c.textPrimary,
-                fontSize: 14, cursor: "pointer", transition: "background 0.15s",
-                userSelect: "none",
+                lineHeight: "1.5",
+                pointerEvents: "auto",
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = c.bgHover}
-              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
-            >
-              <CloudLightning size={20} color="#FF0000" />
-              YouTube Studio
-            </div>
-
-            <div 
-              onClick={handleSyncManifest}
-              style={{
-                display: "flex", alignItems: "center", gap: 14,
-                padding: "9px 16px", borderRadius: 12,
-                color: syncing ? c.textSecondary : c.textPrimary,
-                fontSize: 14, cursor: syncing ? "not-allowed" : "pointer", transition: "background 0.15s",
-                userSelect: "none",
-                opacity: syncing ? 0.6 : 1,
-              }}
-              onMouseEnter={e => { if (!syncing) (e.currentTarget as HTMLDivElement).style.background = c.bgHover; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
-            >
-              <RefreshCw size={20} color={c.textSecondary} style={{ animation: syncing ? "spin 2s linear infinite" : "none" }} />
-              {syncing ? "Syncing..." : "Sync with YouTube"}
-            </div>
-          </nav>
-
-          {/* Virtual Disk Mount */}
-          <div style={{ padding: "0 16px", marginBottom: 24 }}>
-            <div style={{ padding: 16, background: c.bgSurface, border: `1px solid ${c.border}`, borderRadius: "var(--radius-md)" }}>
-              <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 8 }}>VIRTUAL DISK</div>
-              {isMounted ? (
-                <button 
-                  onClick={handleUnmountDisk}
-                  style={{ width: "100%", padding: "10px", borderRadius: 10, background: "#ef444420", border: `1px solid #ef444450`, color: "#ef4444", cursor: "pointer", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-                >
-                  <span>🔌</span> Quitter FUSE
-                </button>
-              ) : (
-                <button 
-                  onClick={handleMountDisk}
-                  style={{ width: "100%", padding: "10px", borderRadius: 10, background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, cursor: "pointer", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-                >
-                  <span>📡</span> Connect
-                </button>
-              )}
-            </div>
+            />
           </div>
 
-          {/* Storage & Quota */}
-          <div style={{ padding: "12px 24px", borderTop: `1px solid ${c.border}` }}>
-            {/* Real Storage Stats */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-              <HardDrive size={18} color={c.textSecondary} />
-              <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 500 }}>{formatSize(stats.total_size)} Secured</span>
+          {/* Actions on the right */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <IconBtn onClick={() => setDark(!dark)} title="Toggle theme" dark={dark}>
+              {dark ? <Sun size={20} /> : <Moon size={20} />}
+            </IconBtn>
+            {/* Avatar */}
+            <div
+              onClick={() => setAccountOpen(true)}
+              style={{ width: 36, height: 36, borderRadius: "50%", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 14, fontWeight: 600, marginLeft: 8, cursor: "pointer", pointerEvents: "auto" }}>
+              {auth.authenticated ? auth.user.charAt(0).toUpperCase() : "!"}
             </div>
-            
-            {/* Quota Progress */}
-            <div style={{ display: "flex", alignItems: "center", justifyItems: "space-between", gap: 10, marginBottom: 8, marginTop: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <CloudLightning size={18} color="#1A73E8" />
-                <span style={{ fontSize: 13, color: c.textPrimary, fontWeight: 600 }}>YouTube Quota</span>
-                {quota.source === "monitoring" && (
-                  <span style={{ fontSize: 9, background: "#10b98120", color: "#10b981", padding: "1px 6px", borderRadius: 10, fontWeight: 700, marginLeft: 4 }}>LIVE</span>
-                )}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-                <span style={{ fontSize: 11, color: c.textSecondary }}>{quota.used}/{Math.round(quota.limit/1000)}k</span>
-                <button 
-                  onClick={handleCalibrateQuota}
-                  style={{ border: "none", background: "transparent", cursor: "pointer", color: c.textSecondary, padding: 0 }}
-                  title="Calibrate Usage"
-                >
-                  <RefreshCw size={10} />
-                </button>
-              </div>
-            </div>
-            <div style={{ height: 6, background: c.border, borderRadius: 4, overflow: "hidden", marginBottom: 6 }}>
-              <div style={{ width: `${Math.min(100, (quota.used / quota.limit) * 100)}%`, height: "100%", background: (quota.used / quota.limit > 0.9) ? "#EA4335" : "#1A73E8" }} />
-            </div>
-            <p style={{ fontSize: 10, color: c.textSecondary, lineHeight: 1.4 }}>Daily limit resets at midnight PT.</p>
-          </div>
-
-        </aside>
-
-        {/* ━━━━ MAIN CONTENT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <main
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            background: c.bgSurface,
-            margin: "8px 16px 8px 0",
-            borderRadius: "var(--radius-lg)",
-            border: `1px solid ${c.border}`,
-            boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
-            overflow: "hidden",
-            position: "relative"
-          }}
-        >
-          <TaskOverlay tasks={tasks} c={c} />
-          {/* Toolbar */}
-          <div style={{
-            height: 56,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "0 20px",
-            borderBottom: `1px solid ${c.border}`,
-            flexShrink: 0,
-          }}>
-            {/* Breadcrumb */}
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary }}>
-                {SECTION_LABELS[section]}
-              </span>
-              <ChevronRight size={18} color={c.textSecondary} />
-            </div>
-
-            {/* View toggles */}
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <ViewToggleBtn active={viewMode === "list"} onClick={() => setViewMode("list")} title="List view" c={c}>
-                <List size={20} />
-              </ViewToggleBtn>
-              <ViewToggleBtn active={viewMode === "grid"} onClick={() => setViewMode("grid")} title="Grid view" c={c}>
-                <Grid3X3 size={20} />
-              </ViewToggleBtn>
+            <div style={{ pointerEvents: "auto", display: "flex", alignItems: "center", gap: 4 }}>
+              <IconBtn onClick={() => getCurrentWindow().minimize()} title="Minimize" dark={dark}>
+                <Minus size={20} />
+              </IconBtn>
+              <IconBtn onClick={async () => await getCurrentWindow().toggleMaximize()} title="Maximize" dark={dark}>
+                <Square size={16} />
+              </IconBtn>
+              <IconBtn onClick={() => getCurrentWindow().close()} title="Close" dark={dark}>
+                <X size={20} />
+              </IconBtn>
             </div>
           </div>
+        </header>
 
-          {/* File area */}
+        {/* ━━━━ BODY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        {!auth.authenticated ? (
+          <SignInView c={c} />
+        ) : (
           <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-            {/* File content */}
-            <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
-              <AnimatePresence mode="wait">
-                <motion.div key={section} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}>
-                  {section === "security" ? (
-                    <SecuritySection c={c} />
-                  ) : files.length === 0 ? (
-                    <EmptyState 
-                      icon={section === "trash" ? <Trash2 size={64} color={c.textSecondary} /> : <Search size={64} />} 
-                      title={section === "trash" ? "Trash is empty" : "No files match your search"} 
-                      sub={section === "trash" ? "Items deleted from Nexus are stored here temporarily." : "Try a different search term."} 
-                      c={c} 
-                    />
-                  ) : (
-                    <>
-                      <p style={{ fontSize: 14, fontWeight: 500, color: c.textSecondary, marginBottom: 16 }}>
-                        {section === "starred" ? "Starred" : "Suggested"}
-                      </p>
-                      {isInitialLoading ? (
-                        <>
-                          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 16 }}>
-                            <Skeleton width={120} height={18} />
-                          </div>
-                          <div style={{ display: viewMode === "grid" ? "grid" : "block", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 20 }}>
-                            {[1,2,3,4,5,6].map(i => <FileSkeleton key={i} viewMode={viewMode} c={c} />)}
-                          </div>
-                        </>
-                      ) : viewMode === "grid" ? (
-                        <FileGrid 
-                          files={files} 
-                          onSelect={handleSelect} 
-                          selectedIds={selectedIds} 
-                          c={c} 
-                          dark={dark} 
-                          persistentCheckboxes={persistentCheckboxes}
-                        />
-                      ) : (
-                        <FileList 
-                          files={files} 
-                          onSelect={handleSelect} 
-                          selectedIds={selectedIds} 
-                          c={c} 
-                          dark={dark} 
-                          persistentCheckboxes={persistentCheckboxes}
-                        />
-                      )}
-                    </>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
 
-            {/* Detail panel (show only for single selection). Width is responsive on large screens. */}
-            <AnimatePresence>
-              {(selectedIds.size === 1) && (
-                <motion.div
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: "clamp(280px, 22vw, 420px)", opacity: 1 }}
-                  exit={{ width: 0, opacity: 0 }}
-                  transition={{ duration: 0.2, ease: "easeInOut" }}
-                  style={{ borderLeft: `1px solid ${c.border}`, overflow: "hidden", flexShrink: 0 }}
+            {/* ━━━━ SIDEBAR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+            <aside
+              data-tauri-drag-region
+              style={{
+                width: 256, flexShrink: 0,
+                background: c.bgApp,
+                display: "flex", flexDirection: "column", paddingTop: 16, paddingBottom: 16, overflow: "hidden",
+              }}>
+
+              {/* New Button */}
+              <div style={{ padding: "0 16px 16px" }}>
+                <button
+                  onClick={() => setUploadOpen(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "14px 20px",
+                    borderRadius: "var(--radius-lg)",
+                    background: c.bgSurface,
+                    border: "none",
+                    boxShadow: c.btnShadow,
+                    cursor: "pointer",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: c.textPrimary,
+                    width: "100%",
+                    transition: "box-shadow 0.15s",
+                  }}
                 >
-                  <DetailPanel 
-                    file={selectedIds.size === 1 ? selected : null} 
-                    selectedIds={selectedIds}
-                    files={dbFiles}
-                    onClose={() => handleSelect(null, null)} 
-                    onAction={handleAction} 
-                    c={c} 
-                    section={section} 
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </main>
-      </div>
-    )}
-
-      {/* ━━━━ MULTI-SELECT TOOLBAR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <MultiSelectToolbar 
-        selectedIds={selectedIds} 
-        onAction={handleBulkAction} 
-        onClear={() => handleSelect(null, null)} 
-        c={c} 
-        dark={dark} 
-      />
-
-      {/* ━━━━ UPLOAD MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <AnimatePresence>
-        {uploadOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setUploadOpen(false)}
-              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100 }}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
-              animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
-              exit={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
-              transition={{ duration: 0.18 }}
-              style={{
-                position: "fixed", top: "50%", left: "50%",
-                width: 460, zIndex: 101,
-                background: c.bgSurface,
-                border: `1px solid ${c.border}`,
-                borderRadius: "var(--radius-xl)",
-                overflow: "hidden",
-                boxShadow: "0 24px 80px rgba(0,0,0,0.25)",
-              }}
-            >
-              <UploadModal onClose={() => setUploadOpen(false)} onUpload={handleUploadClick} c={c} />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* ━━━━ DOWNLOAD PASSWORD MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <AnimatePresence>
-        {downloadPasswordOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setDownloadPasswordOpen(false)}
-              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 150 }}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
-              animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
-              exit={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
-              style={{
-                position: "fixed", top: "50%", left: "50%",
-                width: 400, zIndex: 151,
-                background: c.bgSurface,
-                border: `1px solid ${c.border}`,
-                borderRadius: "var(--radius-xl)",
-                overflow: "hidden",
-                boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
-                padding: 32,
-              }}
-            >
-               <h3 style={{ fontSize: 18, fontWeight: 600, color: c.textPrimary, marginBottom: 8 }}>Authentication Required</h3>
-               <p style={{ fontSize: 14, color: c.textSecondary, marginBottom: 24 }}>
-                 Enter the decryption password for <b>{pendingDownloadFile?.name}</b>.
-               </p>
-               <div style={{ position: "relative", marginBottom: 24 }}>
-                 <Lock size={18} color={c.textSecondary} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-                 <input 
-                   type="password" 
-                   autoFocus
-                   placeholder="Decryption password..."
-                   value={downloadPassword}
-                   onChange={(e) => setDownloadPassword(e.target.value)}
-                   onKeyDown={(e) => e.key === "Enter" && handleAction("download", pendingDownloadFile!)}
-                   style={{ width: "100%", padding: "14px 14px 14px 44px", borderRadius: "var(--radius-sm)", background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 14 }}
-                 />
-               </div>
-               <div style={{ display: "flex", gap: 12 }}>
-                 <button 
-                   onClick={() => setDownloadPasswordOpen(false)}
-                   style={{ flex: 1, padding: "12px", borderRadius: "var(--radius-sm)", background: "transparent", border: `1px solid ${c.border}`, color: c.textSecondary, cursor: "pointer", fontWeight: 500 }}
-                 >
-                   Cancel
-                 </button>
-                 <button 
-                   onClick={() => handleAction("download", pendingDownloadFile!)}
-                   style={{ flex: 1, padding: "12px", borderRadius: "var(--radius-sm)", background: "#1A73E8", color: "white", border: "none", cursor: "pointer", fontWeight: 600 }}
-                 >
-                   Start Recovery
-                 </button>
-               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* ━━━━ ACCOUNT MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <AnimatePresence>
-        {accountOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setAccountOpen(false)}
-              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200 }}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
-              animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
-              exit={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
-              style={{
-                position: "fixed", top: "50%", left: "50%",
-                width: 380, zIndex: 201,
-                background: c.bgSurface,
-                border: `1px solid ${c.border}`,
-                borderRadius: "var(--radius-xl)",
-                overflow: "hidden",
-                boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
-                padding: 32,
-                display: "flex", flexDirection: "column", alignItems: "center"
-              }}
-            >
-              <div style={{ width: 80, height: 80, borderRadius: "50%", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 32, fontWeight: 600, marginBottom: 16 }}>
-                {auth.authenticated ? auth.user.charAt(0).toUpperCase() : "!"}
+                  <Plus size={20} color="#1A73E8" />
+                  New
+                </button>
               </div>
-              <h2 style={{ fontSize: 20, fontWeight: 600, color: c.textPrimary, marginBottom: 4 }}>
-                {auth.authenticated ? (auth.user || "Aurel") : "Guest User"}
-              </h2>
-              <p style={{ fontSize: 14, color: c.textSecondary, marginBottom: 24 }}>
-                {auth.authenticated ? auth.user : "No YouTube account connected"}
-              </p>
-              
-              <div style={{ width: "100%", height: 1, background: c.border, marginBottom: 24 }} />
-              
-              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13, color: c.textSecondary }}>System Access</span>
-                  <span style={{ fontSize: 13, color: "#34A853", fontWeight: 600 }}>Active</span>
+
+              {/* Nav */}
+              <nav style={{ flex: 1, padding: "0 8px", display: "flex", flexDirection: "column", gap: 2 }}>
+                {[
+                  { id: "my-drive" as Section, icon: HardDrive, label: "My Drive" },
+                  { id: "recent" as Section, icon: Clock, label: "Recent" },
+                  { id: "starred" as Section, icon: Star, label: "Starred" },
+                ].map(item => (
+                  <NavItem key={item.id} item={item} active={section === item.id} onClick={() => { setSection(item.id); setSelected(null); }} c={c} />
+                ))}
+
+                <div style={{ height: 1, background: c.border, margin: "8px 8px" }} />
+
+                {[
+                  { id: "security" as Section, icon: Shield, label: "Security Hub" },
+                  { id: "trash" as Section, icon: Trash2, label: "Trash" },
+                ].map(item => (
+                  <NavItem key={item.id} item={item} active={section === item.id} onClick={() => { setSection(item.id); setSelected(null); }} c={c} />
+                ))}
+
+                <div style={{ height: 1, background: c.border, margin: "8px 8px" }} />
+
+                <div
+                  onClick={async () => {
+                    try {
+                      await fetch(`${API_BASE}/studio`);
+                    } catch (e) {
+                      console.error("Studio link failed", e);
+                    }
+                  }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 14,
+                    padding: "9px 16px", borderRadius: 24,
+                    color: c.textPrimary,
+                    fontSize: 14, cursor: "pointer", transition: "background 0.15s",
+                    userSelect: "none",
+                  }}
+                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = c.bgHover}
+                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
+                >
+                  <CloudLightning size={20} color="#FF0000" />
+                  YouTube Studio
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13, color: c.textSecondary }}>Encryption</span>
-                  <span style={{ fontSize: 13, color: c.textPrimary }}>XChaCha20</span>
+
+                <div
+                  onClick={handleSyncManifest}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 14,
+                    padding: "9px 16px", borderRadius: 12,
+                    color: syncing ? c.textSecondary : c.textPrimary,
+                    fontSize: 14, cursor: syncing ? "not-allowed" : "pointer", transition: "background 0.15s",
+                    userSelect: "none",
+                    opacity: syncing ? 0.6 : 1,
+                  }}
+                  onMouseEnter={e => { if (!syncing) (e.currentTarget as HTMLDivElement).style.background = c.bgHover; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+                >
+                  <RefreshCw size={20} color={c.textSecondary} style={{ animation: syncing ? "spin 2s linear infinite" : "none" }} />
+                  {syncing ? "Syncing..." : "Sync with YouTube"}
                 </div>
-                {auth.authenticated && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
-                    <button 
-                      onClick={() => {
-                        navigate('/settings');
-                        setAccountOpen(false);
-                      }}
-                      style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#667eea20", border: `1px solid #667eea40`, color: "#667eea", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+              </nav>
+
+              {/* Virtual Disk Mount */}
+              <div style={{ padding: "0 16px", marginBottom: 24 }}>
+                <div style={{ padding: 16, background: c.bgSurface, border: `1px solid ${c.border}`, borderRadius: "var(--radius-md)" }}>
+                  <div style={{ fontSize: 13, color: c.textSecondary, marginBottom: 8 }}>VIRTUAL DISK</div>
+                  {isMounted ? (
+                    <button
+                      onClick={handleUnmountDisk}
+                      style={{ width: "100%", padding: "10px", borderRadius: 10, background: "#ef444420", border: `1px solid #ef444450`, color: "#ef4444", cursor: "pointer", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                     >
-                      <Settings size={16} /> Settings
+                      <span>🔌</span> Quitter FUSE
                     </button>
-                    <button 
-                      onClick={handleSyncManifest}
-                      style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#1A73E820", border: `1px solid #1A73E840`, color: "#1A73E8", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                  ) : (
+                    <button
+                      onClick={handleMountDisk}
+                      style={{ width: "100%", padding: "10px", borderRadius: 10, background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, cursor: "pointer", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                     >
-                      Sync Manifest Now
+                      <span>📡</span> Connect
                     </button>
-                    <button 
-                      onClick={async () => {
-                        setAccountOpen(false);
-                        await fetch(`${API_BASE}/studio`);
-                      }}
-                      style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#FF000015", border: `1px solid #FF000030`, color: "#CC0000", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                  )}
+                </div>
+              </div>
+
+              {/* Storage & Quota */}
+              <div style={{ padding: "12px 24px", borderTop: `1px solid ${c.border}` }}>
+                {/* Real Storage Stats */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <HardDrive size={18} color={c.textSecondary} />
+                  <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 500 }}>{formatSize(stats.total_size)} Secured</span>
+                </div>
+
+                {/* Quota Progress */}
+                <div style={{ display: "flex", alignItems: "center", justifyItems: "space-between", gap: 10, marginBottom: 8, marginTop: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <CloudLightning size={18} color="#1A73E8" />
+                    <span style={{ fontSize: 13, color: c.textPrimary, fontWeight: 600 }}>YouTube Quota</span>
+                    {quota.source === "monitoring" && (
+                      <span style={{ fontSize: 9, background: "#10b98120", color: "#10b981", padding: "1px 6px", borderRadius: 10, fontWeight: 700, marginLeft: 4 }}>LIVE</span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                    <span style={{ fontSize: 11, color: c.textSecondary }}>{quota.used}/{Math.round(quota.limit / 1000)}k</span>
+                    <button
+                      onClick={handleCalibrateQuota}
+                      style={{ border: "none", background: "transparent", cursor: "pointer", color: c.textSecondary, padding: 0 }}
+                      title="Calibrate Usage"
                     >
-                      <CloudLightning size={16} /> Open YouTube Studio
+                      <RefreshCw size={10} />
                     </button>
                   </div>
-                )}
-                <button 
-                  onClick={handleLogout}
-                  style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#EA433520", border: `1px solid #EA433540`, color: "#EA4335", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
-                >
-                  Logout
-                </button>
+                </div>
+                <div style={{ height: 6, background: c.border, borderRadius: 4, overflow: "hidden", marginBottom: 6 }}>
+                  <div style={{ width: `${Math.min(100, (quota.used / quota.limit) * 100)}%`, height: "100%", background: (quota.used / quota.limit > 0.9) ? "#EA4335" : "#1A73E8" }} />
+                </div>
+                <p style={{ fontSize: 10, color: c.textSecondary, lineHeight: 1.4 }}>Daily limit resets at midnight PT.</p>
               </div>
-              
-              <button 
-                onClick={() => setAccountOpen(false)}
-                style={{ marginTop: 32, width: "100%", padding: "12px", borderRadius: "var(--radius-md)", background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, cursor: "pointer", fontWeight: 500 }}
+
+            </aside>
+
+            {/* ━━━━ MAIN CONTENT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+            <main
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                background: c.bgSurface,
+                margin: "8px 16px 8px 0",
+                borderRadius: "var(--radius-lg)",
+                border: `1px solid ${c.border}`,
+                boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
+                overflow: "hidden",
+                position: "relative"
+              }}
+            >
+              <TaskOverlay tasks={tasks} c={c} />
+              {/* Toolbar */}
+              <div style={{
+                height: 56,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "0 20px",
+                borderBottom: `1px solid ${c.border}`,
+                flexShrink: 0,
+              }}>
+                {/* Breadcrumb */}
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary }}>
+                    {SECTION_LABELS[section]}
+                  </span>
+                  <ChevronRight size={18} color={c.textSecondary} />
+                </div>
+
+                {/* View toggles */}
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <ViewToggleBtn active={viewMode === "list"} onClick={() => setViewMode("list")} title="List view" c={c}>
+                    <List size={20} />
+                  </ViewToggleBtn>
+                  <ViewToggleBtn active={viewMode === "grid"} onClick={() => setViewMode("grid")} title="Grid view" c={c}>
+                    <Grid3X3 size={20} />
+                  </ViewToggleBtn>
+                </div>
+              </div>
+
+              {/* File area */}
+              <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+                {/* File content */}
+                <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+                  <AnimatePresence mode="wait">
+                    <motion.div key={section} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}>
+                      {section === "security" ? (
+                        <SecuritySection c={c} />
+                      ) : files.length === 0 ? (
+                        <EmptyState
+                          icon={section === "trash" ? <Trash2 size={64} color={c.textSecondary} /> : <Search size={64} />}
+                          title={section === "trash" ? "Trash is empty" : "No files match your search"}
+                          sub={section === "trash" ? "Items deleted from Nexus are stored here temporarily." : "Try a different search term."}
+                          c={c}
+                        />
+                      ) : (
+                        <>
+                          <p style={{ fontSize: 14, fontWeight: 500, color: c.textSecondary, marginBottom: 16 }}>
+                            {section === "starred" ? "Starred" : "Suggested"}
+                          </p>
+                          {isInitialLoading ? (
+                            <>
+                              <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 16 }}>
+                                <Skeleton width={120} height={18} />
+                              </div>
+                              <div style={{ display: viewMode === "grid" ? "grid" : "block", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 20 }}>
+                                {[1, 2, 3, 4, 5, 6].map(i => <FileSkeleton key={i} viewMode={viewMode} c={c} />)}
+                              </div>
+                            </>
+                          ) : viewMode === "grid" ? (
+                            <FileGrid
+                              files={files}
+                              onSelect={handleSelect}
+                              selectedIds={selectedIds}
+                              c={c}
+                              dark={dark}
+                              persistentCheckboxes={persistentCheckboxes}
+                            />
+                          ) : (
+                            <FileList
+                              files={files}
+                              onSelect={handleSelect}
+                              selectedIds={selectedIds}
+                              c={c}
+                              dark={dark}
+                              persistentCheckboxes={persistentCheckboxes}
+                            />
+                          )}
+                        </>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+
+                {/* Detail panel (show only for single selection). Width is responsive on large screens. */}
+                <AnimatePresence>
+                  {(selectedIds.size === 1) && (
+                    <motion.div
+                      initial={{ width: 0, opacity: 0 }}
+                      animate={{ width: "clamp(280px, 22vw, 420px)", opacity: 1 }}
+                      exit={{ width: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                      style={{ borderLeft: `1px solid ${c.border}`, overflow: "hidden", flexShrink: 0 }}
+                    >
+                      <DetailPanel
+                        file={selectedIds.size === 1 ? selected : null}
+                        selectedIds={selectedIds}
+                        files={dbFiles}
+                        onClose={() => handleSelect(null, null)}
+                        onAction={handleAction}
+                        c={c}
+                        section={section}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </main>
+          </div>
+        )}
+
+        {/* ━━━━ MULTI-SELECT TOOLBAR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <MultiSelectToolbar
+          selectedIds={selectedIds}
+          onAction={handleBulkAction}
+          onClear={() => handleSelect(null, null)}
+          c={c}
+          dark={dark}
+        />
+
+        {/* ━━━━ UPLOAD MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <AnimatePresence>
+          {uploadOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setUploadOpen(false)}
+                style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100 }}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
+                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+                exit={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
+                transition={{ duration: 0.18 }}
+                style={{
+                  position: "fixed", top: "50%", left: "50%",
+                  width: 460, zIndex: 101,
+                  background: c.bgSurface,
+                  border: `1px solid ${c.border}`,
+                  borderRadius: "var(--radius-xl)",
+                  overflow: "hidden",
+                  boxShadow: "0 24px 80px rgba(0,0,0,0.25)",
+                }}
               >
-                Close Profile
-              </button>
+                <UploadModal onClose={() => setUploadOpen(false)} onUpload={handleUploadClick} c={c} />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ━━━━ DOWNLOAD PASSWORD MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <AnimatePresence>
+          {downloadPasswordOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setDownloadPasswordOpen(false)}
+                style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 150 }}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
+                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+                exit={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
+                style={{
+                  position: "fixed", top: "50%", left: "50%",
+                  width: 400, zIndex: 151,
+                  background: c.bgSurface,
+                  border: `1px solid ${c.border}`,
+                  borderRadius: "var(--radius-xl)",
+                  overflow: "hidden",
+                  boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
+                  padding: 32,
+                }}
+              >
+                <h3 style={{ fontSize: 18, fontWeight: 600, color: c.textPrimary, marginBottom: 8 }}>Authentication Required</h3>
+                <p style={{ fontSize: 14, color: c.textSecondary, marginBottom: 24 }}>
+                  Enter the decryption password for <b>{pendingDownloadFile?.name}</b>.
+                </p>
+                <div style={{ position: "relative", marginBottom: 24 }}>
+                  <Lock size={18} color={c.textSecondary} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+                  <input
+                    type="password"
+                    autoFocus
+                    placeholder="Decryption password..."
+                    value={downloadPassword}
+                    onChange={(e) => setDownloadPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAction("download", pendingDownloadFile!)}
+                    style={{ width: "100%", padding: "14px 14px 14px 44px", borderRadius: "var(--radius-sm)", background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 14 }}
+                  />
+                </div>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <button
+                    onClick={() => setDownloadPasswordOpen(false)}
+                    style={{ flex: 1, padding: "12px", borderRadius: "var(--radius-sm)", background: "transparent", border: `1px solid ${c.border}`, color: c.textSecondary, cursor: "pointer", fontWeight: 500 }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleAction("download", pendingDownloadFile!)}
+                    style={{ flex: 1, padding: "12px", borderRadius: "var(--radius-sm)", background: "#1A73E8", color: "white", border: "none", cursor: "pointer", fontWeight: 600 }}
+                  >
+                    Start Recovery
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ━━━━ ACCOUNT MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <AnimatePresence>
+          {accountOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setAccountOpen(false)}
+                style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200 }}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
+                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+                exit={{ opacity: 0, scale: 0.96, x: "-50%", y: "-40%" }}
+                style={{
+                  position: "fixed", top: "50%", left: "50%",
+                  width: 380, zIndex: 201,
+                  background: c.bgSurface,
+                  border: `1px solid ${c.border}`,
+                  borderRadius: "var(--radius-xl)",
+                  overflow: "hidden",
+                  boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
+                  padding: 32,
+                  display: "flex", flexDirection: "column", alignItems: "center"
+                }}
+              >
+                <div style={{ width: 80, height: 80, borderRadius: "50%", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 32, fontWeight: 600, marginBottom: 16 }}>
+                  {auth.authenticated ? auth.user.charAt(0).toUpperCase() : "!"}
+                </div>
+                <h2 style={{ fontSize: 20, fontWeight: 600, color: c.textPrimary, marginBottom: 4 }}>
+                  {auth.authenticated ? (auth.user || "Aurel") : "Guest User"}
+                </h2>
+                <p style={{ fontSize: 14, color: c.textSecondary, marginBottom: 24 }}>
+                  {auth.authenticated ? auth.user : "No YouTube account connected"}
+                </p>
+
+                <div style={{ width: "100%", height: 1, background: c.border, marginBottom: 24 }} />
+
+                <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 13, color: c.textSecondary }}>System Access</span>
+                    <span style={{ fontSize: 13, color: "#34A853", fontWeight: 600 }}>Active</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 13, color: c.textSecondary }}>Encryption</span>
+                    <span style={{ fontSize: 13, color: c.textPrimary }}>XChaCha20</span>
+                  </div>
+                  {auth.authenticated && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                      <button
+                        onClick={() => {
+                          navigate('/settings');
+                          setAccountOpen(false);
+                        }}
+                        style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#667eea20", border: `1px solid #667eea40`, color: "#667eea", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                      >
+                        <Settings size={16} /> Settings
+                      </button>
+                      <button
+                        onClick={handleSyncManifest}
+                        style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#1A73E820", border: `1px solid #1A73E840`, color: "#1A73E8", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                      >
+                        Sync Manifest Now
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setAccountOpen(false);
+                          await fetch(`${API_BASE}/studio`);
+                        }}
+                        style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#FF000015", border: `1px solid #FF000030`, color: "#CC0000", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                      >
+                        <CloudLightning size={16} /> Open YouTube Studio
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    style={{ padding: "8px", borderRadius: "var(--radius-sm)", background: "#EA433520", border: `1px solid #EA433540`, color: "#EA4335", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                  >
+                    Logout
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setAccountOpen(false)}
+                  style={{ marginTop: 32, width: "100%", padding: "12px", borderRadius: "var(--radius-md)", background: c.bgApp, border: `1px solid ${c.border}`, color: c.textPrimary, cursor: "pointer", fontWeight: 500 }}
+                >
+                  Close Profile
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ━━━━ PASSWORD MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <PasswordModal
+          isOpen={passwordModalOpen}
+          onClose={() => {
+            setPasswordModalOpen(false);
+            setPendingPasswordOperation(null);
+          }}
+          onSubmit={async (password: string) => {
+            if (pendingPasswordOperation) {
+              await pendingPasswordOperation.callback(password);
+            }
+          }}
+          title={pendingPasswordOperation?.title || "Enter Master Password"}
+          description={pendingPasswordOperation?.description || "This operation requires your master password."}
+          dark={dark}
+          c={c}
+        />
+
+        {/* ━━━━ TOAST ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              style={{
+                position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+                background: toast?.type === "error" ? "#EA4335" : (toast?.type === "info" ? "#1A73E8" : "#323232"),
+                color: "white", padding: "12px 24px", borderRadius: "var(--radius-md)",
+                fontSize: 14, fontWeight: 500, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                zIndex: 9999, display: "flex", alignItems: "center", gap: 12
+              }}
+            >
+              {toast?.msg}
             </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* ━━━━ PASSWORD MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <PasswordModal
-        isOpen={passwordModalOpen}
-        onClose={() => {
-          setPasswordModalOpen(false);
-          setPendingPasswordOperation(null);
-        }}
-        onSubmit={async (password: string) => {
-          if (pendingPasswordOperation) {
-            await pendingPasswordOperation.callback(password);
-          }
-        }}
-        title={pendingPasswordOperation?.title || "Enter Master Password"}
-        description={pendingPasswordOperation?.description || "This operation requires your master password."}
-        dark={dark}
-        c={c}
-      />
-
-      {/* ━━━━ TOAST ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            style={{
-              position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-              background: toast?.type === "error" ? "#EA4335" : (toast?.type === "info" ? "#1A73E8" : "#323232"),
-              color: "white", padding: "12px 24px", borderRadius: "var(--radius-md)",
-              fontSize: 14, fontWeight: 500, boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              zIndex: 9999, display: "flex", alignItems: "center", gap: 12
-            }}
-          >
-            {toast?.msg}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
       </div>
     </>
   );
@@ -1419,8 +1420,8 @@ function SignInView({ c }: { c: ColorSet }) {
       <p style={{ fontSize: 16, color: c.textSecondary, maxWidth: 400, marginBottom: 40, lineHeight: 1.6 }}>
         Your ultra-secure, decentralized storage backed by high-resilience YouTube archival.
       </p>
-      
-      <button 
+
+      <button
         onClick={handleLogin}
         disabled={loading}
         style={{
@@ -1436,7 +1437,7 @@ function SignInView({ c }: { c: ColorSet }) {
         <Plus size={20} color="white" />
         {loading ? "Check your browser..." : "Connect YouTube Account"}
       </button>
-      
+
       <p style={{ marginTop: 32, fontSize: 13, color: c.textSecondary }}>
         Safe. Private. Unlimited.
       </p>
@@ -1476,7 +1477,7 @@ function FileGrid({ files, onSelect, selectedIds, c, dark, persistentCheckboxes 
             }}
           >
             {/* Checkbox Overlay */}
-            <div 
+            <div
               style={{
                 position: "absolute",
                 top: 10,
@@ -1535,7 +1536,7 @@ function FileList({ files, onSelect, selectedIds, c, dark, persistentCheckboxes 
         const cfg = TYPE_CONFIG[f.type];
         const Ico = cfg.icon;
         const isSelected = selectedIds.has(f.id);
-        
+
         return (
           <div
             key={f.id}
@@ -1559,7 +1560,7 @@ function FileList({ files, onSelect, selectedIds, c, dark, persistentCheckboxes 
             {/* Name */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
               {/* Checkbox */}
-              <div 
+              <div
                 style={{
                   width: 18,
                   height: 18,
@@ -1602,26 +1603,26 @@ function FileList({ files, onSelect, selectedIds, c, dark, persistentCheckboxes 
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ 
-  file, 
-  selectedIds, 
-  files, 
-  onClose, 
-  onAction, 
-  c, 
-  section 
-}: { 
-  file: NFile | null; 
-  selectedIds: Set<string>; 
-  files: NFile[]; 
-  onClose: () => void; 
-  onAction: (action: "download" | "delete" | "star" | "restore" | "permanent" | "evict", file: NFile) => void; 
-  c: ColorSet; 
-  section: Section 
+function DetailPanel({
+  file,
+  selectedIds,
+  files,
+  onClose,
+  onAction,
+  c,
+  section
+}: {
+  file: NFile | null;
+  selectedIds: Set<string>;
+  files: NFile[];
+  onClose: () => void;
+  onAction: (action: "download" | "delete" | "star" | "restore" | "permanent" | "evict", file: NFile) => void;
+  c: ColorSet;
+  section: Section
 }) {
   const isMulti = selectedIds.size > 1;
   const selectedFiles = files.filter(f => selectedIds.has(f.id));
-  
+
   if (isMulti) {
     const totalSizeRaw = selectedFiles.reduce((acc, f) => {
       const match = f.size.match(/([\d.]+)\s*(KB|MB|GB|TB)/i);
@@ -1631,7 +1632,7 @@ function DetailPanel({
       const mult: Record<string, number> = { KB: 1e3, MB: 1e6, GB: 1e9, TB: 1e12 };
       return acc + (val * (mult[unit] || 1));
     }, 0);
-    
+
     return (
       <div style={{ width: 280, height: "100%", display: "flex", flexDirection: "column", padding: 20, overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
@@ -1640,7 +1641,7 @@ function DetailPanel({
             <X size={18} />
           </button>
         </div>
-        
+
         <div style={{ background: c.bgApp, borderRadius: 20, padding: 20, textAlign: "center", marginBottom: 20, border: `1px solid ${c.border}` }}>
           <Grid3X3 size={40} color="#1A73E8" style={{ marginBottom: 12, opacity: 0.8 }} />
           <p style={{ fontSize: 24, fontWeight: 700, color: c.textPrimary, margin: 0 }}>{selectedIds.size}</p>
@@ -1664,7 +1665,7 @@ function DetailPanel({
   if (!file) return null;
   const cfg = TYPE_CONFIG[file.type];
   const Ico = cfg.icon;
-  
+
   return (
     <div style={{ width: 280, height: "100%", display: "flex", flexDirection: "column", padding: 20, overflowY: "auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -1735,7 +1736,24 @@ function DetailPanel({
 
 function TaskOverlay({ tasks, c }: { tasks: Record<string, BackendTask>; c: ColorSet }) {
   const [closedTasks, setClosedTasks] = useState<string[]>([]);
-  
+
+  const handleCancelTask = async (id: string) => {
+    try {
+      await fetch(`${API_BASE}/tasks/${id}`, { method: 'DELETE' });
+      setClosedTasks(prev => [...prev, id]);
+    } catch (err) {
+      console.error("Failed to cancel task:", err);
+      // Still hide it locally even if backend call fails to respect user's 'X' click
+      setClosedTasks(prev => [...prev, id]);
+    }
+  };
+
+  const handleClearAll = async (targetTasks: BackendTask[]) => {
+    for (const t of targetTasks) {
+      await handleCancelTask(t.id);
+    }
+  };
+
   // Hide internal manifest backup tasks — user doesn't need to see those
   const allTasks = Object.values(tasks)
     .filter(t => !t.id.startsWith("manifest-"))
@@ -1758,8 +1776,8 @@ function TaskOverlay({ tasks, c }: { tasks: Record<string, BackendTask>; c: Colo
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {activeTasks.length > 0 && <span style={{ fontSize: 11, background: "#1A73E8", color: "white", padding: "2px 6px", borderRadius: 10 }}>{activeTasks.length}</span>}
           {finishedTasks.length > 0 && (
-            <button 
-              onClick={() => setClosedTasks([...closedTasks, ...finishedTasks.map(t => t.id)])}
+            <button
+              onClick={() => handleClearAll(finishedTasks)}
               style={{ border: "none", background: "transparent", color: "#1A73E8", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>
               Clear all
             </button>
@@ -1781,8 +1799,8 @@ function TaskOverlay({ tasks, c }: { tasks: Record<string, BackendTask>; c: Colo
                   {t.status}
                 </span>
               </div>
-              <button 
-                onClick={() => setClosedTasks([...closedTasks, t.id])}
+              <button
+                onClick={() => handleCancelTask(t.id)}
                 style={{ position: "absolute", top: 10, right: 10, border: "none", background: "transparent", cursor: "pointer", color: c.textSecondary, padding: 2 }}>
                 <X size={14} />
               </button>
@@ -1804,7 +1822,7 @@ function TaskOverlay({ tasks, c }: { tasks: Record<string, BackendTask>; c: Colo
 // ─── Security Section ─────────────────────────────────────────────────────────
 
 function SecuritySection({ c }: { c: ColorSet }) {
-  const [protocols, setProtocols] = useState<{name: string, detail: string, active: boolean}[]>([]);
+  const [protocols, setProtocols] = useState<{ name: string, detail: string, active: boolean }[]>([]);
   const [, setPurgeDays] = useState(30);
 
   useEffect(() => {
@@ -1908,22 +1926,22 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
 
         {/* Toggle File/Folder */}
         <div style={{ display: "flex", background: c.bgApp, padding: 4, borderRadius: "var(--radius-md)", border: `1px solid ${c.border}` }}>
-           <button 
-             onClick={() => { setIsFolder(false); setSelectedPath(null); }}
-             style={{ flex: 1, padding: "8px", borderRadius: "var(--radius-sm)", border: "none", background: !isFolder ? c.bgSurface : "transparent", color: !isFolder ? c.textPrimary : c.textSecondary, fontWeight: 600, cursor: "pointer", fontSize: 13 }}
-           >
-             Single File
-           </button>
-           <button 
-             onClick={() => { setIsFolder(true); setSelectedPath(null); }}
-             style={{ flex: 1, padding: "8px", borderRadius: "var(--radius-sm)", border: "none", background: isFolder ? c.bgSurface : "transparent", color: isFolder ? c.textPrimary : c.textSecondary, fontWeight: 600, cursor: "pointer", fontSize: 13 }}
-           >
-             Folder (Archive)
-           </button>
+          <button
+            onClick={() => { setIsFolder(false); setSelectedPath(null); }}
+            style={{ flex: 1, padding: "8px", borderRadius: "var(--radius-sm)", border: "none", background: !isFolder ? c.bgSurface : "transparent", color: !isFolder ? c.textPrimary : c.textSecondary, fontWeight: 600, cursor: "pointer", fontSize: 13 }}
+          >
+            Single File
+          </button>
+          <button
+            onClick={() => { setIsFolder(true); setSelectedPath(null); }}
+            style={{ flex: 1, padding: "8px", borderRadius: "var(--radius-sm)", border: "none", background: isFolder ? c.bgSurface : "transparent", color: isFolder ? c.textPrimary : c.textSecondary, fontWeight: 600, cursor: "pointer", fontSize: 13 }}
+          >
+            Folder (Archive)
+          </button>
         </div>
 
         {/* Drop zone / Selector */}
-        <div 
+        <div
           onClick={handleSelect}
           style={{
             border: `2px dashed ${selectedPath ? "#34A853" : c.border}`, borderRadius: "var(--radius-md)",
@@ -1947,74 +1965,74 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
 
         {/* Custom Encryption Password (Optional) */}
         <div>
-           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-             <p style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>Custom Password Protection</p>
-             <button
-               onClick={() => {
-                 setUseCustomPassword(!useCustomPassword);
-                 if (!useCustomPassword) setShowPassword(false);
-                 setPassword("");
-               }}
-               style={{
-                 display: "flex",
-                 alignItems: "center",
-                 gap: 8,
-                 padding: "6px 12px",
-                 borderRadius: 6,
-                 background: useCustomPassword ? "#E8F0FE" : c.bgApp,
-                 border: `1px solid ${useCustomPassword ? "#1A73E8" : c.border}`,
-                 cursor: "pointer",
-                 fontSize: 12,
-                 fontWeight: 600,
-                 color: useCustomPassword ? "#1A73E8" : c.textSecondary,
-                 transition: "all 0.2s"
-               }}
-             >
-               <Lock size={14} />
-               {useCustomPassword ? "Enabled" : "Disabled"}
-             </button>
-           </div>
-           {useCustomPassword && (
-             <div style={{ position: "relative" }}>
-               <Lock size={16} color={c.textSecondary} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-               <input
-                 type={showPassword ? "text" : "password"}
-                 placeholder="Enter password (write it down, it cannot be recovered!)"
-                 value={password}
-                 onChange={(e) => setPassword(e.target.value)}
-                 style={{ width: "100%", padding: "12px 40px 12px 40px", borderRadius: "var(--radius-sm)", background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
-               />
-               <button
-                 type="button"
-                 onClick={() => setShowPassword(!showPassword)}
-                 style={{
-                   position: "absolute",
-                   right: 12,
-                   top: "50%",
-                   transform: "translateY(-50%)",
-                   background: "none",
-                   border: "none",
-                   cursor: "pointer",
-                   color: c.textSecondary,
-                   display: "flex",
-                   alignItems: "center",
-                   padding: 4
-                 }}
-               >
-                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-               </button>
-             </div>
-           )}
-           {useCustomPassword && (
-             <div style={{ marginTop: 8, fontSize: 11, color: "#D33B27" }}>
-               ⚠️ <strong>Important:</strong> If you forget this password, your file will be locked forever. Write it down!
-             </div>
-           )}
-           {!useCustomPassword && (
-             <div style={{ marginTop: 8, fontSize: 11, color: c.textSecondary }}>
-               ℹ️ Encryption is automatic via your Google account. Password protection is optional.
-             </div>
-           )}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: c.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>Custom Password Protection</p>
+            <button
+              onClick={() => {
+                setUseCustomPassword(!useCustomPassword);
+                if (!useCustomPassword) setShowPassword(false);
+                setPassword("");
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "6px 12px",
+                borderRadius: 6,
+                background: useCustomPassword ? "#E8F0FE" : c.bgApp,
+                border: `1px solid ${useCustomPassword ? "#1A73E8" : c.border}`,
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 600,
+                color: useCustomPassword ? "#1A73E8" : c.textSecondary,
+                transition: "all 0.2s"
+              }}
+            >
+              <Lock size={14} />
+              {useCustomPassword ? "Enabled" : "Disabled"}
+            </button>
+          </div>
+          {useCustomPassword && (
+            <div style={{ position: "relative" }}>
+              <Lock size={16} color={c.textSecondary} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter password (write it down, it cannot be recovered!)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{ width: "100%", padding: "12px 40px 12px 40px", borderRadius: "var(--radius-sm)", background: c.bgSurface, border: `1px solid ${c.border}`, color: c.textPrimary, fontSize: 13 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute",
+                  right: 12,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: c.textSecondary,
+                  display: "flex",
+                  alignItems: "center",
+                  padding: 4
+                }}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          )}
+          {useCustomPassword && (
+            <div style={{ marginTop: 8, fontSize: 11, color: "#D33B27" }}>
+              ⚠️ <strong>Important:</strong> If you forget this password, your file will be locked forever. Write it down!
+            </div>
+          )}
+          {!useCustomPassword && (
+            <div style={{ marginTop: 8, fontSize: 11, color: c.textSecondary }}>
+              ℹ️ Encryption is automatic via your Google account. Password protection is optional.
+            </div>
+          )}
         </div>
 
         {/* Mode */}
@@ -2041,13 +2059,13 @@ function UploadModal({ onClose, onUpload, c }: { onClose: () => void; onUpload: 
             ))}
           </div>
         </div>
-        <button 
+        <button
           disabled={!selectedPath}
           onClick={() => selectedPath && onUpload(selectedPath, mode, useCustomPassword ? password : "", isFolder)}
-          style={{ 
-            width: "100%", padding: "13px 20px", borderRadius: "var(--radius-md)", 
-            background: !selectedPath ? c.border : "#1A73E8", 
-            color: "white", border: "none", fontSize: 14, fontWeight: 500, 
+          style={{
+            width: "100%", padding: "13px 20px", borderRadius: "var(--radius-md)",
+            background: !selectedPath ? c.border : "#1A73E8",
+            color: "white", border: "none", fontSize: 14, fontWeight: 500,
             cursor: !selectedPath ? "not-allowed" : "pointer",
             opacity: !selectedPath ? 0.7 : 1,
             transition: "all 0.2s"
@@ -2140,31 +2158,31 @@ interface ColorSet {
 }
 
 const LIGHT: ColorSet = {
-  bgApp:         "#F0F4F9",
-  bgSurface:     "#FFFFFF",
-  bgSearch:      "#DDE3EA",
-  bgHover:       "#E2E8F0",
-  bgActive:      "#C2E7FF",
-  textPrimary:   "#1F1F1F",
+  bgApp: "#F0F4F9",
+  bgSurface: "#FFFFFF",
+  bgSearch: "#DDE3EA",
+  bgHover: "#E2E8F0",
+  bgActive: "#C2E7FF",
+  textPrimary: "#1F1F1F",
   textSecondary: "#444746",
-  textActive:    "#001D35",
-  iconActive:    "#0842A0",
-  border:        "#E0E0E0",
-  btnShadow:     "0 1px 3px rgba(60,64,67,.3), 0 4px 8px rgba(60,64,67,.15)",
+  textActive: "#001D35",
+  iconActive: "#0842A0",
+  border: "#E0E0E0",
+  btnShadow: "0 1px 3px rgba(60,64,67,.3), 0 4px 8px rgba(60,64,67,.15)",
 };
 
 const DARK: ColorSet = {
-  bgApp:         "#131314",
-  bgSurface:     "#1E1F20",
-  bgSearch:      "#2A2B2C",
-  bgHover:       "#2D2E30",
-  bgActive:      "#004A77",
-  textPrimary:   "#E3E3E3",
+  bgApp: "#131314",
+  bgSurface: "#1E1F20",
+  bgSearch: "#2A2B2C",
+  bgHover: "#2D2E30",
+  bgActive: "#004A77",
+  textPrimary: "#E3E3E3",
   textSecondary: "#9AA0A6",
-  textActive:    "#C2E7FF",
-  iconActive:    "#8AB4F8",
-  border:        "#3C4043",
-  btnShadow:     "0 1px 3px rgba(0,0,0,.5), 0 4px 8px rgba(0,0,0,.3)",
+  textActive: "#C2E7FF",
+  iconActive: "#8AB4F8",
+  border: "#3C4043",
+  btnShadow: "0 1px 3px rgba(0,0,0,.5), 0 4px 8px rgba(0,0,0,.3)",
 };
 const shimmer = `
   @keyframes shimmer {
@@ -2218,15 +2236,15 @@ function SplashScreen({ b, loading, c }: { b: boolean; loading: boolean; c: Colo
   return (
     <AnimatePresence>
       {!b && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 1.05 }}
           transition={{ duration: 0.6, ease: "easeInOut" }}
           style={{ position: "fixed", inset: 0, background: c.bgApp, zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}
         >
           <style>{shimmer}</style>
-          <motion.div 
-            animate={{ scale: [1, 1.1, 1], opacity: [0.8, 1, 0.8] }} 
+          <motion.div
+            animate={{ scale: [1, 1.1, 1], opacity: [0.8, 1, 0.8] }}
             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
             style={{ width: 80, height: 80, borderRadius: "var(--radius-xl)", background: "#1A73E8", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24, boxShadow: "0 20px 40px rgba(26, 115, 232, 0.3)" }}
           >
@@ -2234,7 +2252,7 @@ function SplashScreen({ b, loading, c }: { b: boolean; loading: boolean; c: Colo
           </motion.div>
           <h1 style={{ fontSize: 28, fontWeight: 600, color: c.textPrimary, letterSpacing: -0.5, marginBottom: 8, textAlign: "center" }}>Nexus Storage</h1>
           <div style={{ width: 40, height: 4, background: "#1A73E840", borderRadius: 2, overflow: "hidden", marginBottom: 16 }}>
-             <motion.div animate={{ x: [-40, 40] }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }} style={{ width: 20, height: "100%", background: "#1A73E8" }} />
+            <motion.div animate={{ x: [-40, 40] }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }} style={{ width: 20, height: "100%", background: "#1A73E8" }} />
           </div>
           <p style={{ fontSize: 13, color: c.textSecondary, letterSpacing: 1.5, fontWeight: 600 }}>
             {loading ? "FETCHING CLOUD SHARDS..." : "SECURE INITIALIZATION"}
@@ -2247,18 +2265,18 @@ function SplashScreen({ b, loading, c }: { b: boolean; loading: boolean; c: Colo
 
 // ─── Multi-Select Toolbar ───────────────────────────────────────────────────
 
-function MultiSelectToolbar({ 
-  selectedIds, 
-  onAction, 
-  onClear, 
-  c, 
-  dark 
-}: { 
-  selectedIds: Set<string>; 
-  onAction: (action: "delete" | "star" | "restore" | "permanent") => void; 
+function MultiSelectToolbar({
+  selectedIds,
+  onAction,
+  onClear,
+  c,
+  dark
+}: {
+  selectedIds: Set<string>;
+  onAction: (action: "delete" | "star" | "restore" | "permanent") => void;
   onClear: () => void;
-  c: ColorSet; 
-  dark: boolean 
+  c: ColorSet;
+  dark: boolean
 }) {
   const count = selectedIds.size;
   // Only show the bottom multi-select toolbar when more than one item is selected
@@ -2295,11 +2313,11 @@ function MultiSelectToolbar({
 
         <div style={{ display: "flex", gap: 8 }}>
           <ToolbarButton icon={<Star size={18} />} label="Star" onClick={() => onAction("star")} c={c} />
-          <ToolbarButton icon={<Download size={18} />} label="Download" onClick={() => {}} c={c} />
+          <ToolbarButton icon={<Download size={18} />} label="Download" onClick={() => { }} c={c} />
           <ToolbarButton icon={<Trash2 size={18} />} label="Trash" onClick={() => onAction("delete")} c={c} danger />
         </div>
 
-        <button 
+        <button
           onClick={onClear}
           style={{
             width: 48,
@@ -2324,7 +2342,7 @@ function MultiSelectToolbar({
 
 function ToolbarButton({ icon, label, onClick, c, danger }: { icon: any; label: string; onClick: () => void; c: ColorSet; danger?: boolean }) {
   return (
-    <button 
+    <button
       onClick={onClick}
       style={{
         display: "flex",

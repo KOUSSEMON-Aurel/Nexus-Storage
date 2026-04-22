@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -236,7 +235,7 @@ func (m *YouTubeManager) GetLiveQuota() (int, bool) {
 		return 0, false
 	}
 
-	// Prepare time interval (current PT day)
+	// Prepare time interval (current PT day per YouTube quota reset at midnight PT)
 	pt, err := time.LoadLocation("America/Los_Angeles")
 	if err != nil {
 		log.Printf("⚠️  GetLiveQuota: could not load PT timezone: %v", err)
@@ -246,9 +245,16 @@ func (m *YouTubeManager) GetLiveQuota() (int, bool) {
 	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, pt).UTC()
 	end := now.UTC()
 
-	filter := `metric.type="serviceruntime.googleapis.com/quota/rate/net_usage" AND resource.labels.service="youtube.googleapis.com"`
-	url := fmt.Sprintf("https://monitoring.googleapis.com/v3/projects/%s/timeSeries?filter=%s&interval.startTime=%s&interval.endTime=%s",
-		projectID, strings.ReplaceAll(filter, " ", "%20"), start.Format(time.RFC3339), end.Format(time.RFC3339))
+	// Use serviceruntime quota metric — accessible via OAuth token with monitoring.read
+	// resource.type="api" and resource.labels.service="youtube.googleapis.com" narrows to YouTube quota
+	filter := `metric.type="serviceruntime.googleapis.com/quota/rate/net_usage" AND resource.labels.service="youtube.googleapis.com" AND resource.labels.project_id="` + projectID + `"`
+	url := fmt.Sprintf(
+		"https://monitoring.googleapis.com/v3/projects/%s/timeSeries?filter=%s&interval.startTime=%s&interval.endTime=%s&aggregation.alignmentPeriod=86400s&aggregation.perSeriesAligner=ALIGN_SUM",
+		projectID,
+		strings.NewReplacer(" ", "%20", `"`, "%22", "=", "%3D", "&", "%26").Replace(filter),
+		start.Format(time.RFC3339),
+		end.Format(time.RFC3339),
+	)
 
 	resp, err := client.Get(url)
 	if err != nil {
@@ -602,46 +608,6 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
 	tok := &oauth2.Token{}
 	err = json.NewDecoder(f).Decode(tok)
 	return tok, err
-}
-
-// extractGoogleSubFromToken extracts the Google subject ID from the OAuth token's ID token (JWT)
-func extractGoogleSubFromToken(token *oauth2.Token) string {
-	if token == nil {
-		return ""
-	}
-
-	// The ID token is in token.Extra()["id_token"]
-	idTokenRaw, ok := token.Extra("id_token").(string)
-	if !ok || idTokenRaw == "" {
-		return ""
-	}
-
-	// JWT format: header.payload.signature
-	parts := strings.Split(idTokenRaw, ".")
-	if len(parts) != 3 {
-		return ""
-	}
-
-	// Decode the payload (second part)
-	payload := parts[1]
-	// Add padding if needed for base64 decoding
-	padding := (4 - len(payload)%4) % 4
-	payload += strings.Repeat("=", padding)
-
-	decodedBytes, err := base64.StdEncoding.DecodeString(payload)
-	if err != nil {
-		return ""
-	}
-
-	// Parse JSON to extract 'sub' claim
-	var claims struct {
-		Sub string `json:"sub"`
-	}
-	if err := json.Unmarshal(decodedBytes, &claims); err != nil {
-		return ""
-	}
-
-	return claims.Sub
 }
 
 func saveToken(path string, token *oauth2.Token) {

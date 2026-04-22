@@ -22,18 +22,20 @@ var apiPort = 8081
 func getHostTriple() string {
 	// Simple mapping for common platforms
 	arch := runtime.GOARCH
-	if arch == "amd64" {
+	switch arch {
+	case "amd64":
 		arch = "x86_64"
-	} else if arch == "arm64" {
+	case "arm64":
 		arch = "aarch64"
 	}
 
 	os := runtime.GOOS
-	if os == "linux" {
+	switch os {
+	case "linux":
 		return fmt.Sprintf("%s-unknown-linux-gnu", arch)
-	} else if os == "darwin" {
+	case "darwin":
 		return fmt.Sprintf("%s-apple-darwin", arch)
-	} else if os == "windows" {
+	case "windows":
 		return fmt.Sprintf("%s-pc-windows-msvc", arch)
 	}
 	return fmt.Sprintf("%s-unknown-%s", arch, os)
@@ -76,10 +78,6 @@ func findBinary(name string) string {
 	}
 
 	return ""
-}
-
-func has(name string) bool {
-	return findBinary(name) != ""
 }
 
 // Shorten safely slices a string to a maximum length without panicking.
@@ -310,11 +308,12 @@ func scheduleOrphanCleanup(queue *TaskQueue) {
 
 func unmountVirtualDisk() {
 	mountPath := filepath.Join(os.Getenv("HOME"), "Nexus-Storage")
-	if runtime.GOOS == "linux" {
+	switch runtime.GOOS {
+	case "linux":
 		exec.Command("fusermount", "-u", mountPath).Run()
-	} else if runtime.GOOS == "darwin" {
+	case "darwin":
 		exec.Command("umount", mountPath).Run()
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		exec.Command("taskkill", "/IM", "rclone.exe", "/F").Run()
 	}
 	log.Printf("🔌 [SmartMount] Unmount requested.")
@@ -322,12 +321,13 @@ func unmountVirtualDisk() {
 
 func isVirtualDiskMounted() bool {
 	mountPath := filepath.Join(os.Getenv("HOME"), "Nexus-Storage")
-	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "linux", "darwin":
 		out, err := exec.Command("mount").Output()
 		if err == nil {
 			return strings.Contains(string(out), mountPath)
 		}
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		out, err := exec.Command("tasklist").Output()
 		if err == nil {
 			return strings.Contains(string(out), "rclone.exe")

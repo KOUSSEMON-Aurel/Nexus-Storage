@@ -95,25 +95,27 @@ func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManage
 	q.cache = cache
 	ensureYtDlp()
 
-	// Load pending tasks from DB (but skip failed uploads — don't retry them)
+	// Load pending tasks from DB (V6: Only resume strictly 'Pending' or 'In Progress' tasks)
 	rows, err := db.GetPendingTasks()
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			t := &Task{}
-			var tType int
-			err := rows.Scan(&t.ID, &tType, &t.FilePath, &t.Mode, &t.IsManifest, &t.Status, &t.Progress, &t.CreatedAt, &t.ParentID, &t.SHA256)
+			var createdAt string
+			err := rows.Scan(&t.ID, &t.Type, &t.FilePath, &t.Mode, &t.IsManifest, &t.Status, &t.Progress, &createdAt, &t.ParentID, &t.SHA256)
 			if err == nil {
-				t.Type = TaskType(tType)
-				// Skip uploads that previously failed — do not resume them automatically
-				if tType == int(TaskUpload) && strings.Contains(t.Status, "Error") {
-					log.Printf("⏭️  Skipping failed upload task %s (do not retry): %s", t.ID, t.Status)
-					db.DeleteTask(t.ID) // Remove from DB entirely
-					continue
+				t.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+
+				// ROBUSTNESS #3: Only resume tasks that are 'Pending' or similar.
+				// Never resume 'Completed', 'Error', or 'Cancelled' tasks.
+				if t.Status == "Pending" || t.Status == "In Progress" || strings.HasPrefix(t.Status, "Preparing") {
+					log.Printf("🔄 Resuming task %s (%v): %s", t.ID, t.Type, t.Status)
+					q.tasks[t.ID] = t
+					q.taskChan <- t
+				} else {
+					// Load but don't queue (user can see them as finished/failed in GUI)
+					q.tasks[t.ID] = t
 				}
-				q.tasks[t.ID] = t
-				log.Printf("⏳ Resuming pending task %s", t.ID)
-				q.taskChan <- t // Add to sequential worker
 			}
 		}
 	}
@@ -123,6 +125,26 @@ func (q *TaskQueue) Init(core *NexusCore, db *Database, ytManager *YouTubeManage
 
 	// Start task cleanup goroutine: auto-remove completed/error tasks after 30 seconds
 	go q.cleanupCompletedTasks()
+}
+
+func (q *TaskQueue) RemoveTask(id string) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	task, exists := q.tasks[id]
+	if !exists {
+		return fmt.Errorf("task not found")
+	}
+
+	// Update status so if it's currently running, it might stop (if we add cancellation)
+	task.Status = "Cancelled"
+	q.updateTaskState(task)
+
+	// Remove from memory
+	delete(q.tasks, id)
+
+	// Remove from DB so it doesn't resume
+	return q.db.DeleteTask(id)
 }
 
 // V4 Security: MasterKey session management (RAM-only)
@@ -150,27 +172,25 @@ func (q *TaskQueue) ClearMasterKeyHex() {
 	log.Printf("✅ Master key cleared from session")
 }
 
-// deriveKeyFromGoogleSub derives a 32-byte encryption key from Google sub (permanent user ID)
-// Uses PBKDF2 with SHA-256, fixed salt, 100k iterations for consistent, secure key derivation
-// This enables zero-knowledge architecture: user never manages encryption passwords
-func deriveKeyFromGoogleSub(googleSub string) string {
-	// Fixed salt - same for all users (sub is already unique per user)
-	// This ensures: same user → same key across sessions (necessary for downloads)
-	// different user → different key (automatic due to unique sub)
+// deriveLegacyKeyFromGoogleSub derives the old PBKDF2 key (V3 Desktop Legacy)
+func deriveLegacyKeyFromGoogleSub(googleSub string) string {
 	salt := []byte("nexus-storage-google-sub-v1")
-
-	// PBKDF2: 100,000 iterations recommended by OWASP (2024)
-	// Output: 32 bytes (256 bits) for AES-256
-	derivedKey := pbkdf2.Key(
-		[]byte(googleSub), // Input: permanent user ID
-		salt,              // Input: fixed salt
-		100000,            // Iterations: high for security
-		32,                // Output length: 256 bits
-		sha256.New,        // HMAC function: SHA-256
-	)
-
-	// Return as hex string for compatibility with existing encryption code
+	derivedKey := pbkdf2.Key([]byte(googleSub), salt, 100000, 32, sha256.New)
 	return hex.EncodeToString(derivedKey)
+}
+
+// deriveCombinedMasterKey derives the new Argon2id key (V4 Unified) using googleSub + potential password
+func (nc *NexusCore) deriveCombinedMasterKey(googleSub, password string) (string, error) {
+	// Unified salt: 16 bytes of 0x42 (matches mobile)
+	salt := make([]byte, 16)
+	for i := range salt {
+		salt[i] = 0x42
+	}
+	derivedKey, err := nc.DeriveMasterKey(googleSub+password, salt)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(derivedKey), nil
 }
 
 // RotatePassword performs V4.1 password rotation:
@@ -516,31 +536,28 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 	}
 
 	// V4 Security: Use password priority:
-	// 1. Custom password provided by user
-	// 2. Active master key from session
+	// 1. Custom password provided by user (used as master key passphrase)
+	// 2. Active master key from session (already-derived hex)
 	// 3. Auto-derived key from Google sub (zero-knowledge, automatic)
 	encryptionSecret := t.Password
 	if encryptionSecret == "" {
-		// No custom password - check if we have an active masterKey
 		q.masterKeyMu.RLock()
 		if q.masterKeyHex != "" {
-			encryptionSecret = q.masterKeyHex // Use hex-encoded masterKey
+			encryptionSecret = q.masterKeyHex
 		}
 		q.masterKeyMu.RUnlock()
 	}
 
-	// If still no secret, derive from Google sub (new approach: no password needed!)
 	if encryptionSecret == "" && q.ytManager != nil {
 		googleSub := q.ytManager.GetGoogleSub()
 		if googleSub != "" {
-			// Auto-derive key from Google sub - fully automatic, user doesn't know/care
-			encryptionSecret = deriveKeyFromGoogleSub(googleSub)
-			log.Printf("ℹ️  Using auto-derived key from Google sub (user didn't provide password)")
+			var keyErr error
+			encryptionSecret, keyErr = q.core.deriveCombinedMasterKey(googleSub, "")
+			if keyErr != nil {
+				return fmt.Errorf("failed to derive master key: %w", keyErr)
+			}
+			log.Printf("ℹ️  Using auto-derived Argon2id key from Google sub (upload)")
 		}
-	}
-
-	if encryptionSecret == "" {
-		return fmt.Errorf("no encryption secret available: user must be authenticated with Google")
 	}
 
 	encryptedFileKeyBytes, err := q.core.Encrypt(rawFileKey, encryptionSecret)
@@ -912,30 +929,31 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 		return fmt.Errorf("mock local video cannot be downloaded without real youtube video")
 	}
 
-	// V4 Security: Use password priority (same as upload):
-	// 1. Custom password provided by user
-	// 2. Active master key from session
+	// V4 Security: Use password priority:
+	// 1. Custom password provided by user (used as master key passphrase)
+	// 2. Active master key from session (already-derived hex)
 	// 3. Auto-derived key from Google sub (zero-knowledge, automatic)
 	encryptionSecret := t.Password
 	if encryptionSecret == "" {
 		q.masterKeyMu.RLock()
 		if q.masterKeyHex != "" {
-			encryptionSecret = q.masterKeyHex // hex-encoded masterKey
+			encryptionSecret = q.masterKeyHex
 		}
 		q.masterKeyMu.RUnlock()
 	}
 
-	// If still no secret, derive from Google sub (new approach: no password needed for download!)
+	var legacySecret string
 	if encryptionSecret == "" && q.ytManager != nil {
 		googleSub := q.ytManager.GetGoogleSub()
 		if googleSub != "" {
-			// Auto-derive key from Google sub - must match the key used during upload
-			encryptionSecret = deriveKeyFromGoogleSub(googleSub)
+			var keyErr error
+			encryptionSecret, keyErr = q.core.deriveCombinedMasterKey(googleSub, "")
+			if keyErr != nil {
+				return fmt.Errorf("failed to derive master key: %w", keyErr)
+			}
+			legacySecret = deriveLegacyKeyFromGoogleSub(googleSub)
+			log.Printf("ℹ️  Using auto-derived Argon2id key from Google sub (download)")
 		}
-	}
-
-	if encryptionSecret == "" {
-		return fmt.Errorf("no encryption secret available for download: user must be authenticated with Google")
 	}
 
 	var rawFileKey []byte
@@ -957,18 +975,23 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 			if err == nil {
 				log.Printf("[%s] ✅ file_key hex decoded successfully (%d bytes)", t.ID, len(encryptedKey))
 				key, err := q.core.Decrypt(encryptedKey, encryptionSecret)
+				if err != nil && legacySecret != "" {
+					log.Printf("[%s] 🔓 Master key decryption with Argon2id failed. Trying legacy PBKDF2 fallback...", t.ID)
+					key, err = q.core.Decrypt(encryptedKey, legacySecret)
+				}
+
 				if err == nil {
 					rawFileKey = key
 					log.Printf("[%s] ✅ file_key decrypted successfully (%d bytes)", t.ID, len(rawFileKey))
 					// Diagnostic: log a short sample of the decrypted per-file key for debugging
 					if len(rawFileKey) >= 8 {
-						log.Printf("[%s] [debug] Decrypted rawFileKey len=%d start=%x end=%x", t.ID, len(rawFileKey), rawFileKey[:8], rawFileKey[len(rawFileKey)-8:])
+						log.Printf("[%s] [debug] Decrypted rawFileKey len=%d start=%s end=%s", t.ID, len(rawFileKey), Shorten(hex.EncodeToString(rawFileKey), 8), Shorten(hex.EncodeToString(rawFileKey), 8))
 					} else {
 						log.Printf("[%s] [debug] Decrypted rawFileKey len=%d", t.ID, len(rawFileKey))
 					}
 				} else {
 					log.Printf("[%s] ⚠️  file_key decryption FAILED: %v", t.ID, err)
-					log.Printf("[%s]    encryptionSecret first 16 chars: %s", t.ID, encryptionSecret[:16])
+					log.Printf("[%s]    encryptionSecret first 16 chars: %s", t.ID, Shorten(encryptionSecret, 16))
 				}
 			} else {
 				log.Printf("[%s] ❌ file_key hex decode failed: %v", t.ID, err)
@@ -1049,30 +1072,77 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 
 			t.Status = fmt.Sprintf("Extracting Shard %d/%d", i+1, len(shardIDs))
 			q.updateTaskState(t)
-			// Determine target resolution based on mode
-			// Use nearest-neighbor (flags=neighbor) to preserve hard block edges — critical for data integrity
-			targetScale := "1280:720:flags=neighbor"
+
+			// Detect target resolution
+			targetScale := "1280:720"
+			frameWidth, frameHeight := 1280, 720
 			if t.Mode == "high" {
-				targetScale = "3840:2160:flags=neighbor"
+				targetScale = "3840:2160"
+				frameWidth, frameHeight = 3840, 2160
 			}
-			// Ensure we extract as grayscale + scale to original encode resolution for Luma-only decoder
+
+			// New Extraction: Use rawvideo for StreamingDecoder compatibility (faster than PNG)
+			rawVideoPath := filepath.Join(tempDir, fmt.Sprintf("shard_%d.raw", i))
 			ffCmd := exec.Command("ffmpeg", "-y", "-i", videoFile,
-				"-vf", "scale="+targetScale,
+				"-vf", "scale="+targetScale+":flags=neighbor",
 				"-pix_fmt", "gray",
-				filepath.Join(framesDir, "frame_%06d.png"))
+				"-f", "rawvideo",
+				rawVideoPath)
 			if err := ffCmd.Run(); err != nil {
 				return fmt.Errorf("ffmpeg extraction failed: %w", err)
 			}
 
 			t.Status = fmt.Sprintf("Decoding Shard %d/%d", i+1, len(shardIDs))
 			q.updateTaskState(t)
-			apiMode := 0 // Base
+
+			apiModeInt := 0 // Base
 			if t.Mode == "high" {
-				apiMode = 1 // High
+				apiModeInt = 1 // High
 			}
-			rawData, err = q.core.DecodeFromFrames(framesDir, apiMode)
+
+			// Use StreamingDecoder (V4+)
+			decoder, err := q.core.InitDecodeStream(apiModeInt)
 			if err != nil {
-				return fmt.Errorf("decoding failed: %w", err)
+				return err
+			}
+			defer decoder.Close()
+
+			f, err := os.Open(rawVideoPath)
+			if err != nil {
+				return err
+			}
+
+			frameSize := frameWidth * frameHeight
+			frameBuf := make([]byte, frameSize)
+			for {
+				n, err := f.Read(frameBuf)
+				if n > 0 {
+					if err := decoder.Push(frameBuf[:n]); err != nil {
+						log.Printf("[%s] ⚠️  Decode Push failed: %v", t.ID, err)
+					}
+				}
+				if err != nil {
+					break
+				}
+			}
+			f.Close()
+
+			rawData, err = decoder.Pop()
+			if err != nil || len(rawData) == 0 {
+				log.Printf("[%s] ❓ StreamingDecoder returned no data. Attempting legacy DecodeFromFrames...", t.ID)
+				// Fallback to legacy (needs PNGs, so we re-extract)
+				framesDir := filepath.Join(tempDir, fmt.Sprintf("frames_%d", i))
+				os.MkdirAll(framesDir, 0755)
+				ffCmdLegacy := exec.Command("ffmpeg", "-y", "-i", videoFile,
+					"-vf", "scale="+targetScale+":flags=neighbor",
+					"-pix_fmt", "gray",
+					filepath.Join(framesDir, "frame_%06d.png"))
+				ffCmdLegacy.Run()
+
+				rawData, err = q.core.DecodeFromFrames(framesDir, apiModeInt)
+				if err != nil {
+					return fmt.Errorf("decoding failed (both streaming and legacy): %w", err)
+				}
 			}
 
 			if q.cache != nil {
@@ -1083,31 +1153,97 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 		t.Status = fmt.Sprintf("Decrypting Shard %d/%d", i+1, len(shardIDs))
 		q.updateTaskState(t)
 
+		// MOBILE vs DESKTOP Decryption logic
 		var decrypted []byte
-		if rawFileKey != nil {
-			log.Printf("[%s] 🔐 Shard %d: Decrypting with per-file key (%d bytes)", t.ID, i+1, len(rawFileKey))
-			// Diagnostic: log rawData size and samples
-			if len(rawData) > 0 {
-				start := 8
-				if len(rawData) < start {
-					start = len(rawData)
+		if fileRecord != nil && fileRecord.FileKey == "" {
+			// Mobile-style Streaming AEAD
+			log.Printf("[%s] 📱 Detected mobile-encoded stream (missing FileKey). Using Streaming Decrypt.", t.ID)
+			if len(rawData) < 16 {
+				return fmt.Errorf("mobile stream too short to contain nonce prefix")
+			}
+			noncePrefix := rawData[:16]
+			encryptedPayload := rawData[16:]
+
+			// encryptionSecret is hex-encoded
+			encryptionSecretBytes, _ := hex.DecodeString(encryptionSecret)
+			decStream, err := q.core.InitDecryptStream(encryptionSecretBytes, noncePrefix)
+			if err != nil {
+				return fmt.Errorf("failed to init decrypt stream: %w", err)
+			}
+			defer decStream.Close()
+
+			// 1. Try 16-byte nonce prefix (Standard Nexus STREAM)
+			decrypted, err = decStream.DecryptFinalize(encryptedPayload)
+
+			// 2. Try 12-byte nonce prefix (Legacy/Mobile standard ChaCha fallback)
+			if err != nil && len(rawData) >= 12 {
+				log.Printf("[%s] 🔓 streaming decryption (16-byte) failed. Trying 12-byte nonce fallback...", t.ID)
+				n12Prefix := make([]byte, 16)
+				copy(n12Prefix, rawData[:12]) // Pad to 16 with zeros for FFI
+				n12Payload := rawData[12:]
+
+				// Try with all available keys
+				keysToTry := []string{encryptionSecret, legacySecret, hex.EncodeToString(make([]byte, 32))}
+				for _, kHex := range keysToTry {
+					if kHex == "" {
+						continue
+					}
+					kBytes, _ := hex.DecodeString(kHex)
+					lStream, lErr := q.core.InitDecryptStream(kBytes, n12Prefix)
+					if lErr == nil {
+						decrypted, err = lStream.DecryptFinalize(n12Payload)
+						lStream.Close()
+						if err == nil {
+							log.Printf("[%s] ✅ Decryption succeeded via 12-byte nonce fallback!", t.ID)
+							break
+						}
+					}
 				}
-				end := 8
-				if len(rawData) < end {
-					end = len(rawData)
-				}
-				log.Printf("[%s] [DEC] Raw shard %d size=%d start=%x end=%x", t.ID, i+1, len(rawData), rawData[:start], rawData[len(rawData)-end:])
 			}
 
-			// Debug: write full hex dump of downloaded/decoded blob for offline inspection
-			_ = os.MkdirAll("/tmp/nexus-debug", 0755)
-			decPath := fmt.Sprintf("/tmp/nexus-debug/%s-shard-%d-dec.hex", t.ID, i+1)
-			_ = os.WriteFile(decPath, []byte(hex.EncodeToString(rawData)), 0644)
-			log.Printf("[%s] [debug] Wrote downloaded hex dump: %s", t.ID, decPath)
+			// 3. Try one-shot Decrypt (if it wasn't actually a stream)
+			if err != nil {
+				log.Printf("[%s] 🔓 Streaming decryption failed. Trying one-shot Decrypt fallback...", t.ID)
+				keysToTry := []string{encryptionSecret, legacySecret, hex.EncodeToString(make([]byte, 32))}
+				for _, kHex := range keysToTry {
+					if kHex == "" {
+						continue
+					}
+					decrypted, err = q.core.Decrypt(rawData, kHex)
+					if err == nil {
+						log.Printf("[%s] ✅ Decryption succeeded via one-shot fallback!", t.ID)
+						break
+					}
+				}
+			}
+
+			// 4. Try completely unencrypted fallback (direct decompression)
+			if err != nil {
+				log.Printf("[%s] 🔓 All decryption failed. Checking if data is unencrypted...", t.ID)
+				// If we can decompress it directly, it wasn't encrypted.
+				_, decompErr := q.core.Decompress(rawData)
+				if decompErr == nil {
+					log.Printf("[%s] ✅ Data is completely unencrypted! Proceeding.", t.ID)
+					decrypted = rawData
+					err = nil
+				}
+			}
+
+			if err != nil {
+				return fmt.Errorf("decryption failed after all fallbacks: %w", err)
+			}
+			log.Printf("[%s] ✅ Decryption succeeded!", t.ID)
+		} else if rawFileKey != nil {
+			// Desktop-style One-shot Encryption (V3)
+			log.Printf("[%s] 🔐 Shard %d: Decrypting with per-file key (%d bytes)", t.ID, i+1, len(rawFileKey))
 			decrypted, err = q.core.DecryptWithKey(rawData, rawFileKey)
 		} else {
 			log.Printf("[%s] 🔐 Shard %d: Decrypting with encryptionSecret (fallback)", t.ID, i+1)
 			decrypted, err = q.core.Decrypt(rawData, encryptionSecret)
+			if err != nil && legacySecret != "" {
+				log.Printf("[%s] 🔓 Fallback: trying legacy PBKDF2 for non-streaming file", t.ID)
+				decrypted, err = q.core.Decrypt(rawData, legacySecret)
+			}
 		}
 
 		if err != nil {
