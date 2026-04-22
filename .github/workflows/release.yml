@@ -247,6 +247,17 @@ jobs:
         if: matrix.platform == 'linux'
         working-directory: ./nexus-mobile
         run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "Génération du keystore Android à partir des secrets GitHub..."
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/key.jks
+            export ANDROID_STORE_FILE="key.jks"
+            export ANDROID_KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
+            export ANDROID_KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+            export ANDROID_STORE_PASSWORD="${{ secrets.ANDROID_STORE_PASSWORD }}"
+          else
+            echo "Aucun secret ANDROID_KEYSTORE_BASE64 détecté. Le build Android utilisera la clé de debug par défaut (APK non signé pour production)."
+          fi
+          
           flutter pub get
           # Génère un APK universel et les ABI séparés (app-arm64-v8a-release.apk, etc.)
           flutter build apk --release --split-per-abi

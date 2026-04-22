@@ -28,9 +28,26 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        val storeFileEnv = System.getenv("ANDROID_STORE_FILE")
+        if (storeFileEnv != null) {
+            create("release") {
+                storeFile = file(storeFileEnv)
+                storePassword = System.getenv("ANDROID_STORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            val storeFileEnv = System.getenv("ANDROID_STORE_FILE")
+            signingConfig = if (storeFileEnv != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
