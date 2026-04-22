@@ -56,7 +56,7 @@ class NexusService {
     String? fileName,
   }) async {
     final now = DateTime.now();
-    if (now.difference(_lastProgressUpdate).inMilliseconds < 1000 &&
+    if (now.difference(_lastProgressUpdate).inMilliseconds < 250 &&
         status != 'completed' &&
         !status.startsWith('Failed') &&
         progress > 0.05 &&
@@ -764,9 +764,12 @@ class NexusService {
           reusableFramePtr.asTypedList(frameSize).setAll(0, frameData);
 
           if (i % 20 == 0) {
+            // Estimate total frames: approx 2KB of source data per 720p frame in Base mode
+            // For a 13MB file, it's about 6500 frames.
+            final estimatedFrames = (record.size / 2000).clamp(100, 20000);
             await _updateStatus(
               taskId,
-              0.4 + (i / 90 * 0.5), // Approximated progress
+              0.4 + ((i / estimatedFrames) * 0.55).clamp(0.0, 0.55),
               'Decoding frame $i...',
               fileName: fileName,
             );
