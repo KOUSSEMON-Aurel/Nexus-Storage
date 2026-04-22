@@ -840,7 +840,7 @@ func (d *Database) CalculateLogicalHash() (string, error) {
 	var lines []string
 
 	// Files
-	rows, err := d.db.Query("SELECT id, last_update FROM files ORDER BY id")
+	rows, err := d.db.Query("SELECT id, IFNULL(strftime('%Y-%m-%d %H:%M:%S', last_update), '') FROM files ORDER BY id")
 	if err != nil {
 		return "", err
 	}
@@ -865,7 +865,7 @@ func (d *Database) CalculateLogicalHash() (string, error) {
 	rows.Close()
 
 	// Tasks
-	rows, err = d.db.Query("SELECT id, created_at FROM tasks ORDER BY id")
+	rows, err = d.db.Query("SELECT id, IFNULL(strftime('%Y-%m-%d %H:%M:%S', created_at), '') FROM tasks ORDER BY id")
 	if err != nil {
 		return "", err
 	}

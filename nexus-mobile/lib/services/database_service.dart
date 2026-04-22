@@ -433,7 +433,7 @@ class DatabaseService {
 
     // Files (id and last_update timestamp ensure content freshness)
     final files = await db.rawQuery(
-      'SELECT id, last_update FROM files ORDER BY id',
+      "SELECT id, IFNULL(strftime('%Y-%m-%d %H:%M:%S', last_update), '') as last_update FROM files ORDER BY id",
     );
     for (var r in files) {
       lines.add('file:${r['id']}:${r['last_update']}');
@@ -447,10 +447,10 @@ class DatabaseService {
 
     // Tasks (id and created_at)
     final tasks = await db.rawQuery(
-      'SELECT id, created_at FROM tasks ORDER BY id',
+      "SELECT id, IFNULL(strftime('%Y-%m-%d %H:%M:%S', created_at), '') as last_update FROM tasks ORDER BY id",
     );
     for (var r in tasks) {
-      lines.add('task:${r['id']}:${r['created_at']}');
+      lines.add('task:${r['id']}:${r['last_update']}');
     }
 
     final content = lines.join('\n');
