@@ -39,3 +39,4 @@ client_secret.json
 *.md
 !README.md
 !TODO.md
+\n.secrets
