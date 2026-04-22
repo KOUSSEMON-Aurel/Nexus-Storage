@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "nexus",
-  "version": "5.3.4",
+  "version": "6.0.0",
   "identifier": "com.aurel.nexus-gui",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -40,10 +40,7 @@
     "active": true,
     "targets": "all",
     "macOS": {
-      "signingIdentity": null,
-      "notarization": {
-        "active": false
-      }
+      "signingIdentity": null
     },
     "externalBin": [
       "bin/nexus-daemon",
