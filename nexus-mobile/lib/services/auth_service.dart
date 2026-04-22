@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'database_service.dart';
 import 'logger_service.dart';
+import 'sync_service.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -15,7 +16,7 @@ class AuthService {
     'profile',
     'https://www.googleapis.com/auth/youtube.force-ssl',
     'https://www.googleapis.com/auth/monitoring.read',
-    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/drive', // Full drive access for cross-platform sync
   ];
 
   // Using late final with explicit type
@@ -77,9 +78,8 @@ class AuthService {
       if (account != null) {
         _currentUser = account;
         _googleSub = account.id;
-        await DatabaseService().setKV('google_sub', _googleSub!);
 
-        // Fetch YouTube Identity
+        // Fetch YouTube Identity first (before triggering sync/setKV)
         try {
           final auth = await account.authentication;
           if (auth.accessToken != null) {
@@ -89,7 +89,14 @@ class AuthService {
           AppLogger.warn('DEBUG: Failed to fetch YouTube identity: $e');
         }
 
+        // After identity fetch, emit the user event
         _userStreamController.add(account);
+
+        // Trigger cloud sync to pull the remote database if it exists
+        // This runs in background – errors are non-fatal
+        SyncService().sync().catchError((e) {
+          AppLogger.warn('Post-login sync failed (non-fatal): $e');
+        });
       }
 
       return account;
@@ -141,9 +148,8 @@ class AuthService {
     _backgroundToken = null;
     _ytChannelName = null;
     _ytChannelAvatar = null;
-    await DatabaseService().setKV('yt_channel_name', '');
-    await DatabaseService().setKV('yt_channel_avatar', '');
-    await DatabaseService().setKV('google_sub', '');
+    // Wipe local DB so LSN resets to 0 for the next account
+    await DatabaseService().deleteAllData();
     _userStreamController.add(null);
   }
 

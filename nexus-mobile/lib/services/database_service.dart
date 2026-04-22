@@ -60,6 +60,44 @@ class DatabaseService {
     }
   }
 
+  /// Wipes all user data from the local database and resets the LSN to zero.
+  /// Called on logout to prevent stale data from bleeding into a new session.
+  Future<void> deleteAllData() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('files');
+      await txn.delete('folders');
+      await txn.delete('shards');
+      await txn.delete('tasks');
+      await txn.delete('tombstones');
+      await txn.delete('pending_sync');
+      await txn.delete('recovery_state');
+      // Reset LSN and push tracking state
+      await txn.rawInsert(
+        'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+        ['manifest_version', '0'],
+      );
+      await txn.rawInsert(
+        'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+        ['last_push_lsn', '0'],
+      );
+      await txn.rawInsert(
+        'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+        ['google_sub', ''],
+      );
+      await txn.rawInsert(
+        'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+        ['yt_channel_name', ''],
+      );
+      await txn.rawInsert(
+        'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+        ['yt_channel_avatar', ''],
+      );
+    });
+    notifyChange();
+    AppLogger.info('Local database wiped for logout.');
+  }
+
   Future<Database> get database async {
     if (_db != null) return _db!;
     _dbFuture ??= _initDatabase();

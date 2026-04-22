@@ -46,14 +46,21 @@ class SyncService {
       await _db.checkpointWAL();
       final localLSNStr = await _db.getKV('manifest_version') ?? '0';
       int localLSN = int.parse(localLSNStr);
-      final localHash = await _db.calculateLogicalHash();
       final localStats = await _db.getSyncStats();
       final localModified =
           await _db.getLastModified() ?? DateTime.now().toIso8601String();
 
       // 2. Decision Logic
       if (remoteManifestBytes == null) {
+        // No remote backup at all. Only push if we have actual data.
+        if (localLSN == 0 || localStats['files'] == 0) {
+          AppLogger.info(
+            'No remote manifest and local DB is empty. Nothing to sync.',
+          );
+          return;
+        }
         AppLogger.info('No remote manifest. Initial push required.');
+        final localHash = await _db.calculateLogicalHash();
         await _performPush(
           token,
           folderId,
@@ -68,6 +75,17 @@ class SyncService {
       final remoteManifest = jsonDecode(utf8.decode(remoteManifestBytes));
       final remoteLSN = remoteManifest['lsn'] as int;
       final remoteHash = remoteManifest['logical_hash'] as String;
+
+      // PRIORITY 0: If local is empty/reset, always pull from remote.
+      if (localLSN == 0 || localStats['files'] == 0) {
+        AppLogger.info(
+          'Local DB is empty (LSN=$localLSN). Forcing pull from remote (LSN=$remoteLSN)...',
+        );
+        await _performPull(token, folderId, remoteLSN, remoteHash);
+        return;
+      }
+
+      final localHash = await _db.calculateLogicalHash();
 
       // PRIORITY 1: LSN based comparison
       if (remoteLSN > localLSN) {
