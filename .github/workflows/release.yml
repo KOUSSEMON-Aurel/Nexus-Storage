@@ -262,8 +262,9 @@ jobs:
           flutter pub get
           # Génère un APK universel et les ABI séparés (app-arm64-v8a-release.apk, etc.)
           flutter build apk --release --split-per-abi
+          flutter build appbundle --release
 
-      - name: Upload Android APKs
+      - name: Upload Android APKs and Bundle
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -274,5 +275,8 @@ jobs:
           echo "Uploading to release tag: $TAG_NAME"
           # Retry a few times in case the release isn't created yet by the desktop job
           for i in {1..5}; do
-            gh release upload "$TAG_NAME" ./nexus-mobile/build/app/outputs/flutter-apk/app-*.apk --clobber && break || sleep 30
+            # Upload APKs
+            gh release upload "$TAG_NAME" ./nexus-mobile/build/app/outputs/flutter-apk/app-*.apk --clobber && \
+            # Upload AAB
+            gh release upload "$TAG_NAME" ./nexus-mobile/build/app/outputs/bundle/release/app-release.aab --clobber && break || sleep 30
           done
