@@ -318,6 +318,7 @@ class DatabaseService {
     if (key != 'manifest_version' && key != 'last_push_lsn') {
       await incrementLSN();
     }
+    notifyChange();
   }
 
   Future<String?> getKV(String key) async {

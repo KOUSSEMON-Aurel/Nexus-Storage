@@ -289,6 +289,7 @@ class SyncService {
         AppLogger.info(
           '✅ DB successfully pulled and verified (LSN $remoteLSN)',
         );
+        _db.notifyChange();
       } catch (e) {
         AppLogger.error(
           '❌ Failed to re-open pulled DB: $e. Attempting rollback...',
