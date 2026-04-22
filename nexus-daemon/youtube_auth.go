@@ -25,14 +25,15 @@ import (
 )
 
 type YouTubeManager struct {
-	config       *oauth2.Config
-	service      *youtube.Service
-	driveService *drive.Service
-	mu           sync.RWMutex
-	authed       bool
-	user         string
-	channelID    string
-	googleSub    string // ← Unique, permanent Google user ID
+	config        *oauth2.Config
+	service       *youtube.Service
+	driveService  *drive.Service
+	mu            sync.RWMutex
+	authed        bool
+	user          string
+	channelID     string
+	googleSub     string // ← Unique, permanent Google user ID
+	OnAuthSuccess func()
 }
 
 func getConfigDir() string {
@@ -131,6 +132,10 @@ func (m *YouTubeManager) TryLoadToken() bool {
 
 	// Async fetch channel info
 	go m.FetchChannelID()
+
+	if m.OnAuthSuccess != nil {
+		go m.OnAuthSuccess()
+	}
 
 	return true
 }

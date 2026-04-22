@@ -3,19 +3,19 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"strconv"
 	"math"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -47,6 +47,65 @@ func NewSyncManager(db *Database, yt *YouTubeManager, pm *PlaylistManager, dbPat
 		pm:     pm,
 		dbPath: dbPath,
 	}
+}
+
+// RunSyncMatrix executes the core synchronization decision logic.
+// It checks local integrity, remote manifest presence, and performs recovery if needed.
+func (s *SyncManager) RunSyncMatrix() {
+	if !s.yt.IsAuthenticated() {
+		return
+	}
+
+	log.Printf("🔍 [SYNC-MATRIX] Running DB state evaluation...")
+
+	if err := s.pm.EnsureBasePlaylists(); err != nil {
+		log.Printf("⚠️  Playlist Manager error: %v", err)
+	}
+
+	// 1. Check for WAL and Checkpoint if needed
+	walPath := s.dbPath + "-wal"
+	if info, err := os.Stat(walPath); err == nil && info.Size() > 0 {
+		log.Printf("🧹 Found non-empty WAL, checkpointing...")
+		s.db.Checkpoint()
+	}
+
+	// 2. Integrity Check
+	integrityErr := s.db.IntegrityCheck()
+	localLSN, _ := s.db.GetLocalLSN()
+	remoteManifest, _ := s.GetRemoteManifest()
+
+	if integrityErr != nil {
+		log.Printf("❌ DB CORRUPTION DETECTED: %v", integrityErr)
+		// Quarantaine
+		corruptPath := s.dbPath + ".corrupt"
+		os.Rename(s.dbPath, corruptPath)
+		log.Printf("📁 Corrupted DB moved to %s", corruptPath)
+
+		if remoteManifest != nil {
+			log.Printf("📥 Remote backup found, attempting recovery pull...")
+			if err := s.PullDBFromDrive(true); err != nil {
+				log.Printf("❌ Recovery pull failed: %v", err)
+			}
+		} else {
+			log.Printf("⚠️ No remote backup found. Starting with fresh DB.")
+			s.db.Init(s.dbPath)
+		}
+	} else if localLSN == 0 {
+		log.Printf("📥 Local DB is empty, checking for cloud backup...")
+		if remoteManifest != nil {
+			if err := s.PullDBFromDrive(false); err != nil {
+				log.Printf("ℹ️ Initial pull skipped: %v", err)
+			}
+		}
+	} else {
+		log.Printf("✅ Local DB is healthy (LSN %d)", localLSN)
+		if remoteManifest != nil && remoteManifest.LSN > localLSN {
+			log.Printf("📥 Remote DB is newer (Remote: %d), Pulling...", remoteManifest.LSN)
+			s.PullDBFromDrive(false)
+		}
+	}
+
+	log.Printf("✅ Auto-sync matrix completed.")
 }
 
 // retryWithBackoff retries fn up to maxAttempts times with exponential backoff
@@ -103,11 +162,11 @@ func (s *SyncManager) PushDBToDrive() (err error) {
 
 		// structured log entry
 		entry := map[string]interface{}{
-			"type":       "push_result",
-			"lsn":        localLSN,
+			"type":        "push_result",
+			"lsn":         localLSN,
 			"logicalHash": logicalHash,
-			"success":    err == nil,
-			"duration_s": time.Since(start).Seconds(),
+			"success":     err == nil,
+			"duration_s":  time.Since(start).Seconds(),
 		}
 		if err != nil {
 			entry["error"] = err.Error()
@@ -384,9 +443,9 @@ func (s *SyncManager) PullDBFromDrive(force bool) (err error) {
 	var remoteLogical string
 	defer func() {
 		entry := map[string]interface{}{
-			"type":      "pull_result",
-			"lsn":       remoteLSN,
-			"success":   err == nil,
+			"type":       "pull_result",
+			"lsn":        remoteLSN,
+			"success":    err == nil,
 			"duration_s": time.Since(start).Seconds(),
 		}
 		if remoteLogical != "" {
@@ -849,7 +908,7 @@ func decryptFileAESGCM(src, dst string, key []byte) error {
 	return os.WriteFile(dst, plain, 0600)
 }
 
-	// use crypto/rand.Reader for nonce generation
+// use crypto/rand.Reader for nonce generation
 
 func (s *SyncManager) UploadToDrive(manifest SyncManifest) error {
 	// Deprecated: prefer UploadDBFileToDrive with an explicit snapshot.

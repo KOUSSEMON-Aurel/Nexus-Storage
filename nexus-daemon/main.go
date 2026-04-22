@@ -50,7 +50,7 @@ func findBinary(name string) string {
 	if execPath, err := os.Executable(); err == nil {
 		dir := filepath.Dir(execPath)
 		triple := getHostTriple()
-		
+
 		// Names to try: "rclone", "rclone.exe", "rclone-x86_64-pc-windows-msvc.exe"
 		candidates := []string{
 			name,
@@ -167,62 +167,18 @@ func main() {
 		}
 	}()
 
-	// 6b. Auto-sync cloud manifest 10s after auth
+	// 6b. Setup dynamic sync triggers
+	ytManager.OnAuthSuccess = func() {
+		log.Println("🚀 Post-auth trigger: running sync matrix...")
+		time.Sleep(2 * time.Second) // wait for auth state to propagate
+		syncMgr.RunSyncMatrix()
+	}
+
+	// 6c. Initial startup sync (if already authenticated)
 	go func() {
 		time.Sleep(5 * time.Second)
 		if ytManager.IsAuthenticated() {
-			if err := pm.EnsureBasePlaylists(); err != nil {
-				log.Printf("⚠️  Playlist Manager: %v", err)
-			}
-			time.Sleep(5 * time.Second) // extra delay so playlists are ready
-			
-			// FULL STARTUP MATRIX
-			log.Printf("🔍 Running startup DB state matrix...")
-			
-			// 1. Check for WAL and Checkpoint if needed
-			walPath := (*dbPath) + "-wal"
-			if info, err := os.Stat(walPath); err == nil && info.Size() > 0 {
-				log.Printf("🧹 Found non-empty WAL, checkpointing...")
-				db.Checkpoint()
-			}
-
-			// 2. Integrity Check
-			integrityErr := db.IntegrityCheck()
-			localLSN, _ := db.GetLocalLSN()
-			remoteManifest, _ := syncMgr.GetRemoteManifest()
-
-			if integrityErr != nil {
-				log.Printf("❌ DB CORRUPTION DETECTED: %v", integrityErr)
-				// Quarantaine
-				corruptPath := (*dbPath) + ".corrupt"
-				os.Rename(*dbPath, corruptPath)
-				log.Printf("📁 Corrupted DB moved to %s", corruptPath)
-
-				if remoteManifest != nil {
-					log.Printf("📥 Remote backup found, attempting recovery pull...")
-					if err := syncMgr.PullDBFromDrive(true); err != nil {
-						log.Printf("❌ Recovery pull failed: %v", err)
-					}
-				} else {
-					log.Printf("⚠️ No remote backup found. Starting with fresh DB.")
-					db.Init(*dbPath)
-				}
-			} else if localLSN == 0 {
-				log.Printf("📥 Local DB is empty, checking for cloud backup...")
-				if remoteManifest != nil {
-					if err := syncMgr.PullDBFromDrive(false); err != nil {
-						log.Printf("ℹ️ Initial pull skipped: %v", err)
-					}
-				}
-			} else {
-				log.Printf("✅ Local DB is healthy (LSN %d)", localLSN)
-				if remoteManifest != nil && remoteManifest.LSN > localLSN {
-					log.Printf("📥 Remote DB is newer (Remote: %d), Pulling...", remoteManifest.LSN)
-					syncMgr.PullDBFromDrive(false)
-				}
-			}
-
-			log.Printf("✅ Auto-sync on startup completed.")
+			syncMgr.RunSyncMatrix()
 		}
 	}()
 
@@ -252,7 +208,7 @@ func main() {
 
 func handleShutdown(db *Database, syncMgr *SyncManager) {
 	fmt.Println("\n👋 Shutting down NexusStorage...")
-	
+
 	// Final Sync before exit: Use strict Push logic
 	if syncMgr != nil {
 		log.Println("🔄 Performing strict final DB backup to Drive...")
@@ -262,11 +218,11 @@ func handleShutdown(db *Database, syncMgr *SyncManager) {
 			log.Printf("✅ Final backup completed.")
 		}
 	}
-	
+
 	if db != nil {
 		db.Close()
 	}
-	
+
 	unmountVirtualDisk()
 }
 
@@ -278,25 +234,25 @@ func scheduleTrashCleanup(db *Database, queue *TaskQueue) {
 		// Calculate next cleanup time (3:00 AM today or tomorrow)
 		now := time.Now()
 		next := time.Date(now.Year(), now.Month(), now.Day(), 3, 0, 0, 0, now.Location())
-		
+
 		// If 3 AM has already passed today, schedule for tomorrow
 		if now.After(next) {
 			next = next.AddDate(0, 0, 1)
 		}
-		
+
 		waitDuration := next.Sub(now)
 		log.Printf("⏰ Trash cleanup scheduled for %s (in %v)", next.Format("15:04:05"), waitDuration.Round(time.Second))
-		
+
 		// Sleep until the scheduled cleanup time
 		time.Sleep(waitDuration)
-		
+
 		// Execute cleanup
 		log.Printf("🧹 [SCHEDULED] Running daily trash cleanup...")
 		purgeDays := 30
 		if v, ok := db.GetKV("trash_purge_days"); ok {
 			fmt.Sscanf(v, "%d", &purgeDays)
 		}
-		
+
 		if purgeDays > 0 {
 			if deletedVids, err := db.CleanupTrash(purgeDays); err == nil && len(deletedVids) > 0 {
 				log.Printf("🗑️  [SCHEDULED] Queueing %d expired cloud shards for deletion...", len(deletedVids))
@@ -378,7 +334,7 @@ func isVirtualDiskMounted() bool {
 func autoMountVirtualDisk() {
 	mountPath := filepath.Join(os.Getenv("HOME"), "Nexus-Storage")
 	var (
-		httpURL   = fmt.Sprintf("http://127.0.0.1:%d/vfs/", apiPort)
+		httpURL = fmt.Sprintf("http://127.0.0.1:%d/vfs/", apiPort)
 	)
 
 	// Clean env — Tauri injects LD_LIBRARY_PATH which breaks cold browser/file-manager launches
@@ -410,7 +366,7 @@ func autoMountVirtualDisk() {
 		if has("rclone") {
 			log.Printf("🚀 [SmartMount] Attempting Rclone FUSE mount at %s", mountPath)
 			os.MkdirAll(mountPath, 0755)
-			
+
 			// Unmount first if already mounted (clean start)
 			exec.Command("fusermount", "-u", mountPath).Run()
 
@@ -425,7 +381,7 @@ func autoMountVirtualDisk() {
 				"--daemon", // Run in background
 				"--volname", "Nexus Storage",
 			}
-			
+
 			cmd := exec.Command("rclone", args...)
 			cmd.Env = cleanEnv
 			if err := cmd.Run(); err == nil {
@@ -447,55 +403,55 @@ func autoMountVirtualDisk() {
 	// ─── Windows ─────────────────────────────────────────────────────────────
 	case "windows":
 		log.Printf("🪟 [SmartMount] Windows detected — probing FUSE provider...")
-		
-		driveLetter := "N:" 
-			rclonePath := findBinary("rclone")
-			if rclonePath == "" {
-				log.Printf("❌ [SmartMount] Rclone binary not found.")
+
+		driveLetter := "N:"
+		rclonePath := findBinary("rclone")
+		if rclonePath == "" {
+			log.Printf("❌ [SmartMount] Rclone binary not found.")
+			return
+		}
+
+		if !checkWinFsp() {
+			log.Printf("⚠️  [SmartMount] WinFsp missing. Attempting automatic installation...")
+			if err := installWinFsp(); err != nil {
+				log.Printf("❌ [SmartMount] Auto-install failed: %v", err)
+				log.Printf("💡 [SmartMount] Please install WinFsp manually: https://winfsp.dev/")
 				return
 			}
+			log.Printf("✅ [SmartMount] WinFsp installer launched. Please complete the setup and restart the app.")
+			return
+		}
 
-			if !checkWinFsp() {
-				log.Printf("⚠️  [SmartMount] WinFsp missing. Attempting automatic installation...")
-				if err := installWinFsp(); err != nil {
-					log.Printf("❌ [SmartMount] Auto-install failed: %v", err)
-					log.Printf("💡 [SmartMount] Please install WinFsp manually: https://winfsp.dev/")
-					return
-				}
-				log.Printf("✅ [SmartMount] WinFsp installer launched. Please complete the setup and restart the app.")
-				return
-			}
+		log.Printf("🚀 [SmartMount] Attempting Rclone FUSE mount at %s", driveLetter)
+		exec.Command("taskkill", "/IM", "rclone*", "/F").Run()
 
-			log.Printf("🚀 [SmartMount] Attempting Rclone FUSE mount at %s", driveLetter)
-			exec.Command("taskkill", "/IM", "rclone*", "/F").Run()
+		args := []string{
+			"mount", ":webdav:", driveLetter,
+			"--webdav-url", httpURL,
+			"--vfs-cache-mode", "full",
+			"--network-mode",
+			"--no-console",
+			"--volname", "Nexus Storage",
+		}
 
-			args := []string{
-				"mount", ":webdav:", driveLetter,
-				"--webdav-url", httpURL,
-				"--vfs-cache-mode", "full",
-				"--network-mode",
-				"--no-console",
-				"--volname", "Nexus Storage",
-			}
-			
-			cmd := exec.Command(rclonePath, args...)
-			cmd.Env = cleanEnv
-			if err := cmd.Start(); err == nil {
-				log.Printf("✅ [SmartMount] Rclone FUSE mount dispatched.")
-				time.Sleep(2 * time.Second)
-				exec.Command("explorer", driveLetter).Start()
-				return
-			}
+		cmd := exec.Command(rclonePath, args...)
+		cmd.Env = cleanEnv
+		if err := cmd.Start(); err == nil {
+			log.Printf("✅ [SmartMount] Rclone FUSE mount dispatched.")
+			time.Sleep(2 * time.Second)
+			exec.Command("explorer", driveLetter).Start()
+			return
+		}
 		log.Printf("❌ [SmartMount] Rclone mount failed or WinFsp missing.")
 
 	// ─── macOS ───────────────────────────────────────────────────────────────
 	case "darwin":
 		log.Printf("🍎 [SmartMount] macOS detected — probing FUSE provider...")
-		
+
 		if has("rclone") {
 			log.Printf("🚀 [SmartMount] Attempting Rclone FUSE mount at %s", mountPath)
 			os.MkdirAll(mountPath, 0755)
-			
+
 			args := []string{
 				"mount", ":webdav:", mountPath,
 				"--webdav-url", httpURL,
@@ -503,7 +459,7 @@ func autoMountVirtualDisk() {
 				"--daemon",
 				"--volname", "Nexus Storage",
 			}
-			
+
 			cmd := exec.Command("rclone", args...)
 			cmd.Env = cleanEnv
 			if err := cmd.Run(); err == nil {
@@ -542,7 +498,7 @@ func installWinFsp() error {
 	msiPath := filepath.Join(os.TempDir(), "winfsp-install.msi")
 
 	log.Printf("📥 Downloading WinFsp installer...")
-	
+
 	// Use powershell to download (standard on all Windows)
 	dlCmd := fmt.Sprintf("Invoke-WebRequest -Uri '%s' -OutFile '%s'", msiURL, msiPath)
 	if err := exec.Command("powershell", "-Command", dlCmd).Run(); err != nil {
