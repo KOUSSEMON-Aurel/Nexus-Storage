@@ -155,10 +155,11 @@ class _FilesPageState extends State<FilesPage> {
         }
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
 
     _refreshFiles();
@@ -369,8 +370,9 @@ class _FilesPageState extends State<FilesPage> {
       stream: AuthService().userStream,
       initialData: AuthService().currentUser,
       builder: (context, snapshot) {
-        if (snapshot.hasData || AuthService().isAuthenticated)
+        if (snapshot.hasData || AuthService().isAuthenticated) {
           return const SizedBox.shrink();
+        }
 
         return GlassCard(
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -545,15 +547,21 @@ class _FilesPageState extends State<FilesPage> {
 
   IconData _getFileIcon(String path) {
     final ext = path.split('.').last.toLowerCase();
-    if (['mp4', 'mov', 'avi', 'mkv'].contains(ext))
+    if (['mp4', 'mov', 'avi', 'mkv'].contains(ext)) {
       return Icons.videocam_outlined;
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext))
+    }
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext)) {
       return Icons.image_outlined;
-    if (['mp3', 'aac', 'flac', 'wav'].contains(ext))
+    }
+    if (['mp3', 'aac', 'flac', 'wav'].contains(ext)) {
       return Icons.audio_file_outlined;
-    if (['pdf'].contains(ext)) return Icons.picture_as_pdf_outlined;
-    if (['zip', 'tar', 'gz', 'rar'].contains(ext))
+    }
+    if (['pdf'].contains(ext)) {
+      return Icons.picture_as_pdf_outlined;
+    }
+    if (['zip', 'tar', 'gz', 'rar'].contains(ext)) {
       return Icons.folder_zip_outlined;
+    }
     return Icons.insert_drive_file_outlined;
   }
 
