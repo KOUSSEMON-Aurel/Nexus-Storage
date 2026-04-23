@@ -25,10 +25,9 @@ import '../utils/exceptions.dart';
 import '../core/task_config.dart';
 
 class NexusService {
-  static const MethodChannel _mediaChannel = MethodChannel('nexus/media');
-
   final NexusCoreBindings _native = NexusLoader.bindings;
   final DatabaseService _db = DatabaseService();
+  static const _mediaChannel = MethodChannel('com.aurel.nexus/media_store');
   final YouTubeService _youtube = YouTubeService();
   final AuthService _auth = AuthService();
   DateTime _lastRefreshTime = DateTime.fromMillisecondsSinceEpoch(0);
@@ -552,6 +551,7 @@ class NexusService {
     final fileName = record.path.split('/').last;
 
     File? videoFile;
+    File? tempFile;
     Directory? framesDir;
     RandomAccessFile? ios;
     Pointer<StreamingDecoder>? decoderCtx;
@@ -728,18 +728,14 @@ class NexusService {
       outPtrPtr = malloc<Pointer<Uint8>>();
       outLenPtr = malloc<Size>();
 
-      final downloadsDir = await _getPublicDownloadsDirectory();
-      var finalFile = File('${downloadsDir.path}/$fileName');
-      int counter = 1;
-      while (await finalFile.exists()) {
-        final nameParts = fileName.split('.');
-        final ext = nameParts.length > 1 ? '.${nameParts.removeLast()}' : '';
-        final baseName = nameParts.join('.');
-        finalFile = File('${downloadsDir.path}/$baseName ($counter)$ext');
-        counter++;
-      }
-      ios = await finalFile.open(mode: FileMode.write);
-      AppLogger.info('NexusService: Output file opened: ${finalFile.path}');
+      // Option B: Decrypt to a temporary file in the app's internal cache first.
+      // This avoids permission issues with direct writing to public storage on Android 11+.
+      final tempDir = await getTemporaryDirectory();
+      tempFile = File('${tempDir.path}/nexus_dec_tmp_$taskId');
+      if (await tempFile.exists()) await tempFile.delete();
+      
+      ios = await tempFile.open(mode: FileMode.write);
+      AppLogger.info('NexusService: Temporary output file opened: ${tempFile.path}');
 
       int i = 0;
 
@@ -1049,16 +1045,32 @@ class NexusService {
 
       try {
         await ios.close();
-        // Trigger media scan to make file visible in Downloads
-        await _scanMediaFile(finalFile.path);
+        ios = null; // Important to avoid double close in finally
+
+        AppLogger.info('NexusService: Decryption finished. Exporting via Native MediaStore...');
+        
+        // Option 2: Use Native Platform Channel for robust MediaStore handling
+        // This avoids RAM issues and works without MANAGE_EXTERNAL_STORAGE
+        final bool success = await _mediaChannel.invokeMethod('saveFileToDownloads', {
+          'tempPath': tempFile.path,
+          'fileName': fileName,
+          'relativePath': 'NexusStorage',
+        });
+
+        if (success) {
+          AppLogger.info('NexusService: Successfully exported to public Downloads/NexusStorage via Native');
+        } else {
+          AppLogger.error('NexusService: Native MediaStore export returned false.');
+          throw NexusException('Failed to save file to public storage via Native Channel');
+        }
       } catch (e) {
-        AppLogger.warn(
-          'NexusService: Failed to close output file (ignored): $e',
-        );
+        AppLogger.error('NexusService: Final native export error: $e');
+        rethrow;
       }
-      final finalSize = await finalFile.length();
+
+      final finalSize = await tempFile.length();
       AppLogger.info(
-        'NexusService: Decryption complete. Final file size: $finalSize bytes',
+        'NexusService: Decryption complete. Temp file size: $finalSize bytes',
       );
       if (finalSize == 0) {
         throw NexusException(
@@ -1073,12 +1085,32 @@ class NexusService {
       rethrow;
     } finally {
       try {
-        await ios!.close();
+        if (ios != null) await ios.close();
       } catch (e) {
         AppLogger.warn(
           'NexusService: Ignored error closing output file in finally: $e',
         );
       }
+      
+      // Cleanup temp files
+      if (tempFile != null && await tempFile.exists()) {
+        try {
+          await tempFile.delete();
+          AppLogger.info('NexusService: Cleaned up temp decrypted file.');
+        } catch (e) {
+          AppLogger.warn('NexusService: Failed to delete temp file: $e');
+        }
+      }
+      
+      if (videoFile != null && await videoFile.exists()) {
+        try {
+          await videoFile.delete();
+          AppLogger.info('NexusService: Cleaned up source video file.');
+        } catch (e) {
+          AppLogger.warn('NexusService: Failed to delete video file: $e');
+        }
+      }
+
       if (decoderCtx != null) _native.nexus_decoder_stream_drop(decoderCtx);
       if (cryptoCtx != null) _native.nexus_crypto_stream_drop(cryptoCtx);
       if (keyPtr != null) malloc.free(keyPtr);
@@ -1090,32 +1122,6 @@ class NexusService {
       if (videoFile != null && await videoFile.exists()) {
         await videoFile.delete();
       }
-    }
-  }
-
-  Future<void> _scanMediaFile(String path) async {
-    if (!Platform.isAndroid) return;
-    try {
-      await _mediaChannel.invokeMethod('scanFile', {'path': path});
-      AppLogger.info('NexusService: Media scan triggered for $path');
-    } catch (e) {
-      AppLogger.error('NexusService: Failed to trigger media scan: $e');
-    }
-  }
-
-  Future<Directory> _getPublicDownloadsDirectory() async {
-    if (Platform.isAndroid) {
-      final dir = Directory('/storage/emulated/0/Download/NexusStorage');
-      try {
-        if (!await dir.exists()) await dir.create(recursive: true);
-        return dir;
-      } catch (e) {
-        AppLogger.error('Failed to create public downloads dir: $e');
-        return await getTemporaryDirectory();
-      }
-    } else {
-      final dir = await getDownloadsDirectory();
-      return dir ?? await getApplicationDocumentsDirectory();
     }
   }
 }

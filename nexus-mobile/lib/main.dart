@@ -155,9 +155,16 @@ Future<void> _requestPermissions() async {
     final androidInfo = await deviceInfo.androidInfo;
     final sdkInt = androidInfo.version.sdkInt;
 
-    if (sdkInt < 30) {
-      // Android 10 (API 29) and below: legacy storage is enough with Manifest flag
+    if (sdkInt < 33) {
+      // Android 12 (API 32) and below: legacy storage is needed for some operations
       await Permission.storage.request();
+    } else {
+      // Android 13+ (API 33+): We use MediaStore for downloads, 
+      // but we might need photo/video permissions for picking files.
+      await [
+        Permission.photos,
+        Permission.videos,
+      ].request();
     }
 
     // Common permissions
