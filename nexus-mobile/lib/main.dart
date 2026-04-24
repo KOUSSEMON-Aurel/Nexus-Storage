@@ -29,7 +29,6 @@ import 'package:nexus_mobile/ui/widgets/glass_card.dart';
 import 'package:nexus_mobile/ui/widgets/app_button.dart';
 
 import 'package:nexus_mobile/services/cleanup_service.dart';
-import 'package:nexus_mobile/core/thermal_monitor.dart';
 
 void main() async {
   try {
@@ -39,7 +38,6 @@ void main() async {
     AppLogger.info('Initializing Nexus Storage...');
 
     _initForegroundTask();
-    // ThermalMonitor.start(); // Start thermal monitoring disabled due to native hang risks
 
     // Validation at startup (Rule 8)
     await Future.wait([
