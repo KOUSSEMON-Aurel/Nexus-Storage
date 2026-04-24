@@ -1,0 +1,80 @@
+name: Release Android
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java (Android)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter (Android)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Build Android APK
+        working-directory: ./nexus-mobile
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "Génération du keystore Android à partir des secrets GitHub..."
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/key.jks
+            export ANDROID_STORE_FILE="key.jks"
+            export ANDROID_KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
+            export ANDROID_KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+            export ANDROID_STORE_PASSWORD="${{ secrets.ANDROID_STORE_PASSWORD }}"
+          fi
+          
+          flutter pub get
+          # Génère un APK universel et les ABI séparés
+          flutter build apk --release --split-per-abi
+          flutter build appbundle --release
+
+      - name: Create Release and Upload Artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # On récupère la version de pubspec.yaml (ex: 6.3.0+4)
+          VERSION=$(grep 'version: ' nexus-mobile/pubspec.yaml | sed 's/version: //')
+          # On enlève le +num pour le tag (ex: 6.3.0)
+          TAG_VERSION=$(echo $VERSION | cut -d'+' -f1)
+          TAG_NAME="app-v${TAG_VERSION}"
+          
+          echo "Version mobile: $VERSION"
+          echo "Tag GitHub: $TAG_NAME"
+
+          # Vérifie si la release existe, sinon on la crée
+          if ! gh release view "$TAG_NAME" > /dev/null 2>&1; then
+            echo "La release $TAG_NAME n'existe pas, création..."
+            gh release create "$TAG_NAME" --title "Nexus Storage v${TAG_VERSION}" --notes "Release automatique Android (v$VERSION)." || true
+          fi
+
+          # Renommage et Upload des APKs
+          cd ./nexus-mobile/build/app/outputs/flutter-apk/
+          for f in app-*-release.apk; do
+            arch=$(echo $f | sed 's/app-//;s/-release.apk//')
+            # On utilise TAG_VERSION pour avoir un nom de fichier propre
+            mv "$f" "nexus_${TAG_VERSION}_${arch}.apk"
+          done
+          gh release upload "$TAG_NAME" nexus_*.apk --clobber
+          
+          # Upload de l'AAB
+          cd -
+          AAB_ORIGINAL="./nexus-mobile/build/app/outputs/bundle/release/app-release.aab"
+          AAB_TARGET="./nexus-mobile/build/app/outputs/bundle/release/nexus_${TAG_VERSION}.aab"
+          if [ -f "$AAB_ORIGINAL" ]; then
+            mv "$AAB_ORIGINAL" "$AAB_TARGET"
+            gh release upload "$TAG_NAME" "$AAB_TARGET" --clobber
+          fi
