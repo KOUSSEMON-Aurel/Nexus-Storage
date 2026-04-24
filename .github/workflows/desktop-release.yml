@@ -1,4 +1,4 @@
-name: Release Nexus Storage
+name: Release Desktop
 on:
   push:
     tags:
