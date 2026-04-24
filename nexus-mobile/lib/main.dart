@@ -39,7 +39,7 @@ void main() async {
     AppLogger.info('Initializing Nexus Storage...');
 
     _initForegroundTask();
-    ThermalMonitor.start(); // Start thermal monitoring
+    // ThermalMonitor.start(); // Start thermal monitoring disabled due to native hang risks
 
     // Validation at startup (Rule 8)
     await Future.wait([

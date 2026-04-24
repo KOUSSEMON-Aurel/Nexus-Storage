@@ -368,11 +368,11 @@ class NexusService {
       sw.reset();
       sw.start();
 
-      if (frameCount < 45 && lastFrameData != null) {
-        for (int j = frameCount + 1; j <= 45; j++) {
+      if (frameCount < 90 && lastFrameData != null) {
+        for (int j = frameCount + 1; j <= 90; j++) {
           pipeSink.add(lastFrameData);
         }
-        frameCount = 45;
+        frameCount = 90;
       }
 
       await pipeSink.close();

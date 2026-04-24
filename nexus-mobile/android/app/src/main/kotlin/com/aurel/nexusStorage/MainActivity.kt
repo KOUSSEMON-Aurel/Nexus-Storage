@@ -15,7 +15,6 @@ import java.io.OutputStream
 
 class MainActivity: FlutterActivity() {
     private val MEDIA_CHANNEL = "com.aurel.nexus/media_store"
-    private val THERMAL_CHANNEL = "nexus/thermal"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -36,20 +35,6 @@ class MainActivity: FlutterActivity() {
                     }
                 } else {
                     result.error("INVALID_ARGUMENTS", "Path or FileName is null", null)
-                }
-            } else {
-                result.notImplemented()
-            }
-        }
-
-        // Thermal Channel
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, THERMAL_CHANNEL).setMethodCallHandler { call, result ->
-            if (call.method == "getCpuTemp") {
-                val temp = getCpuTemp()
-                if (temp != null) {
-                    result.success(temp)
-                } else {
-                    result.error("UNAVAILABLE", "Could not read CPU temperature", null)
                 }
             } else {
                 result.notImplemented()
@@ -104,29 +89,5 @@ class MainActivity: FlutterActivity() {
             resolver.delete(uri, null, null)
             false
         }
-    }
-
-    private fun getCpuTemp(): Double? {
-        val thermalFiles = arrayOf(
-            "/sys/class/thermal/thermal_zone0/temp",
-            "/sys/class/thermal/thermal_zone1/temp",
-            "/sys/class/thermal/thermal_zone2/temp"
-        )
-        
-        for (path in thermalFiles) {
-            try {
-                val f = File(path)
-                if (f.exists()) {
-                    val tempStr = f.readText().trim()
-                    val tempRaw = tempStr.toDoubleOrNull()
-                    if (tempRaw != null) {
-                        return if (tempRaw > 1000) tempRaw / 1000.0 else tempRaw
-                    }
-                }
-            } catch (e: Exception) {
-                // Try next file
-            }
-        }
-        return null
     }
 }
