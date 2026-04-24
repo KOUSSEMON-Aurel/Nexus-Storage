@@ -14,11 +14,14 @@ import java.io.FileOutputStream
 import java.io.OutputStream
 
 class MainActivity: FlutterActivity() {
-    private val CHANNEL = "com.aurel.nexus/media_store"
+    private val MEDIA_CHANNEL = "com.aurel.nexus/media_store"
+    private val THERMAL_CHANNEL = "nexus/thermal"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        
+        // Media Store Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "saveFileToDownloads") {
                 val tempPath = call.argument<String>("tempPath")
                 val fileName = call.argument<String>("fileName")
@@ -38,6 +41,20 @@ class MainActivity: FlutterActivity() {
                 result.notImplemented()
             }
         }
+
+        // Thermal Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, THERMAL_CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "getCpuTemp") {
+                val temp = getCpuTemp()
+                if (temp != null) {
+                    result.success(temp)
+                } else {
+                    result.error("UNAVAILABLE", "Could not read CPU temperature", null)
+                }
+            } else {
+                result.notImplemented()
+            }
+        }
     }
 
     private fun saveFileToDownloads(tempPath: String, fileName: String, relativeSubDir: String): Boolean {
@@ -47,7 +64,6 @@ class MainActivity: FlutterActivity() {
 
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-            // Detect mime type simple logic
             val mimeType = when {
                 fileName.endsWith(".mp4") -> "video/mp4"
                 fileName.endsWith(".pdf") -> "application/pdf"
@@ -66,7 +82,6 @@ class MainActivity: FlutterActivity() {
         val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             MediaStore.Downloads.EXTERNAL_CONTENT_URI
         } else {
-            // Fallback for older Android if needed, but Downloads collection is Q+
             MediaStore.Files.getContentUri("external")
         }
 
@@ -89,5 +104,29 @@ class MainActivity: FlutterActivity() {
             resolver.delete(uri, null, null)
             false
         }
+    }
+
+    private fun getCpuTemp(): Double? {
+        val thermalFiles = arrayOf(
+            "/sys/class/thermal/thermal_zone0/temp",
+            "/sys/class/thermal/thermal_zone1/temp",
+            "/sys/class/thermal/thermal_zone2/temp"
+        )
+        
+        for (path in thermalFiles) {
+            try {
+                val f = File(path)
+                if (f.exists()) {
+                    val tempStr = f.readText().trim()
+                    val tempRaw = tempStr.toDoubleOrNull()
+                    if (tempRaw != null) {
+                        return if (tempRaw > 1000) tempRaw / 1000.0 else tempRaw
+                    }
+                }
+            } catch (e: Exception) {
+                // Try next file
+            }
+        }
+        return null
     }
 }

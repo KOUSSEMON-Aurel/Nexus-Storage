@@ -512,9 +512,9 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) {
+      builder: (bottomSheetContext) {
         final bottomPad =
-            MediaQuery.of(context).viewPadding.bottom + AppSpacing.xl;
+            MediaQuery.of(bottomSheetContext).viewPadding.bottom + AppSpacing.xl;
         return GlassCard(
           customBorderRadius: const BorderRadius.vertical(
             top: Radius.circular(AppSpacing.radiusLg),
@@ -559,7 +559,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       : null,
                   onTap: () {
                     _settings.updateTheme(t);
-                    Navigator.pop(context);
+                    Navigator.pop(bottomSheetContext);
                   },
                 ),
               ),
@@ -586,9 +586,11 @@ class _SettingsPageState extends State<SettingsPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Trash emptied')));
+              if (mounted) {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('Trash emptied')),
+                );
+              }
             },
             child: const Text('Empty', style: TextStyle(color: Colors.red)),
           ),
@@ -607,9 +609,9 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) {
+      builder: (bottomSheetContext) {
         final bottomPad =
-            MediaQuery.of(context).viewPadding.bottom + AppSpacing.xl;
+            MediaQuery.of(bottomSheetContext).viewPadding.bottom + AppSpacing.xl;
         return GlassCard(
           customBorderRadius: const BorderRadius.vertical(
             top: Radius.circular(AppSpacing.radiusLg),
@@ -652,7 +654,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       : null,
                   onTap: () {
                     _settings.updateLanguage(l);
-                    Navigator.pop(context);
+                    Navigator.pop(bottomSheetContext);
                   },
                 ),
               ),

@@ -336,17 +336,13 @@ class _FilesPageState extends State<FilesPage> {
                     }
                     widget.onDownload!(file);
                   } else {
-                    if (Platform.isAndroid &&
-                        !await Permission.manageExternalStorage.isGranted) {
-                      await Permission.manageExternalStorage.request();
-                    }
                     _nexus.downloadAndDecrypt(file, file.key);
                   }
                 }
                 if (!mounted) return;
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(this.context).showSnackBar(
                     const SnackBar(
                       content: Text('Download started for selected items'),
                     ),
@@ -654,11 +650,8 @@ class _FilesPageState extends State<FilesPage> {
                   onTap: () async {
                     Navigator.pop(context);
 
-                    // Request absolute path permission and battery optimization ignore for background stability
+                    // Request battery optimization ignore for background stability
                     if (Platform.isAndroid) {
-                      if (!await Permission.manageExternalStorage.isGranted) {
-                        await Permission.manageExternalStorage.request();
-                      }
                       if (!await FlutterForegroundTask
                           .isIgnoringBatteryOptimizations) {
                         await FlutterForegroundTask.requestIgnoreBatteryOptimization();
@@ -673,7 +666,7 @@ class _FilesPageState extends State<FilesPage> {
                     if (!mounted) return;
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      ScaffoldMessenger.of(this.context).showSnackBar(
                         const SnackBar(content: Text('Download started...')),
                       );
                     });

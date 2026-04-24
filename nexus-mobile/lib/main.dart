@@ -360,6 +360,7 @@ class _MainScreenState extends State<MainScreen> {
                               Text(
                                 L10n.get('upload', lang),
                                 style: Theme.of(context).textTheme.titleLarge,
+                                softWrap: true,
                               ),
                               Text(
                                 name,
@@ -446,7 +447,12 @@ class _MainScreenState extends State<MainScreen> {
           children: [
             const Icon(Icons.account_circle_outlined, color: AppColors.primary),
             const SizedBox(width: AppSpacing.sm),
-            Text(L10n.get('auth_required', lang)),
+            Expanded(
+              child: Text(
+                L10n.get('auth_required', lang),
+                softWrap: true,
+              ),
+            ),
           ],
         ),
         content: Text(L10n.get('please_connect_google', lang)),
