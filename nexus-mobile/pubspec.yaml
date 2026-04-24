@@ -37,7 +37,7 @@ dependencies:
   sqflite: ^2.4.2
   http: ^1.6.0
   dio: ^5.9.2
-  google_sign_in: ^6.3.1
+  google_sign_in: ^6.3.0
   youtube_explode_dart: ^3.0.5
   ffmpeg_kit_flutter_new: ^4.1.0
   workmanager: ^0.9.0+3
