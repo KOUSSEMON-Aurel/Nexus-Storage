@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'logger_service.dart';
 
