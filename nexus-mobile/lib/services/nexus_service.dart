@@ -546,6 +546,7 @@ class NexusService {
     String password, {
     String? explicitTaskId,
   }) async {
+    print('NEXUS_RAW_LOG: Starting downloadAndDecrypt for ${record.path}');
     final taskId =
         explicitTaskId ?? DateTime.now().millisecondsSinceEpoch.toString();
     final fileName = record.path.split('/').last;

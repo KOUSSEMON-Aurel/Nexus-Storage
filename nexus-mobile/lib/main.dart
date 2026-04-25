@@ -10,8 +10,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
 
 import 'package:nexus_mobile/services/database_service.dart';
-import 'package:nexus_mobile/services/nexus_service.dart';
-// background task handler imported only in isolate entrypoint; not used here
+import 'package:nexus_mobile/services/task_handler.dart';
 import 'package:nexus_mobile/models/file_record.dart';
 import 'package:nexus_mobile/ui/files_page.dart';
 import 'package:nexus_mobile/ui/tasks_page.dart';
@@ -472,170 +471,89 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+// ... (dans _MainScreenState)
+
   Future<void> _startBackgroundUpload(
     File file,
     String name,
     String password,
   ) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
-    final notifId = taskId.hashCode;
     AppLogger.info(
-      'NexusDebug: Starting direct async upload for $name, taskId: $taskId',
+      'NexusDebug: Starting background isolate upload for $name, taskId: $taskId',
     );
 
-    // Restauration du ForegroundService pour empêcher l'OS de geler l'application
-    // Indispensable sur Android 13/14 (systèmes Griffin/Hiber)
     try {
-      if (!await FlutterForegroundTask.isRunningService) {
-        await FlutterForegroundTask.startService(
-          notificationTitle: 'Nexus : Sécurisation en cours...',
-          notificationText: 'Préparation du fichier : $name',
-          callback: null, // Callback non nécessaire en mode direct
-        );
+      // Préparer les données pour l'isolate
+      await FlutterForegroundTask.saveData(key: 'id', value: taskId);
+      await FlutterForegroundTask.saveData(key: 'type', value: 'upload');
+      await FlutterForegroundTask.saveData(key: 'path', value: file.path);
+      await FlutterForegroundTask.saveData(key: 'pwd', value: password);
+      
+      // Récupérer et passer le token pour l'isolate
+      final token = await AuthService().getAccessToken();
+      if (token != null) {
+        await FlutterForegroundTask.saveData(key: 'token', value: token);
       }
 
-      final nexus = NexusService();
-      await nexus.encodeAndUpload(file, password, explicitTaskId: taskId);
-      DatabaseService().notifyChange();
-
-      await FlutterForegroundTask.stopService();
-      // Dismiss progress notification and show final success
-      await FlutterLocalNotificationsPlugin().cancel(id: notifId);
-      await FlutterLocalNotificationsPlugin().show(
-        id: notifId + 1,
-        title: '✅ Upload terminé',
-        body: 'Fichier sécurisé : $name',
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'nexus_final_channel',
-            'Nexus Tâches Terminées',
-            importance: Importance.high,
-            priority: Priority.high,
-            autoCancel: true,
-          ),
-        ),
+      await FlutterForegroundTask.startService(
+        notificationTitle: 'Nexus : Sécurisation en cours...',
+        notificationText: 'Préparation du fichier : $name',
+        callback: startCallback,
+        serviceTypes: [ForegroundServiceTypes.dataSync],
       );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Upload Complete: $name'),
-            backgroundColor: Colors.green,
+            content: Text('🚀 Upload started in background: $name'),
+            backgroundColor: AppColors.primary,
           ),
         );
       }
     } catch (e) {
-      AppLogger.error('Upload Error: $e');
-      AppLogger.error('NEXUS_UPLOAD_CRITICAL_ERROR: $e');
-      // Dismiss progress notification and show final failure
-      try {
-        await FlutterLocalNotificationsPlugin().cancel(id: notifId);
-        await FlutterLocalNotificationsPlugin().show(
-          id: notifId + 1,
-          title: '❌ Upload échoué',
-          body: '$name — ${e.toString().split('\n').first}',
-          notificationDetails: const NotificationDetails(
-            android: AndroidNotificationDetails(
-              'nexus_final_channel',
-              'Nexus Tâches Terminées',
-              importance: Importance.high,
-              priority: Priority.high,
-              autoCancel: true,
-              icon: '@mipmap/launcher_icon',
-            ),
-          ),
-        );
-      } catch (notifErr) {
-        AppLogger.warn(
-          'NEXUS_UPLOAD: Failed to show error notification: $notifErr',
-        );
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Upload Failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      AppLogger.error('Upload Launch Error: $e');
     }
   }
 
   Future<void> _startBackgroundDownload(FileRecord record) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
-    final notifId = taskId.hashCode;
     final fileName = record.path.split('/').last;
     AppLogger.info(
-      'NexusDebug: Starting direct async download for $fileName, taskId: $taskId',
+      'NexusDebug: Starting background isolate download for $fileName, taskId: $taskId',
     );
 
-    // Restauration du ForegroundService pour empêcher l'OS de geler l'application
     try {
-      if (!await FlutterForegroundTask.isRunningService) {
-        await FlutterForegroundTask.startService(
-          notificationTitle: 'Nexus : Récupération en cours...',
-          notificationText: 'Téléchargement de $fileName',
-          callback: null,
-        );
+      // Préparer les données pour l'isolate
+      await FlutterForegroundTask.saveData(key: 'id', value: taskId);
+      await FlutterForegroundTask.saveData(key: 'type', value: 'download');
+      await FlutterForegroundTask.saveData(key: 'video_id', value: record.videoId);
+      await FlutterForegroundTask.saveData(key: 'file_name', value: fileName);
+      await FlutterForegroundTask.saveData(key: 'pwd', value: record.key);
+
+      // Récupérer et passer le token pour l'isolate
+      final token = await AuthService().getAccessToken();
+      if (token != null) {
+        await FlutterForegroundTask.saveData(key: 'token', value: token);
       }
 
-      final nexus = NexusService();
-      await nexus.downloadAndDecrypt(
-        record,
-        record.key,
-        explicitTaskId: taskId,
+      await FlutterForegroundTask.startService(
+        notificationTitle: 'Nexus : Récupération en cours...',
+        notificationText: 'Téléchargement de $fileName',
+        callback: startCallback,
+        serviceTypes: [ForegroundServiceTypes.dataSync],
       );
-      DatabaseService().notifyChange();
 
-      await FlutterForegroundTask.stopService();
-      // Dismiss progress notification and show final success
-      await FlutterLocalNotificationsPlugin().cancel(id: notifId);
-      await FlutterLocalNotificationsPlugin().show(
-        id: notifId + 1,
-        title: '✅ Download terminé',
-        body: 'Sauvegardé dans /Download/NexusStorage/$fileName',
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'nexus_final_channel',
-            'Nexus Tâches Terminées',
-            importance: Importance.high,
-            priority: Priority.high,
-            autoCancel: true,
-          ),
-        ),
-      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Download Complete: $fileName'),
-            backgroundColor: Colors.green,
+            content: Text('🚀 Download started in background: $fileName'),
+            backgroundColor: AppColors.primary,
           ),
         );
       }
     } catch (e) {
-      AppLogger.error('Download Error: $e');
-      await FlutterLocalNotificationsPlugin().cancel(id: notifId);
-      await FlutterLocalNotificationsPlugin().show(
-        id: notifId + 1,
-        title: '❌ Download échoué',
-        body: '$fileName — ${e.toString().split('\n').first}',
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'nexus_final_channel',
-            'Nexus Tâches Terminées',
-            importance: Importance.high,
-            priority: Priority.high,
-            autoCancel: true,
-          ),
-        ),
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Download Failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      AppLogger.error('Download Launch Error: $e');
     }
   }
 
