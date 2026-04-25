@@ -214,10 +214,19 @@ class NexusService {
         );
       }
 
-      final pipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
-      if (pipePath == null) {
-        throw NexusException('Failed to create FFmpeg pipe');
+      String? pipePath;
+      for (int retry = 0; retry < 3; retry++) {
+        pipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
+        if (pipePath != null && pipePath.isNotEmpty) break;
+        AppLogger.warn('NexusService: FFmpeg pipe registration failed, retrying ($retry/3)...');
+        await Future.delayed(const Duration(milliseconds: 500));
       }
+
+      if (pipePath == null || pipePath.isEmpty) {
+        throw NexusException('Failed to create FFmpeg pipe (Context Error)');
+      }
+
+      AppLogger.info('NexusService: FFmpeg pipe registered: $pipePath');
       videoFile = File('${framesDir.path}/out.mp4');
 
       final videoSize = '1280x720';
@@ -546,7 +555,6 @@ class NexusService {
     String password, {
     String? explicitTaskId,
   }) async {
-    print('NEXUS_RAW_LOG: Starting downloadAndDecrypt for ${record.path}');
     final taskId =
         explicitTaskId ?? DateTime.now().millisecondsSinceEpoch.toString();
     final fileName = record.path.split('/').last;
@@ -678,13 +686,21 @@ class NexusService {
       // Improvement: Force 16:9 aspect ratio with increase/crop to avoid black bars on unusual YT sources
       // 'flags=neighbor' is attached to 'scale' specifically to ensure block alignment doesn't get smoothed out
       // Use grayscale extraction to match the encoder's Luma frames and avoid color conversion artifacts
-      final pipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
-      if (pipePath == null) {
-        throw NexusException('Failed to create FFmpeg pipe for download');
+      
+      String? pipePath;
+      for (int retry = 0; retry < 3; retry++) {
+        pipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
+        if (pipePath != null && pipePath.isNotEmpty) break;
+        AppLogger.warn('NexusService: FFmpeg pipe registration failed, retrying ($retry/3)...');
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      if (pipePath == null || pipePath.isEmpty) {
+        throw NexusException('Failed to create FFmpeg pipe for download (Context Error)');
       }
 
       AppLogger.info(
-        'NexusService: Download mode: ${isHighMode ? "High" : "Base"}',
+        'NexusService: FFmpeg pipe registered: $pipePath',
       );
       AppLogger.info(
         'NexusService: Target resolution: $targetWidth x $targetHeight',
@@ -772,6 +788,9 @@ class NexusService {
       final byteBuffer = BytesBuilder(copy: false);
 
       await for (final chunk in pipeStream) {
+        // Laisser l'UI Isolate traiter ses messages (évite Stop FGS timeout)
+        await Future.delayed(Duration.zero);
+        
         byteBuffer.add(chunk);
 
         while (byteBuffer.length >= frameSize) {
@@ -993,12 +1012,15 @@ class NexusService {
 
       if (!ReturnCode.isSuccess(returnCode)) {
         final logs = await session.getLogs();
-        var logMsg = logs.map((l) => l.getMessage()).join('\n');
-        AppLogger.error(
-          'NexusService: FFmpeg failed. Logs: ${logMsg.length > 1000 ? logMsg.substring(0, 1000) : logMsg}',
-        );
-        if (logMsg.length > 500) logMsg = logMsg.substring(0, 500);
-        throw NexusException('FFmpeg Extraction Failed: $logMsg');
+        final fullLog = logs.map((l) => l.getMessage()).join('\n');
+        
+        // Prendre les 1000 derniers caractères pour avoir l'erreur réelle
+        String errorContext = fullLog.length > 1000 
+            ? '...${fullLog.substring(fullLog.length - 1000)}' 
+            : fullLog;
+            
+        AppLogger.error('NexusService: FFmpeg failed (code: $returnCode). Last logs:\n$errorContext');
+        throw NexusException('FFmpeg Extraction Failed (Code: $returnCode)');
       }
 
       if (i == 0) {

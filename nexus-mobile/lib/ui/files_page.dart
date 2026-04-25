@@ -14,7 +14,6 @@ import 'package:nexus_mobile/ui/widgets/glass_card.dart';
 import 'package:nexus_mobile/ui/widgets/app_button.dart';
 import 'package:nexus_mobile/ui/widgets/skeleton_item.dart';
 import 'package:nexus_mobile/ui/settings_page.dart';
-import 'package:nexus_mobile/services/nexus_service.dart';
 import 'package:nexus_mobile/services/logger_service.dart';
 import 'package:nexus_mobile/services/sync_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -30,7 +29,6 @@ class FilesPage extends StatefulWidget {
 class _FilesPageState extends State<FilesPage> {
   final DatabaseService _db = DatabaseService();
   final SettingsService _settings = SettingsService();
-  final NexusService _nexus = NexusService();
   List<FileRecord> _files = [];
   String _currentTab = 'my-drive';
   bool _isLoading = true;
@@ -334,8 +332,6 @@ class _FilesPageState extends State<FilesPage> {
                       await FlutterForegroundTask.requestIgnoreBatteryOptimization();
                     }
                     widget.onDownload!(file);
-                  } else {
-                    _nexus.downloadAndDecrypt(file, file.key);
                   }
                 }
                 if (!mounted) return;
@@ -659,8 +655,6 @@ class _FilesPageState extends State<FilesPage> {
 
                     if (widget.onDownload != null) {
                       widget.onDownload!(file);
-                    } else {
-                      _nexus.downloadAndDecrypt(file, file.key);
                     }
                     if (!mounted) return;
                     WidgetsBinding.instance.addPostFrameCallback((_) {

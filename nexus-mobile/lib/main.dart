@@ -10,6 +10,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
 
 import 'package:nexus_mobile/services/database_service.dart';
+import 'package:nexus_mobile/services/nexus_service.dart';
 import 'package:nexus_mobile/services/task_handler.dart';
 import 'package:nexus_mobile/models/file_record.dart';
 import 'package:nexus_mobile/ui/files_page.dart';
@@ -92,8 +93,8 @@ void _initForegroundTask() {
   FlutterForegroundTask.init(
     androidNotificationOptions: AndroidNotificationOptions(
       channelId: 'nexus_upload_channel',
-      channelName: 'Nexus Upload Service',
-      channelDescription: 'Handles secure file uploads in background.',
+      channelName: 'Nexus Service',
+      channelDescription: 'Handles secure transfers.',
       channelImportance: NotificationChannelImportance.LOW,
       priority: NotificationPriority.LOW,
     ),
@@ -153,18 +154,14 @@ Future<void> _requestPermissions() async {
     final sdkInt = androidInfo.version.sdkInt;
 
     if (sdkInt < 33) {
-      // Android 12 (API 32) and below: legacy storage is needed for some operations
       await Permission.storage.request();
     } else {
-      // Android 13+ (API 33+): We use MediaStore for downloads, 
-      // but we might need photo/video permissions for picking files.
       await [
         Permission.photos,
         Permission.videos,
       ].request();
     }
 
-    // Common permissions
     await Permission.notification.request();
   }
 }
@@ -192,7 +189,6 @@ class _NexusAppState extends State<NexusApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Re-check critical permissions when returning from settings
       _requestPermissions();
     }
   }
@@ -262,10 +258,16 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
-  void _onReceiveTaskData(dynamic data) {
+  void _onReceiveTaskData(dynamic data) async {
     if (data == 'refresh') {
-      AppLogger.info('UI: Refresh signal received from background task');
+      AppLogger.info('UI: Refresh signal received');
       DatabaseService().notifyChange();
+      return;
+    }
+
+    if (data is Map<String, dynamic> && data['action'] == 'stop_service') {
+      AppLogger.info('UI: Background task reported completion, stopping FGS');
+      FlutterForegroundTask.stopService();
     }
   }
 
@@ -471,46 +473,35 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-// ... (dans _MainScreenState)
-
   Future<void> _startBackgroundUpload(
     File file,
     String name,
     String password,
   ) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
-    AppLogger.info(
-      'NexusDebug: Starting background isolate upload for $name, taskId: $taskId',
-    );
+    AppLogger.info('NexusDebug: Launching upload for $name');
 
     try {
-      // Préparer les données pour l'isolate
-      await FlutterForegroundTask.saveData(key: 'id', value: taskId);
-      await FlutterForegroundTask.saveData(key: 'type', value: 'upload');
-      await FlutterForegroundTask.saveData(key: 'path', value: file.path);
-      await FlutterForegroundTask.saveData(key: 'pwd', value: password);
-      
-      // Récupérer et passer le token pour l'isolate
-      final token = await AuthService().getAccessToken();
-      if (token != null) {
-        await FlutterForegroundTask.saveData(key: 'token', value: token);
-      }
-
+      // 1. Démarrer et ATTENDRE que le service soit prêt
       await FlutterForegroundTask.startService(
-        notificationTitle: 'Nexus : Sécurisation en cours...',
-        notificationText: 'Préparation du fichier : $name',
+        notificationTitle: 'Nexus : Sécurisation...',
+        notificationText: 'Préparation : $name',
         callback: startCallback,
         serviceTypes: [ForegroundServiceTypes.dataSync],
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('🚀 Upload started in background: $name'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
-      }
+      // 2. Petite pause pour laisser l'OS respirer
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // 3. Lancer le travail lourd asynchrone
+      final nexus = NexusService();
+      nexus.encodeAndUpload(file, password, explicitTaskId: taskId).then((_) {
+        FlutterForegroundTask.stopService();
+        DatabaseService().notifyChange();
+      }).catchError((e) {
+        AppLogger.error('Upload Process Error: $e');
+        FlutterForegroundTask.stopService();
+      });
     } catch (e) {
       AppLogger.error('Upload Launch Error: $e');
     }
@@ -519,39 +510,29 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _startBackgroundDownload(FileRecord record) async {
     final taskId = DateTime.now().millisecondsSinceEpoch.toString();
     final fileName = record.path.split('/').last;
-    AppLogger.info(
-      'NexusDebug: Starting background isolate download for $fileName, taskId: $taskId',
-    );
+    AppLogger.info('NexusDebug: Launching download for $fileName');
 
     try {
-      // Préparer les données pour l'isolate
-      await FlutterForegroundTask.saveData(key: 'id', value: taskId);
-      await FlutterForegroundTask.saveData(key: 'type', value: 'download');
-      await FlutterForegroundTask.saveData(key: 'video_id', value: record.videoId);
-      await FlutterForegroundTask.saveData(key: 'file_name', value: fileName);
-      await FlutterForegroundTask.saveData(key: 'pwd', value: record.key);
-
-      // Récupérer et passer le token pour l'isolate
-      final token = await AuthService().getAccessToken();
-      if (token != null) {
-        await FlutterForegroundTask.saveData(key: 'token', value: token);
-      }
-
+      // 1. Démarrer et ATTENDRE
       await FlutterForegroundTask.startService(
-        notificationTitle: 'Nexus : Récupération en cours...',
-        notificationText: 'Téléchargement de $fileName',
+        notificationTitle: 'Nexus : Récupération...',
+        notificationText: 'Téléchargement : $fileName',
         callback: startCallback,
         serviceTypes: [ForegroundServiceTypes.dataSync],
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('🚀 Download started in background: $fileName'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
-      }
+      // 2. Pause de sécurité
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // 3. Travail lourd (async)
+      final nexus = NexusService();
+      nexus.downloadAndDecrypt(record, record.key, explicitTaskId: taskId).then((_) {
+        FlutterForegroundTask.stopService();
+        DatabaseService().notifyChange();
+      }).catchError((e) {
+        AppLogger.error('Download Process Error: $e');
+        FlutterForegroundTask.stopService();
+      });
     } catch (e) {
       AppLogger.error('Download Launch Error: $e');
     }
@@ -566,10 +547,7 @@ class _MainScreenState extends State<MainScreen> {
       child: Scaffold(
         body: Stack(
           children: [
-            // Theme-aware background
             Container(color: AppColors.getBackground(context)),
-
-            // Background Blobs for Glassmorphisme (Design Rule)
             Positioned(
               top: -100,
               left: -100,
@@ -598,10 +576,7 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
             ),
-
             SafeArea(child: FilesPage(onDownload: _startBackgroundDownload)),
-
-            // Speed Dial FAB
             Positioned.fill(
               child: ValueListenableBuilder<String>(
                 valueListenable: SettingsService().language,
