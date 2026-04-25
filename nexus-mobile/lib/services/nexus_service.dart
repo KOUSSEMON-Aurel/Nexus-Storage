@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' hide Size;
 import 'package:crypto/crypto.dart';
 import 'package:convert/convert.dart';
@@ -218,7 +219,9 @@ class NexusService {
       for (int retry = 0; retry < 3; retry++) {
         pipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
         if (pipePath != null && pipePath.isNotEmpty) break;
-        AppLogger.warn('NexusService: FFmpeg pipe registration failed, retrying ($retry/3)...');
+        AppLogger.warn(
+          'NexusService: FFmpeg pipe registration failed, retrying ($retry/3)...',
+        );
         await Future.delayed(const Duration(milliseconds: 500));
       }
 
@@ -257,58 +260,19 @@ class NexusService {
 
       await for (final chunk in inputFile.openRead()) {
         sha256Input.add(chunk);
-        assert(chunk.length <= maxChunkSize, 'Chunk too large for FFI buffer');
-        reusableChunkPtr.asTypedList(chunk.length).setAll(0, chunk);
 
-        int res = _native.nexus_encrypt_stream_update(
-          cryptoCtx,
-          reusableChunkPtr,
-          chunk.length,
-          outPtrPtr,
-          outLenPtr,
-        );
-        // malloc.free is not needed since reusableChunkPtr will be freed at end
-        if (res != 0) throw NexusException('Streaming encryption failed: $res');
+        final result = await compute(_processEncodeChunkIsolate, {
+          'cryptoCtx': cryptoCtx.address,
+          'encoderCtx': encoderCtx.address,
+          'chunk': chunk,
+        });
 
-        if (outLenPtr.value > 0) {
-          res = _native.nexus_encode_stream_push_fec(
-            encoderCtx,
-            outPtrPtr.value,
-            outLenPtr.value,
-          );
-          _native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
-          if (res < 0) {
-            throw NexusException('Streaming encoding push failed: $res');
-          }
-        }
-
-        while (true) {
-          final popRes = _native.nexus_encode_stream_pop_frame(
-            encoderCtx,
-            outPtrPtr,
-            outLenPtr,
-          );
-          if (popRes == 1) break;
-          if (popRes != 0) {
-            throw NexusException('Frame generation failed: $popRes');
-          }
-
+        final frames = result['frames'] as List<Uint8List>;
+        for (final frame in frames) {
           frameCount++;
-          final frameData = outPtrPtr.value.asTypedList(outLenPtr.value);
-          // Only copy if we must free the C memory immediately
-          final copy = Uint8List.fromList(frameData);
-          _native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
-
-          pipeSink.add(copy);
-
-          // Force backpressure: flush after every frame
-          // This blocks the Dart loop if the OS FIFO is full
+          pipeSink.add(frame);
           await pipeSink.flush();
-
-          // Rule 3: Maintain UI responsiveness during heavy processing
-          if (frameCount % 5 == 0) {
-            await Future.delayed(Duration.zero);
-          }
+          await Future.delayed(Duration.zero);
         }
 
         processedBytes += chunk.length;
@@ -327,48 +291,17 @@ class NexusService {
       sw.reset();
       sw.start();
 
-      int res = _native.nexus_encrypt_stream_finalize(
-        cryptoCtx,
-        nullptr,
-        0,
-        outPtrPtr,
-        outLenPtr,
-      );
-      if (res != 0) {
-        throw NexusException('Streaming encryption finalize failed: $res');
-      }
+      final result = await compute(_processEncodeFinalizeIsolate, {
+        'cryptoCtx': cryptoCtx.address,
+        'encoderCtx': encoderCtx.address,
+      });
 
-      if (outLenPtr.value > 0) {
-        res = _native.nexus_encode_stream_push_fec(
-          encoderCtx,
-          outPtrPtr.value,
-          outLenPtr.value,
-        );
-        _native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
-        if (res < 0) throw NexusException('Final encoding push failed: $res');
-      }
-
-      res = _native.nexus_encode_stream_finalize(encoderCtx);
-      if (res != 0) {
-        throw NexusException('Streaming encoding finalize failed: $res');
-      }
-
-      while (true) {
-        final popRes = _native.nexus_encode_stream_pop_frame(
-          encoderCtx,
-          outPtrPtr,
-          outLenPtr,
-        );
-        if (popRes == 1) break;
-        if (popRes != 0) {
-          throw NexusException('Final frame generation failed: $popRes');
-        }
-
+      final frames = result['frames'] as List<Uint8List>;
+      for (final frame in frames) {
         frameCount++;
-        final frameData = outPtrPtr.value.asTypedList(outLenPtr.value);
-        lastFrameData = Uint8List.fromList(frameData);
-        pipeSink.add(lastFrameData);
-        _native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
+        lastFrameData = frame;
+        pipeSink.add(frame);
+        await Future.delayed(Duration.zero);
       }
 
       AppLogger.info(
@@ -686,22 +619,24 @@ class NexusService {
       // Improvement: Force 16:9 aspect ratio with increase/crop to avoid black bars on unusual YT sources
       // 'flags=neighbor' is attached to 'scale' specifically to ensure block alignment doesn't get smoothed out
       // Use grayscale extraction to match the encoder's Luma frames and avoid color conversion artifacts
-      
+
       String? pipePath;
       for (int retry = 0; retry < 3; retry++) {
         pipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
         if (pipePath != null && pipePath.isNotEmpty) break;
-        AppLogger.warn('NexusService: FFmpeg pipe registration failed, retrying ($retry/3)...');
+        AppLogger.warn(
+          'NexusService: FFmpeg pipe registration failed, retrying ($retry/3)...',
+        );
         await Future.delayed(const Duration(milliseconds: 500));
       }
 
       if (pipePath == null || pipePath.isEmpty) {
-        throw NexusException('Failed to create FFmpeg pipe for download (Context Error)');
+        throw NexusException(
+          'Failed to create FFmpeg pipe for download (Context Error)',
+        );
       }
 
-      AppLogger.info(
-        'NexusService: FFmpeg pipe registered: $pipePath',
-      );
+      AppLogger.info('NexusService: FFmpeg pipe registered: $pipePath');
       AppLogger.info(
         'NexusService: Target resolution: $targetWidth x $targetHeight',
       );
@@ -750,9 +685,11 @@ class NexusService {
       final tempDir = await getTemporaryDirectory();
       tempFile = File('${tempDir.path}/nexus_dec_tmp_$taskId');
       if (await tempFile.exists()) await tempFile.delete();
-      
+
       ios = await tempFile.open(mode: FileMode.write);
-      AppLogger.info('NexusService: Temporary output file opened: ${tempFile.path}');
+      AppLogger.info(
+        'NexusService: Temporary output file opened: ${tempFile.path}',
+      );
 
       int i = 0;
 
@@ -790,7 +727,7 @@ class NexusService {
       await for (final chunk in pipeStream) {
         // Laisser l'UI Isolate traiter ses messages (évite Stop FGS timeout)
         await Future.delayed(Duration.zero);
-        
+
         byteBuffer.add(chunk);
 
         while (byteBuffer.length >= frameSize) {
@@ -826,8 +763,6 @@ class NexusService {
             }
           }
 
-          reusableFramePtr.asTypedList(frameSize).setAll(0, frameData);
-
           if (i % 20 == 0) {
             // Estimate total frames: approx 2KB of source data per 720p frame in Base mode
             // For a 13MB file, it's about 6500 frames.
@@ -841,160 +776,27 @@ class NexusService {
             await Future.delayed(Duration.zero);
           }
 
-          int res = _native.nexus_decode_stream_push_fec(
-            decoderCtx,
-            reusableFramePtr,
-            frameSize,
-          );
+          final isolateResult = await compute(_processDecodeFrameIsolate, {
+            'decoderCtx': decoderCtx.address,
+            'cryptoCtx': cryptoCtx?.address,
+            'keyPtr': keyPtr?.address,
+            'frame': frameData,
+            'initializedCrypto': initializedCrypto,
+            'nonceBuffer': nonceBuffer,
+          });
 
-          if (res != 0) {
-            throw NexusException('Frame push error at frame $i: $res');
+          final decDataList = isolateResult['decryptedData'] as List<Uint8List>;
+          initializedCrypto = isolateResult['initializedCrypto'];
+          nonceBuffer = isolateResult['nonceBuffer'];
+          final int newCryptoAddr = isolateResult['cryptoCtxAddr'];
+          if (newCryptoAddr != 0) {
+            cryptoCtx = Pointer<StreamingContext>.fromAddress(newCryptoAddr);
           }
 
-          while (true) {
-            final popRes = _native.nexus_decode_stream_pop(
-              decoderCtx,
-              outPtrPtr,
-              outLenPtr,
-            );
-            if (popRes == 1) break; // Need more data
-            if (popRes != 0) {
-              throw NexusException('Frame pop error at frame $i: $popRes');
-            }
-
-            final decodedBytes = outPtrPtr.value.asTypedList(outLenPtr.value);
-            final hex = decodedBytes
-                .take(16)
-                .map((b) => b.toRadixString(16).padLeft(2, '0'))
-                .join(' ');
-
-            AppLogger.info(
-              'NexusService: Decoder produced ${outLenPtr.value} bytes. First 16: $hex',
-            );
-
-            if (!initializedCrypto) {
-              nonceBuffer = Uint8List.fromList([
-                ...nonceBuffer,
-                ...decodedBytes,
-              ]);
-              if (nonceBuffer.length < 16) {
-                _native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
-                continue;
-              }
-
-              final noncePrefix = nonceBuffer.sublist(0, 16);
-              final nonceHex = noncePrefix
-                  .map((b) => b.toRadixString(16).padLeft(2, '0'))
-                  .join(' ');
-              AppLogger.info(
-                'NexusService: Nonce extracted ($nonceHex), initializing crypto stream',
-              );
-
-              final noncePtr = malloc<Uint8>(16);
-              noncePtr.asTypedList(16).setAll(0, noncePrefix);
-
-              cryptoCtx = _native.nexus_decrypt_stream_init(keyPtr, noncePtr);
-              malloc.free(noncePtr);
-              if (cryptoCtx == nullptr) {
-                throw NexusException('Crypto stream init failed (NULL)');
-              }
-
-              initializedCrypto = true;
-
-              if (nonceBuffer.length > 16) {
-                final remainingData = nonceBuffer.sublist(16);
-                final remaining = malloc<Uint8>(remainingData.length);
-                remaining
-                    .asTypedList(remainingData.length)
-                    .setAll(0, remainingData);
-
-                final decPtrPtr = malloc<Pointer<Uint8>>();
-                final decLenPtr = malloc<Size>();
-                final hex1 = remainingData
-                    .take(16)
-                    .map((b) => b.toRadixString(16).padLeft(2, '0'))
-                    .join(' ');
-                AppLogger.info(
-                  'NexusService: About to decrypt ${remainingData.length} bytes (post-nonce). First 16: $hex1',
-                );
-                final decRes = _native.nexus_decrypt_stream_update(
-                  cryptoCtx,
-                  remaining,
-                  remainingData.length,
-                  decPtrPtr,
-                  decLenPtr,
-                );
-                malloc.free(remaining);
-                AppLogger.info(
-                  'NexusService: Decrypt returned: res=$decRes, outLen=${decLenPtr.value}',
-                );
-
-                if (decRes == 0 && decLenPtr.value > 0) {
-                  final decData = decPtrPtr.value.asTypedList(decLenPtr.value);
-                  if (!headerInspected && decData.isNotEmpty) {
-                    final hex = decData
-                        .take(16)
-                        .map((e) => e.toRadixString(16).padLeft(2, '0'))
-                        .join(' ');
-                    AppLogger.info('NexusService: First decrypted bytes: $hex');
-                    headerInspected = true;
-                  }
-                  totalDecryptedBytes += decLenPtr.value;
-                  await ios.writeFrom(decData);
-                }
-                if (decRes == 0) {
-                  if (decLenPtr.value == 0) {
-                    AppLogger.info(
-                      'NexusService: Decryption update returned 0 bytes',
-                    );
-                  }
-                  _native.nexus_free_bytes(decPtrPtr.value, decLenPtr.value);
-                }
-                malloc.free(decPtrPtr);
-                malloc.free(decLenPtr);
-                if (decRes != 0) {
-                  throw NexusException(
-                    'Initial decryption update error: $decRes',
-                  );
-                }
-              }
-            } else {
-              final decPtrPtr = malloc<Pointer<Uint8>>();
-              final decLenPtr = malloc<Size>();
-              final decRes = _native.nexus_decrypt_stream_update(
-                cryptoCtx!,
-                outPtrPtr.value,
-                outLenPtr.value,
-                decPtrPtr,
-                decLenPtr,
-              );
-
-              if (decRes == 0 && decLenPtr.value > 0) {
-                final decData = decPtrPtr.value.asTypedList(decLenPtr.value);
-                if (!headerInspected && decData.isNotEmpty) {
-                  final hex = decData
-                      .take(16)
-                      .map((e) => e.toRadixString(16).padLeft(2, '0'))
-                      .join(' ');
-                  AppLogger.info('NexusService: First decrypted bytes: $hex');
-                  headerInspected = true;
-                }
-                totalDecryptedBytes += decLenPtr.value;
-                await ios.writeFrom(decData);
-              }
-              if (decRes == 0) {
-                _native.nexus_free_bytes(decPtrPtr.value, decLenPtr.value);
-              }
-              malloc.free(decPtrPtr);
-              malloc.free(decLenPtr);
-              if (decRes != 0) {
-                throw NexusException(
-                  'Decryption update error: $decRes at frame $i',
-                );
-              }
-            }
-
-            _native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
+          for (final dataChunk in decDataList) {
+            totalDecryptedBytes += dataChunk.length;
+            await ios.writeFrom(dataChunk);
+            await Future.delayed(Duration.zero);
           }
           i++;
         }
@@ -1013,13 +815,15 @@ class NexusService {
       if (!ReturnCode.isSuccess(returnCode)) {
         final logs = await session.getLogs();
         final fullLog = logs.map((l) => l.getMessage()).join('\n');
-        
+
         // Prendre les 1000 derniers caractères pour avoir l'erreur réelle
-        String errorContext = fullLog.length > 1000 
-            ? '...${fullLog.substring(fullLog.length - 1000)}' 
+        String errorContext = fullLog.length > 1000
+            ? '...${fullLog.substring(fullLog.length - 1000)}'
             : fullLog;
-            
-        AppLogger.error('NexusService: FFmpeg failed (code: $returnCode). Last logs:\n$errorContext');
+
+        AppLogger.error(
+          'NexusService: FFmpeg failed (code: $returnCode). Last logs:\n$errorContext',
+        );
         throw NexusException('FFmpeg Extraction Failed (Code: $returnCode)');
       }
 
@@ -1032,59 +836,50 @@ class NexusService {
       );
 
       if (cryptoCtx != null) {
-        final decPtrPtr = malloc<Pointer<Uint8>>();
-        final decLenPtr = malloc<Size>();
         AppLogger.info('NexusService: Finalizing crypto stream...');
-        final finRes = _native.nexus_decrypt_stream_finalize(
-          cryptoCtx,
-          nullptr,
-          0,
-          decPtrPtr,
-          decLenPtr,
-        );
+        final isolateResult = await compute(_processDecodeFinalizeIsolate, {
+          'cryptoCtx': cryptoCtx.address,
+        });
 
-        if (finRes == 0) {
-          if (decLenPtr.value > 0) {
-            await ios.writeFrom(decPtrPtr.value.asTypedList(decLenPtr.value));
-            totalDecryptedBytes += decLenPtr.value;
-          }
-          _native.nexus_free_bytes(decPtrPtr.value, decLenPtr.value);
-          AppLogger.info(
-            'NexusService: Finalization successful. Total final bytes: $totalDecryptedBytes',
-          );
-        } else {
-          AppLogger.error(
-            'NexusService: Finalization failed with error code: $finRes',
-          );
-          malloc.free(decPtrPtr);
-          malloc.free(decLenPtr);
-          throw NexusException(
-            'Decryption finalization failed (Code: $finRes). Data might be corrupted or password incorrect.',
-          );
+        final finalData = isolateResult['finalData'] as Uint8List?;
+        if (finalData != null) {
+          totalDecryptedBytes += finalData.length;
+          await ios.writeFrom(finalData);
+          await Future.delayed(Duration.zero);
         }
-        malloc.free(decPtrPtr);
-        malloc.free(decLenPtr);
+        AppLogger.info(
+          'NexusService: Finalization successful. Total final bytes: $totalDecryptedBytes',
+        );
       }
 
       try {
         await ios.close();
         ios = null; // Important to avoid double close in finally
 
-        AppLogger.info('NexusService: Decryption finished. Exporting via Native MediaStore...');
-        
+        AppLogger.info(
+          'NexusService: Decryption finished. Exporting via Native MediaStore...',
+        );
+
         // Option 2: Use Native Platform Channel for robust MediaStore handling
         // This avoids RAM issues and works without MANAGE_EXTERNAL_STORAGE
-        final bool success = await _mediaChannel.invokeMethod('saveFileToDownloads', {
-          'tempPath': tempFile.path,
-          'fileName': fileName,
-          'relativePath': 'NexusStorage',
-        });
+        final bool success = await _mediaChannel
+            .invokeMethod('saveFileToDownloads', {
+              'tempPath': tempFile.path,
+              'fileName': fileName,
+              'relativePath': 'NexusStorage',
+            });
 
         if (success) {
-          AppLogger.info('NexusService: Successfully exported to public Downloads/NexusStorage via Native');
+          AppLogger.info(
+            'NexusService: Successfully exported to public Downloads/NexusStorage via Native',
+          );
         } else {
-          AppLogger.error('NexusService: Native MediaStore export returned false.');
-          throw NexusException('Failed to save file to public storage via Native Channel');
+          AppLogger.error(
+            'NexusService: Native MediaStore export returned false.',
+          );
+          throw NexusException(
+            'Failed to save file to public storage via Native Channel',
+          );
         }
       } catch (e) {
         AppLogger.error('NexusService: Final native export error: $e');
@@ -1114,7 +909,7 @@ class NexusService {
           'NexusService: Ignored error closing output file in finally: $e',
         );
       }
-      
+
       // Cleanup temp files
       if (tempFile != null && await tempFile.exists()) {
         try {
@@ -1124,7 +919,7 @@ class NexusService {
           AppLogger.warn('NexusService: Failed to delete temp file: $e');
         }
       }
-      
+
       if (videoFile != null && await videoFile.exists()) {
         try {
           await videoFile.delete();
@@ -1147,4 +942,278 @@ class NexusService {
       }
     }
   }
+}
+
+Map<String, dynamic> _processEncodeChunkIsolate(Map<String, dynamic> args) {
+  final int cryptoCtxAddr = args['cryptoCtx'];
+  final int encoderCtxAddr = args['encoderCtx'];
+  final Uint8List chunk = args['chunk'];
+
+  final cryptoCtx = Pointer<StreamingContext>.fromAddress(cryptoCtxAddr);
+  final encoderCtx = Pointer<StreamingEncoder>.fromAddress(encoderCtxAddr);
+  final native = NexusLoader.bindings;
+
+  final outPtrPtr = malloc<Pointer<Uint8>>();
+  final outLenPtr = malloc<Size>();
+  final reusableChunkPtr = malloc<Uint8>(chunk.length);
+  reusableChunkPtr.asTypedList(chunk.length).setAll(0, chunk);
+
+  int res = native.nexus_encrypt_stream_update(
+    cryptoCtx,
+    reusableChunkPtr,
+    chunk.length,
+    outPtrPtr,
+    outLenPtr,
+  );
+  if (res != 0) throw Exception('Streaming encryption failed: $res');
+
+  if (outLenPtr.value > 0) {
+    res = native.nexus_encode_stream_push_fec(
+      encoderCtx,
+      outPtrPtr.value,
+      outLenPtr.value,
+    );
+    native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
+    if (res < 0) throw Exception('Streaming encoding push failed: $res');
+  }
+
+  List<Uint8List> frames = [];
+  while (true) {
+    final popRes = native.nexus_encode_stream_pop_frame(
+      encoderCtx,
+      outPtrPtr,
+      outLenPtr,
+    );
+    if (popRes == 1) break;
+    if (popRes != 0) throw Exception('Frame generation failed: $popRes');
+
+    final frameData = outPtrPtr.value.asTypedList(outLenPtr.value);
+    frames.add(Uint8List.fromList(frameData)); // copy
+    native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
+  }
+
+  malloc.free(outPtrPtr);
+  malloc.free(outLenPtr);
+  malloc.free(reusableChunkPtr);
+
+  return {'frames': frames};
+}
+
+Map<String, dynamic> _processEncodeFinalizeIsolate(Map<String, dynamic> args) {
+  final int cryptoCtxAddr = args['cryptoCtx'];
+  final int encoderCtxAddr = args['encoderCtx'];
+
+  final cryptoCtx = Pointer<StreamingContext>.fromAddress(cryptoCtxAddr);
+  final encoderCtx = Pointer<StreamingEncoder>.fromAddress(encoderCtxAddr);
+  final native = NexusLoader.bindings;
+
+  final outPtrPtr = malloc<Pointer<Uint8>>();
+  final outLenPtr = malloc<Size>();
+
+  int res = native.nexus_encrypt_stream_finalize(
+    cryptoCtx,
+    nullptr,
+    0,
+    outPtrPtr,
+    outLenPtr,
+  );
+  if (res != 0) throw Exception('Streaming encryption finalize failed: $res');
+
+  if (outLenPtr.value > 0) {
+    res = native.nexus_encode_stream_push_fec(
+      encoderCtx,
+      outPtrPtr.value,
+      outLenPtr.value,
+    );
+    native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
+    if (res < 0) throw Exception('Final encoding push failed: $res');
+  }
+
+  res = native.nexus_encode_stream_finalize(encoderCtx);
+  if (res != 0) throw Exception('Streaming encoding finalize failed: $res');
+
+  List<Uint8List> frames = [];
+  while (true) {
+    final popRes = native.nexus_encode_stream_pop_frame(
+      encoderCtx,
+      outPtrPtr,
+      outLenPtr,
+    );
+    if (popRes == 1) break;
+    if (popRes != 0) throw Exception('Final frame generation failed: $popRes');
+
+    final frameData = outPtrPtr.value.asTypedList(outLenPtr.value);
+    frames.add(Uint8List.fromList(frameData));
+    native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
+  }
+
+  malloc.free(outPtrPtr);
+  malloc.free(outLenPtr);
+
+  return {'frames': frames};
+}
+
+Map<String, dynamic> _processDecodeFrameIsolate(Map<String, dynamic> args) {
+  final int decoderCtxAddr = args['decoderCtx'];
+  final int? cryptoCtxAddr = args['cryptoCtx'];
+  final int? keyPtrAddr = args['keyPtr'];
+  final Uint8List frame = args['frame'];
+  final bool initializedCrypto = args['initializedCrypto'];
+  final Uint8List prevNonceBuffer = args['nonceBuffer'];
+
+  final decoderCtx = Pointer<StreamingDecoder>.fromAddress(decoderCtxAddr);
+  Pointer<StreamingContext>? cryptoCtx;
+  if (cryptoCtxAddr != null && cryptoCtxAddr != 0) {
+    cryptoCtx = Pointer<StreamingContext>.fromAddress(cryptoCtxAddr);
+  }
+  Pointer<Uint8>? keyPtr;
+  if (keyPtrAddr != null && keyPtrAddr != 0) {
+    keyPtr = Pointer<Uint8>.fromAddress(keyPtrAddr);
+  }
+
+  final native = NexusLoader.bindings;
+
+  final outPtrPtr = malloc<Pointer<Uint8>>();
+  final outLenPtr = malloc<Size>();
+  final reusableFramePtr = malloc<Uint8>(frame.length);
+  reusableFramePtr.asTypedList(frame.length).setAll(0, frame);
+
+  int res = native.nexus_decode_stream_push_fec(
+    decoderCtx,
+    reusableFramePtr,
+    frame.length,
+  );
+  if (res != 0) throw Exception('Frame push error: $res');
+
+  List<Uint8List> decryptedData = [];
+  bool newInitCrypto = initializedCrypto;
+  Uint8List newNonceBuffer = prevNonceBuffer;
+  int newCryptoCtxAddr = cryptoCtxAddr ?? 0;
+
+  while (true) {
+    final popRes = native.nexus_decode_stream_pop(
+      decoderCtx,
+      outPtrPtr,
+      outLenPtr,
+    );
+    if (popRes == 1) break;
+    if (popRes != 0) throw Exception('Frame pop error: $popRes');
+
+    final decodedBytes = outPtrPtr.value.asTypedList(outLenPtr.value);
+
+    if (!newInitCrypto) {
+      final combined = BytesBuilder();
+      combined.add(newNonceBuffer);
+      combined.add(decodedBytes);
+      newNonceBuffer = combined.toBytes();
+
+      if (newNonceBuffer.length >= 16) {
+        final noncePrefix = newNonceBuffer.sublist(0, 16);
+        final noncePtr = malloc<Uint8>(16);
+        noncePtr.asTypedList(16).setAll(0, noncePrefix);
+
+        cryptoCtx = native.nexus_decrypt_stream_init(keyPtr!, noncePtr);
+        malloc.free(noncePtr);
+        if (cryptoCtx == nullptr) throw Exception('Crypto stream init failed');
+
+        newInitCrypto = true;
+        newCryptoCtxAddr = cryptoCtx.address;
+
+        if (newNonceBuffer.length > 16) {
+          final remainingData = newNonceBuffer.sublist(16);
+          final remaining = malloc<Uint8>(remainingData.length);
+          remaining.asTypedList(remainingData.length).setAll(0, remainingData);
+
+          final decPtrPtr = malloc<Pointer<Uint8>>();
+          final decLenPtr = malloc<Size>();
+          final decRes = native.nexus_decrypt_stream_update(
+            cryptoCtx,
+            remaining,
+            remainingData.length,
+            decPtrPtr,
+            decLenPtr,
+          );
+          malloc.free(remaining);
+          if (decRes == 0 && decLenPtr.value > 0) {
+            decryptedData.add(
+              Uint8List.fromList(decPtrPtr.value.asTypedList(decLenPtr.value)),
+            );
+            native.nexus_free_bytes(decPtrPtr.value, decLenPtr.value);
+          }
+          malloc.free(decPtrPtr);
+          malloc.free(decLenPtr);
+          if (decRes != 0) throw Exception('Initial decryption error: $decRes');
+        }
+      }
+      native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
+    } else {
+      final decPtrPtr = malloc<Pointer<Uint8>>();
+      final decLenPtr = malloc<Size>();
+      final decRes = native.nexus_decrypt_stream_update(
+        cryptoCtx!,
+        outPtrPtr.value,
+        outLenPtr.value,
+        decPtrPtr,
+        decLenPtr,
+      );
+      if (decRes == 0 && decLenPtr.value > 0) {
+        decryptedData.add(
+          Uint8List.fromList(decPtrPtr.value.asTypedList(decLenPtr.value)),
+        );
+        native.nexus_free_bytes(decPtrPtr.value, decLenPtr.value);
+      }
+      malloc.free(decPtrPtr);
+      malloc.free(decLenPtr);
+      native.nexus_free_bytes(outPtrPtr.value, outLenPtr.value);
+      if (decRes != 0) throw Exception('Decryption update error: $decRes');
+    }
+  }
+
+  malloc.free(outPtrPtr);
+  malloc.free(outLenPtr);
+  malloc.free(reusableFramePtr);
+
+  return {
+    'decryptedData': decryptedData,
+    'initializedCrypto': newInitCrypto,
+    'nonceBuffer': newNonceBuffer,
+    'cryptoCtxAddr': newCryptoCtxAddr,
+  };
+}
+
+Map<String, dynamic> _processDecodeFinalizeIsolate(Map<String, dynamic> args) {
+  final int cryptoCtxAddr = args['cryptoCtx'];
+  final cryptoCtx = Pointer<StreamingContext>.fromAddress(cryptoCtxAddr);
+  final native = NexusLoader.bindings;
+
+  final decPtrPtr = malloc<Pointer<Uint8>>();
+  final decLenPtr = malloc<Size>();
+  final finRes = native.nexus_decrypt_stream_finalize(
+    cryptoCtx,
+    nullptr,
+    0,
+    decPtrPtr,
+    decLenPtr,
+  );
+
+  Uint8List? finalData;
+  if (finRes == 0) {
+    if (decLenPtr.value > 0) {
+      finalData = Uint8List.fromList(
+        decPtrPtr.value.asTypedList(decLenPtr.value),
+      );
+    }
+    if (decLenPtr.value > 0 || finRes == 0) {
+      if (decLenPtr.value > 0) {
+        native.nexus_free_bytes(decPtrPtr.value, decLenPtr.value);
+      }
+    }
+  }
+
+  malloc.free(decPtrPtr);
+  malloc.free(decLenPtr);
+
+  if (finRes != 0) throw Exception('Decryption finalize failed: $finRes');
+
+  return {'finalData': finalData};
 }
