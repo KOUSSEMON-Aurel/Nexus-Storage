@@ -55,6 +55,15 @@ Afin d'éviter que les vidéos de données ne soient classées comme spam par Yo
 * **optimiser traitement fichier et ,upload et download pour pas faire en un chunk dans la ramm, mais en streaming ou similaire .**
 
 * **Optimiser le code pour qu'il soit plus rapide**
+### 9. Sécurité et Conformité (Pipeline Upload)
+
+* **Vérification du type de fichier (Magika) :** Intégrer Magika pour s'assurer que le contenu réel des fichiers correspond à leur extension avant le chiffrement.
+* **Scan Malware (ClamAV) :** Intégrer un scan antivirus sur **Desktop uniquement** (via `clamd`) avant l'upload pour garantir l'intégrité de la plateforme.
+* **Détection de contenu illégal (Meta PDQ) :** Utiliser le hachage perceptuel PDQ (Meta) pour identifier les contenus interdits via comparaison de hashes connus, garantissant une modération compatible avec le chiffrement de bout-en-bout.
+
 ---
 
-**Laquelle de ces pistes te semble la plus intéressante pour commencer ?** *(Le menu contextuel custom ou le Drag & Drop seraient des progressions logiques après nos dernières modifications sur la sélection).*
+### 10. Monétisation
+
+* **Mobile (Android/iOS) :** Intégrer **AdMob** pour afficher des bannières et des publicités interstitielles lors des transferts.
+* **Desktop (Linux/Windows/macOS) :** Maintenir la version Desktop **totalement gratuite** et sans publicité pour favoriser l'adoption et offrir une expérience premium "épurée".

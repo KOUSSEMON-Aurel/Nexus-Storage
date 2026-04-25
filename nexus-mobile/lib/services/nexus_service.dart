@@ -11,7 +11,6 @@ import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:ffmpeg_kit_flutter_new/ffprobe_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit_config.dart';
 import 'package:ffmpeg_kit_flutter_new/session_state.dart';
 import '../ffi/nexus_bindings.dart';
@@ -492,15 +491,11 @@ class NexusService {
         explicitTaskId ?? DateTime.now().millisecondsSinceEpoch.toString();
     final fileName = record.path.split('/').last;
 
-    File? videoFile;
     File? tempFile;
-    Directory? framesDir;
     RandomAccessFile? ios;
     Pointer<StreamingDecoder>? decoderCtx;
     Pointer<StreamingContext>? cryptoCtx;
     Pointer<Uint8>? keyPtr;
-    Pointer<Pointer<Uint8>>? outPtrPtr;
-    Pointer<Size>? outLenPtr;
 
     try {
       await _db.insertTask({
@@ -527,123 +522,47 @@ class NexusService {
         'Starting streaming download for $fileName (ID: ${record.videoId}) Mode: ${record.mode}',
       );
 
-      // Fix 4 & 1: Detect mode and prefer WebM for High mode
       final isHighMode = record.mode == 'high';
-
-      videoFile = await _youtube.downloadVideo(
-        record.videoId,
-        isHighMode: isHighMode,
-        onProgress: (p) => _updateStatus(
-          taskId,
-          0.1 + (p * 0.3),
-          'Downloading...',
-          fileName: fileName,
-        ),
-      );
-      if (videoFile == null) {
-        AppLogger.error(
-          'NexusService: YouTube download returned null. Aborting.',
-        );
-        throw NexusException('YouTube download failed');
-      }
-
-      final videoSize = await videoFile.length();
-      AppLogger.info('NexusService: Downloaded video size: $videoSize bytes');
-      if (videoSize == 0) {
-        throw NexusException('Downloaded video is empty (0 bytes)');
-      }
-      if (!await videoFile.exists()) {
-        throw NexusException('Video file missing after download');
-      }
-
-      final tmpDir = await getTemporaryDirectory();
-      framesDir = Directory('${tmpDir.path}/nexus-dl-$taskId');
-      if (await framesDir.exists()) await framesDir.delete(recursive: true);
-      await framesDir.create();
-
-      await _updateStatus(
-        taskId,
-        0.4,
-        'Analyzing video...',
-        fileName: fileName,
-      );
-
-      final probeSession = await FFprobeKit.getMediaInformation(videoFile.path);
-      final mediaInformation = probeSession.getMediaInformation();
-
-      if (mediaInformation != null) {
-        final streams = mediaInformation.getStreams();
-        int? width, height;
-        for (var stream in streams) {
-          if (stream.getType() == 'video') {
-            final props = stream.getAllProperties();
-            width = int.tryParse(props?['width']?.toString() ?? '');
-            height = int.tryParse(props?['height']?.toString() ?? '');
-            break;
-          }
-        }
-
-        AppLogger.info(
-          'NexusService: Video resolution detected: $width x $height',
-        );
-
-        if (width != null && height != null) {
-          // Validation de sécurité pour éviter le décodage de bruit (ex: 144p)
-          if (!isHighMode && (width < 640 || height < 360)) {
-            // Seuil minimal absolu pour Base (idéal 720p)
-            throw NexusException(
-              'Qualité insuffisante : ${width}x$height. Le mode Base requiert au moins du 360p (idéal 720p).',
-            );
-          }
-          // (debug) frames retention handled later per-frame during decoding loop
-          if (isHighMode && (width < 1280 || height < 720)) {
-            throw NexusException(
-              'Qualité insuffisante pour le mode High : ${width}x$height. 720p minimum requis.',
-            );
-          }
-
-          if (width != 1280 || height != 720) {
-            if (!isHighMode) {
-              AppLogger.warn(
-                'NexusService: Resolution mismatch (Base). Expected 1280x720, got ${width}x$height. FFmpeg will rescale.',
-              );
-            }
-          }
-        }
-      }
-
       final targetWidth = isHighMode ? 3840 : 1280;
       final targetHeight = isHighMode ? 2160 : 720;
+
+      AppLogger.info(
+        'NexusService: Starting Direct Pipeline. Target: ${targetWidth}x$targetHeight',
+      );
+
+      final inputPipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
+      final outputPipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
+
+      if (inputPipePath == null || outputPipePath == null) {
+        throw NexusException('Failed to create FFmpeg pipes');
+      }
+
+      final videoStream = await _youtube.getVideoStream(record.videoId);
+      if (videoStream == null) throw NexusException('YouTube stream failed');
+
+      // Start the stream pump in background
+      final inputPipeFile = File(inputPipePath);
+      final _ = () async {
+        try {
+          final sink = inputPipeFile.openWrite();
+          await sink.addStream(videoStream);
+          await sink.close();
+          AppLogger.info('NexusService: Input pipe pump finished');
+        } catch (e) {
+          AppLogger.error('NexusService: Input pipe pump error: $e');
+        }
+      }();
 
       // Force scaling to target resolution with neighbor flags to maintain block alignment
       // Improvement: Force 16:9 aspect ratio with increase/crop to avoid black bars on unusual YT sources
       // 'flags=neighbor' is attached to 'scale' specifically to ensure block alignment doesn't get smoothed out
       // Use grayscale extraction to match the encoder's Luma frames and avoid color conversion artifacts
 
-      String? pipePath;
-      for (int retry = 0; retry < 3; retry++) {
-        pipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
-        if (pipePath != null && pipePath.isNotEmpty) break;
-        AppLogger.warn(
-          'NexusService: FFmpeg pipe registration failed, retrying ($retry/3)...',
-        );
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-
-      if (pipePath == null || pipePath.isEmpty) {
-        throw NexusException(
-          'Failed to create FFmpeg pipe for download (Context Error)',
-        );
-      }
-
-      AppLogger.info('NexusService: FFmpeg pipe registered: $pipePath');
-      AppLogger.info(
-        'NexusService: Target resolution: $targetWidth x $targetHeight',
-      );
+      final pipePath = outputPipePath;
 
       final ffmpegArgs = [
         '-i',
-        videoFile.path,
+        inputPipePath,
         '-vf',
         'scale=$targetWidth:$targetHeight:force_original_aspect_ratio=increase:flags=neighbor,crop=$targetWidth:$targetHeight,format=gray',
         '-f',
@@ -655,7 +574,7 @@ class NexusService {
         '-color_range',
         'pc',
         '-y',
-        pipePath,
+        outputPipePath,
       ];
 
       AppLogger.info(
@@ -676,9 +595,6 @@ class NexusService {
       // Initialize decoder with the correct mode
       decoderCtx = _native.nexus_decode_stream_init(isHighMode ? 1 : 0);
       if (decoderCtx == nullptr) throw NexusException('Failed to init decoder');
-
-      outPtrPtr = malloc<Pointer<Uint8>>();
-      outLenPtr = malloc<Size>();
 
       // Option B: Decrypt to a temporary file in the app's internal cache first.
       // This avoids permission issues with direct writing to public storage on Android 11+.
@@ -717,7 +633,6 @@ class NexusService {
       Uint8List nonceBuffer = Uint8List(0);
 
       int totalDecryptedBytes = 0;
-      bool headerInspected = false;
 
       final frameSize = targetWidth * targetHeight;
       final reusableFramePtr = malloc<Uint8>(frameSize);
@@ -779,7 +694,7 @@ class NexusService {
           final isolateResult = await compute(_processDecodeFrameIsolate, {
             'decoderCtx': decoderCtx.address,
             'cryptoCtx': cryptoCtx?.address,
-            'keyPtr': keyPtr?.address,
+            'keyPtr': keyPtr.address,
             'frame': frameData,
             'initializedCrypto': initializedCrypto,
             'nonceBuffer': nonceBuffer,
@@ -802,7 +717,7 @@ class NexusService {
         }
       }
       malloc.free(reusableFramePtr);
-      await FFmpegKitConfig.closeFFmpegPipe(pipePath);
+      await FFmpegKitConfig.closeFFmpegPipe(outputPipePath);
 
       final session = await sessionPromise;
       final returnCode = await session.getReturnCode();
@@ -920,26 +835,9 @@ class NexusService {
         }
       }
 
-      if (videoFile != null && await videoFile.exists()) {
-        try {
-          await videoFile.delete();
-          AppLogger.info('NexusService: Cleaned up source video file.');
-        } catch (e) {
-          AppLogger.warn('NexusService: Failed to delete video file: $e');
-        }
-      }
-
       if (decoderCtx != null) _native.nexus_decoder_stream_drop(decoderCtx);
       if (cryptoCtx != null) _native.nexus_crypto_stream_drop(cryptoCtx);
       if (keyPtr != null) malloc.free(keyPtr);
-      if (outPtrPtr != null) malloc.free(outPtrPtr);
-      if (outLenPtr != null) malloc.free(outLenPtr);
-      if (framesDir != null && await framesDir.exists()) {
-        await framesDir.delete(recursive: true);
-      }
-      if (videoFile != null && await videoFile.exists()) {
-        await videoFile.delete();
-      }
     }
   }
 }
