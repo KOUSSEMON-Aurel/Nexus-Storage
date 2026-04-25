@@ -46,9 +46,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # On récupère la version de pubspec.yaml (ex: 6.3.3+4)
+          # On récupère la version de pubspec.yaml (ex: 6.3.4+4)
           VERSION=$(grep 'version: ' nexus-mobile/pubspec.yaml | sed 's/version: //')
-          # On enlève le +num pour le tag (ex: 6.3.3)
+          # On enlève le +num pour le tag (ex: 6.3.4)
           TAG_VERSION=$(echo $VERSION | cut -d'+' -f1)
           TAG_NAME="app-v${TAG_VERSION}"
           
