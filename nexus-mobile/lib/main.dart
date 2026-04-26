@@ -92,11 +92,11 @@ void main() async {
 void _initForegroundTask() {
   FlutterForegroundTask.init(
     androidNotificationOptions: AndroidNotificationOptions(
-      channelId: 'nexus_upload_channel',
-      channelName: 'Nexus Service',
-      channelDescription: 'Handles secure transfers.',
-      channelImportance: NotificationChannelImportance.LOW,
-      priority: NotificationPriority.LOW,
+      channelId: 'nexus_background_channel',
+      channelName: 'Nexus Background Service',
+      channelDescription: 'Used for background encryption and transfers.',
+      channelImportance: NotificationChannelImportance.HIGH,
+      priority: NotificationPriority.HIGH,
     ),
     iosNotificationOptions: const IOSNotificationOptions(
       showNotification: true,
@@ -156,10 +156,7 @@ Future<void> _requestPermissions() async {
     if (sdkInt < 33) {
       await Permission.storage.request();
     } else {
-      await [
-        Permission.photos,
-        Permission.videos,
-      ].request();
+      await [Permission.photos, Permission.videos].request();
     }
 
     await Permission.notification.request();
@@ -447,10 +444,7 @@ class _MainScreenState extends State<MainScreen> {
             const Icon(Icons.account_circle_outlined, color: AppColors.primary),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
-              child: Text(
-                L10n.get('auth_required', lang),
-                softWrap: true,
-              ),
+              child: Text(L10n.get('auth_required', lang), softWrap: true),
             ),
           ],
         ),
@@ -495,13 +489,16 @@ class _MainScreenState extends State<MainScreen> {
 
       // 3. Lancer le travail lourd asynchrone
       final nexus = NexusService();
-      nexus.encodeAndUpload(file, password, explicitTaskId: taskId).then((_) {
-        FlutterForegroundTask.stopService();
-        DatabaseService().notifyChange();
-      }).catchError((e) {
-        AppLogger.error('Upload Process Error: $e');
-        FlutterForegroundTask.stopService();
-      });
+      nexus
+          .encodeAndUpload(file, password, explicitTaskId: taskId)
+          .then((_) {
+            FlutterForegroundTask.stopService();
+            DatabaseService().notifyChange();
+          })
+          .catchError((e) {
+            AppLogger.error('Upload Process Error: $e');
+            FlutterForegroundTask.stopService();
+          });
     } catch (e) {
       AppLogger.error('Upload Launch Error: $e');
     }
@@ -526,13 +523,16 @@ class _MainScreenState extends State<MainScreen> {
 
       // 3. Travail lourd (async)
       final nexus = NexusService();
-      nexus.downloadAndDecrypt(record, record.key, explicitTaskId: taskId).then((_) {
-        FlutterForegroundTask.stopService();
-        DatabaseService().notifyChange();
-      }).catchError((e) {
-        AppLogger.error('Download Process Error: $e');
-        FlutterForegroundTask.stopService();
-      });
+      nexus
+          .downloadAndDecrypt(record, record.key, explicitTaskId: taskId)
+          .then((_) {
+            FlutterForegroundTask.stopService();
+            DatabaseService().notifyChange();
+          })
+          .catchError((e) {
+            AppLogger.error('Download Process Error: $e');
+            FlutterForegroundTask.stopService();
+          });
     } catch (e) {
       AppLogger.error('Download Launch Error: $e');
     }

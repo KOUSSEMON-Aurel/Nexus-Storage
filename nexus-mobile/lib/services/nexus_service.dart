@@ -264,7 +264,7 @@ class NexusService {
       await for (final chunk in inputFile.openRead()) {
         sha256Input.add(chunk);
 
-        final result = await compute(_processEncodeChunkIsolate, {
+        final result = _processEncodeChunkIsolate({
           'cryptoCtx': cryptoCtx.address,
           'encoderCtx': encoderCtx.address,
           'chunk': chunk,
@@ -294,7 +294,7 @@ class NexusService {
       sw.reset();
       sw.start();
 
-      final result = await compute(_processEncodeFinalizeIsolate, {
+      final result = _processEncodeFinalizeIsolate({
         'cryptoCtx': cryptoCtx.address,
         'encoderCtx': encoderCtx.address,
       });
@@ -715,7 +715,7 @@ class NexusService {
             await Future.delayed(Duration.zero);
           }
 
-          final isolateResult = await compute(_processDecodeFrameIsolate, {
+          final isolateResult = _processDecodeFrameIsolate({
             'decoderCtx': decoderCtx.address,
             'cryptoCtx': cryptoCtx?.address,
             'keyPtr': keyPtr.address,
@@ -744,11 +744,29 @@ class NexusService {
       await FFmpegKitConfig.closeFFmpegPipe(outputPipePath);
 
       final session = await sessionPromise;
+
+      // Wait for FFmpeg to actually finish (EOF on pipe doesn't guarantee process termination)
+      AppLogger.info(
+        'NexusService: EOF reached on pipe, waiting for FFmpeg to exit...',
+      );
+      int waitTicks = 0;
+      while (await session.getState() == SessionState.running ||
+          await session.getState() == SessionState.created) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        waitTicks++;
+        if (waitTicks > 100) {
+          AppLogger.warn(
+            'NexusService: Timeout waiting for FFmpeg to exit (10s)',
+          );
+          break;
+        }
+      }
+
       final returnCode = await session.getReturnCode();
       final duration = DateTime.now().difference(startTime);
 
       AppLogger.info(
-        'NexusService: FFmpeg extraction finished in ${duration.inSeconds}s with return code: $returnCode',
+        'NexusService: FFmpeg extraction finished in ${duration.inSeconds}s (State: ${await session.getState()}, Code: $returnCode)',
       );
 
       if (!ReturnCode.isSuccess(returnCode)) {
@@ -776,7 +794,7 @@ class NexusService {
 
       if (cryptoCtx != null) {
         AppLogger.info('NexusService: Finalizing crypto stream...');
-        final isolateResult = await compute(_processDecodeFinalizeIsolate, {
+        final isolateResult = _processDecodeFinalizeIsolate({
           'cryptoCtx': cryptoCtx.address,
         });
 
