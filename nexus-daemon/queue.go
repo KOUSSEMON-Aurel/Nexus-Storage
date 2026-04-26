@@ -1158,26 +1158,6 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 				}
 			}
 
-			// FEC-PAD FIX: If the data starts with our 8-byte size header,
-			// use it to strip the FEC zero-padding before decryption.
-			if len(rawData) > 8 {
-				realSize := uint64(rawData[0]) |
-					uint64(rawData[1])<<8 |
-					uint64(rawData[2])<<16 |
-					uint64(rawData[3])<<24 |
-					uint64(rawData[4])<<32 |
-					uint64(rawData[5])<<40 |
-					uint64(rawData[6])<<48 |
-					uint64(rawData[7])<<56
-				if realSize > 0 && realSize <= uint64(len(rawData)-8) {
-					log.Printf("[%s] 🔢 FEC size header found: real encrypted size=%d, total=%d (stripping %d pad bytes)",
-						t.ID, realSize, len(rawData), uint64(len(rawData)-8)-realSize)
-					rawData = rawData[8 : 8+realSize]
-				} else {
-					log.Printf("[%s] ⚠️  FEC size header invalid (realSize=%d, buf=%d), using raw data as-is", t.ID, realSize, len(rawData))
-				}
-			}
-
 			if q.cache != nil {
 				q.cache.Put(vID, rawData)
 			}
@@ -1268,6 +1248,25 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 			log.Printf("[%s] ✅ Decryption succeeded!", t.ID)
 		} else if rawFileKey != nil {
 			// Desktop-style One-shot Encryption (V3)
+			// FEC-PAD FIX: strip the 8-byte real-size header we prepended on upload
+			// (only for desktop files; mobile files do NOT have this header).
+			if len(rawData) > 8 {
+				realSize := uint64(rawData[0]) |
+					uint64(rawData[1])<<8 |
+					uint64(rawData[2])<<16 |
+					uint64(rawData[3])<<24 |
+					uint64(rawData[4])<<32 |
+					uint64(rawData[5])<<40 |
+					uint64(rawData[6])<<48 |
+					uint64(rawData[7])<<56
+				if realSize > 0 && realSize <= uint64(len(rawData)-8) {
+					log.Printf("[%s] 🔢 FEC-PAD: stripped %d padding bytes (real=%d, total=%d)",
+						t.ID, uint64(len(rawData)-8)-realSize, realSize, len(rawData))
+					rawData = rawData[8 : 8+realSize]
+				} else {
+					log.Printf("[%s] ⚠️  FEC-PAD: header invalid or not present (realSize=%d, bufLen=%d) — using as-is", t.ID, realSize, len(rawData))
+				}
+			}
 			log.Printf("[%s] 🔐 Shard %d: Decrypting with per-file key (%d bytes)", t.ID, i+1, len(rawFileKey))
 			decrypted, err = q.core.DecryptWithKey(rawData, rawFileKey)
 		} else {
