@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nexusstorage",
+  "compatibility_date": "2026-04-26",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "nexus-gui"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
