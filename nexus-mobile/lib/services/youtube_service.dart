@@ -180,38 +180,59 @@ class YouTubeService {
     Function(double)? onProgress,
   }) async {
     try {
-      final manifest = await _yt.videos.streamsClient.getManifest(videoId);
-      final allStreams = [...manifest.videoOnly, ...manifest.muxed];
-      final videoStreams = allStreams
-          .whereType<yt_explode.VideoStreamInfo>()
+      // ✅ Using iOS and AndroidVR clients bypasses the YouTube download throttle
+      final manifest = await _yt.videos.streamsClient.getManifest(
+        videoId,
+        ytClients: [
+          yt_explode.YoutubeApiClient.ios,
+          yt_explode.YoutubeApiClient.androidVr,
+        ],
+      );
+
+      yt_explode.VideoStreamInfo? streamInfo;
+
+      // Prioritize 720p
+      final streams720 = manifest.videoOnly
+          .where(
+            (s) =>
+                s.videoQuality.index == yt_explode.VideoQuality.high720.index,
+          )
           .toList();
 
-      if (videoStreams.isEmpty) throw Exception('No video streams found');
-
-      // Sort by quality
-      videoStreams.sort(
-        (a, b) => b.videoQuality.index.compareTo(a.videoQuality.index),
-      );
-
-      yt_explode.StreamInfo streamInfo;
-      final streams720mp4 = manifest.videoOnly.where(
-        (s) =>
-            s.videoQuality.index == yt_explode.VideoQuality.high720.index &&
-            s.container == yt_explode.StreamContainer.mp4,
-      );
-
-      if (streams720mp4.isNotEmpty) {
-        streamInfo = streams720mp4.withHighestBitrate();
+      if (streams720.isNotEmpty) {
+        final mp4_720 = streams720.where(
+          (s) => s.container == yt_explode.StreamContainer.mp4,
+        );
+        streamInfo = mp4_720.isNotEmpty
+            ? mp4_720.withHighestBitrate()
+            : streams720.withHighestBitrate();
       } else {
-        streamInfo = manifest.videoOnly
-            .where(
-              (s) =>
-                  s.videoQuality.index <= yt_explode.VideoQuality.high720.index,
-            )
-            .withHighestBitrate();
+        streamInfo =
+            manifest.videoOnly
+                    .where(
+                      (s) =>
+                          s.videoQuality.index <=
+                          yt_explode.VideoQuality.high720.index,
+                    )
+                    .withHighestBitrate()
+                as yt_explode.VideoStreamInfo?;
       }
 
-      return _yt.videos.streamsClient.get(streamInfo);
+      if (streamInfo == null) throw Exception('No suitable video stream found');
+
+      AppLogger.info(
+        'YouTube: Stream ${streamInfo.qualityLabel} via iOS/androidVr clients',
+      );
+
+      final stream = _yt.videos.streamsClient.get(streamInfo);
+      final totalBytes = streamInfo.size.totalBytes;
+      int received = 0;
+
+      return stream.map((chunk) {
+        received += chunk.length;
+        onProgress?.call(received / totalBytes);
+        return chunk;
+      });
     } catch (e) {
       AppLogger.error('YouTube Get Stream Error: $e');
       return null;
