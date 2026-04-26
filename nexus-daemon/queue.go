@@ -606,6 +606,19 @@ func (q *TaskQueue) handleUpload(t *Task) error {
 		if err != nil {
 			return err
 		}
+		// FEC-PAD FIX: Prepend real encrypted size (8 bytes LE) so the
+		// StreamingDecoder can strip the FEC zero-padding on download.
+		encSizeHdr := make([]byte, 8)
+		encSize := uint64(len(encrypted))
+		encSizeHdr[0] = byte(encSize)
+		encSizeHdr[1] = byte(encSize >> 8)
+		encSizeHdr[2] = byte(encSize >> 16)
+		encSizeHdr[3] = byte(encSize >> 24)
+		encSizeHdr[4] = byte(encSize >> 32)
+		encSizeHdr[5] = byte(encSize >> 40)
+		encSizeHdr[6] = byte(encSize >> 48)
+		encSizeHdr[7] = byte(encSize >> 56)
+		encrypted = append(encSizeHdr, encrypted...)
 		// Diagnostic: log encrypted blob size and sample bytes to help trace corruption
 		if len(encrypted) > 0 {
 			end := 8
@@ -1142,6 +1155,26 @@ func (q *TaskQueue) handleDownload(t *Task) error {
 				rawData, err = q.core.DecodeFromFrames(framesDir, apiModeInt)
 				if err != nil {
 					return fmt.Errorf("decoding failed (both streaming and legacy): %w", err)
+				}
+			}
+
+			// FEC-PAD FIX: If the data starts with our 8-byte size header,
+			// use it to strip the FEC zero-padding before decryption.
+			if len(rawData) > 8 {
+				realSize := uint64(rawData[0]) |
+					uint64(rawData[1])<<8 |
+					uint64(rawData[2])<<16 |
+					uint64(rawData[3])<<24 |
+					uint64(rawData[4])<<32 |
+					uint64(rawData[5])<<40 |
+					uint64(rawData[6])<<48 |
+					uint64(rawData[7])<<56
+				if realSize > 0 && realSize <= uint64(len(rawData)-8) {
+					log.Printf("[%s] 🔢 FEC size header found: real encrypted size=%d, total=%d (stripping %d pad bytes)",
+						t.ID, realSize, len(rawData), uint64(len(rawData)-8)-realSize)
+					rawData = rawData[8 : 8+realSize]
+				} else {
+					log.Printf("[%s] ⚠️  FEC size header invalid (realSize=%d, buf=%d), using raw data as-is", t.ID, realSize, len(rawData))
 				}
 			}
 
