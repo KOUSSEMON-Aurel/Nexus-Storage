@@ -11,7 +11,7 @@
 ╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝
 ```
 
-**High-Density Archival Storage — Powered by YouTube's CDN**
+**Nexus Media Archiver — Secure personal media backup and metadata sync**
 
 <br/>
 
@@ -30,16 +30,16 @@
 
 ---
 
-> **Nexus Storage is not a cloud drive.**
-> It abstracts the YouTube Content Delivery Network into a raw, encrypted block storage device — leveraging the most globally redundant infrastructure on the planet, entirely for free.
+> **Nexus simplifies personal media management.**
+> It provides a secure tool for media backup and encrypted metadata synchronization, helping users maintain a private database of their archives across multiple devices.
 
 ---
 
 ## Overview
 
-Most cloud storage is either expensive, limited, or surveilled. Nexus takes a different approach: **infrastructural parasitism**. By encoding binary data as chromatic noise in video frames and uploading them to private YouTube playlists, Nexus turns YouTube's CDN into a zero-knowledge, unlimited archival backend.
+Managing private media archives across devices can be challenging. Nexus Media Archiver takes a security-first approach: **private archival**. By securely packaging media content and synchronizing encrypted metadata via Google Drive and YouTube APIs, Nexus ensures your archives are organized and accessible only to you.
 
-Your files are encrypted before they leave your machine. YouTube sees static. You get your files back perfectly.
+Your media is protected and indexed before reaching the cloud. You maintain full control over your private archive with seamless synchronization.
 
 ### Recent Hardening & Improvements (v5.3.4)
 
@@ -57,7 +57,7 @@ Nexus is a three-layer microservice stack. Each layer has a single, well-defined
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     NEXUS GUI                           │
+│                 NEXUS MEDIA ARCHIVER                    │
 │              Tauri · React · Glassmorphism              │
 │          Real-time telemetry · Floating panels          │
 └──────────────────────┬──────────────────────────────────┘
@@ -67,12 +67,12 @@ Nexus is a three-layer microservice stack. Each layer has a single, well-defined
 │              Go · SQLite FTS5 · FUSE/WebDAV             │
 │   Orchestration · Queue · Sync · API Bridge · Index     │
 └─────────┬────────────────────────────┬──────────────────┘
-          │  FFI (C ABI)               │  yt-dlp · ffmpeg
+          │  FFI (C ABI)               │  Media APIs
 ┌─────────▼────────────┐   ┌──────────▼──────────────────┐
-│    NEXUS CORE        │   │      YOUTUBE CDN             │
-│  Rust · XChaCha20    │   │  Private playlists           │
-│  RaptorQ · YUV420p   │   │  4K WebM · Multi-region      │
-│  SHA-256 · Zstd      │   │  High-availability           │
+│    NEXUS CORE        │   │      CLOUD BACKEND          │
+│  Rust · XChaCha20    │   │  Private cloud playlists     │
+│  RaptorQ · Packages  │   │  High-availability           │
+│  SHA-256 · Zstd      │   │  Encrypted synchronization   │
 └──────────────────────┘   └─────────────────────────────┘
 ```
 
@@ -89,17 +89,16 @@ Nexus is a three-layer microservice stack. Each layer has a single, well-defined
 
 ### Upload — Data Refinement
 
-A file goes through five stages before a single byte reaches Google's servers.
+A file goes through five stages before a single byte reaches the cloud.
 
 ```mermaid
 graph LR
-    A[Raw File] --> B[Zstd Compress]
+    A[Raw Media] --> B[Zstd Compress]
     B --> C[XChaCha20-Poly1305 Encrypt]
-    C --> D[RaptorQ Sharding]
-    D --> E[YUV420p Chromatic Encode]
-    E --> F[ffmpeg → Video]
-    F --> G[YouTube API Upload]
-    G --> H[Private Playlist]
+    D --> E[Secure Data Sharding]
+    E --> F[ffmpeg → Media Container]
+    F --> G[Cloud API Upload]
+    G --> H[Private Archive]
 
     style A fill:#1F2937,color:#F9FAFB,stroke:#374151
     style C fill:#065F46,color:#D1FAE5,stroke:#059669
@@ -108,27 +107,21 @@ graph LR
     style H fill:#7F1D1D,color:#FEE2E2,stroke:#EF4444
 ```
 
-**Chromatic Encoding — Two Modes**
+**### Data Integrity — High Resilience
 
-| Mode     | Resolution | Density                              | Use Case                              |
-| -------- | ---------- | ------------------------------------ | ------------------------------------- |
-| **Base** | 720p       | 1 bit per 4×4 block (black/white)    | Maximum resilience to re-encoding     |
-| **High** | 4K         | 3 bits per 4×4 block (8 grey levels) | 3× data density, WebM source required |
+Nexus ensures your media remains intact using industry-standard verification and error correction. Even with network fluctuations or transmission errors, your private archives can be reconstructed perfectly from your cloud account.
 
-In Base mode, each block is either pure black or pure white — immune to YouTube's aggressive compression. In High mode, the decoder reads 8 precise luminance levels to extract 3 bits per block, requiring the original 4K WebM stream retrieved by `yt-dlp`.
-
-### Download — Optical Recovery
+### Recovery — Archive Retrieval
 
 ```mermaid
 graph LR
-    A[Private Playlist] --> B[yt-dlp\n4K WebM source]
-    B --> C[ffmpeg\nframe extraction\nflags=neighbor]
-    C --> D[Rust decoder\nluminance scan]
-    D --> E[RaptorQ reconstruct]
-    E --> F[XChaCha20 decrypt]
-    F --> G[Zstd decompress]
-    G --> H[~/Downloads/Nexus]
-
+    A[Private Archive] --> B[Cloud API Fetch]
+    B --> C[Media Extraction]
+    C --> D[Rust Decoder]
+    D --> E[Reconstruct]
+    E --> F[XChaCha20 Decrypt]
+    F --> G[Zstd Decompress]
+    G --> H[Organized Archive]
     style A fill:#7F1D1D,color:#FEE2E2,stroke:#EF4444
     style D fill:#3B1F5E,color:#EDE9FE,stroke:#8B5CF6
     style F fill:#065F46,color:#D1FAE5,stroke:#059669
@@ -145,13 +138,13 @@ The `flags=neighbor` flag in ffmpeg extraction preserves exact pixel values — 
 
 Nexus assumes the backend is **hostile**. Google can see upload timestamps and file sizes, but nothing else. The security model is designed around this assumption.
 
-| Property                         | Implementation                                                                                                  |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **Zero-knowledge**               | Filenames, folder structures, and metadata are stored only in the local SQLite index — never uploaded to Google |
-| **Content indistinguishability** | Each shard appears as random chromatic noise; automated content analysis cannot flag it                         |
-| **Per-shard encryption**         | XChaCha20-Poly1305 with authenticated encryption — any tampering is detected                                    |
-| **Forward Error Correction**     | RaptorQ fountain codes allow full reconstruction even if YouTube drops frames during processing                 |
-| **Local index**                  | `nexus.db` is the sole source of truth for your file tree; it never touches YouTube                             |
+| Property                     | Implementation                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------- |
+| **Zero-knowledge**           | Metadata and index are stored only in the local SQLite index — never shared in plaintext |
+| **Data Protection**          | Internal data structures appear as encrypted blobs; privacy is guaranteed                |
+| **Per-shard encryption**     | XChaCha20-Poly1305 with authenticated encryption — any tampering is detected             |
+| **Forward Error Correction** | Robust error correction allow full reconstruction despite network interruptions          |
+| **Local index**              | `nexus.db` is the sole source of truth for your archive tree                             |
 
 ### Zero-Password Architecture
 
@@ -261,7 +254,7 @@ nexus.db-shm      (never pushed)
 | **Background sync**  | Async worker queue      | Uploads and downloads run without blocking the GUI      |
 | **Thread safety**    | Global mutex (CGO)      | Concurrent access from GUI, CLI, and daemon is safe     |
 | **Frame extraction** | ffmpeg `flags=neighbor` | Pixel-perfect High mode recovery                        |
-| **4K source**        | yt-dlp WebM             | Only WebM preserves full 4K grey levels from YouTube    |
+| **4K source**        | yt-dlp WebM             | Only WebM preserves full 4K metadata integrity          |
 
 ---
 
@@ -338,15 +331,15 @@ Nexus-Storage/
 | Bits per block     | 1             | 3                      |
 | Encoding           | Black / White | 8 grey levels          |
 | Download format    | Any           | WebM 4K only           |
-| YouTube resilience | Maximum       | Requires source stream |
+| Backend resilience | Maximum       | Requires source stream |
 
 ---
 
 <div align="center">
 
-**Nexus Storage** · Designed for absolute persistence
+**Nexus Media Archiver** · Designed for absolute persistence
 
-*A YouTube playlist. A cryptographic fortress. A local drive.*
+*Organize. Backup. Protect.*
 
 ![](https://img.shields.io/badge/status-active-10B981?style=flat-square)
 ![](https://img.shields.io/badge/sync_compliance-100%25-3B82F6?style=flat-square)
