@@ -1,5 +1,0 @@
-name = "nexusstorage"
-compatibility_date = "2026-04-26"
-
-[assets]
-directory = "./nexus-site"
