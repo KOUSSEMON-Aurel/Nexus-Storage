@@ -20,16 +20,22 @@ class NexusTaskHandler extends TaskHandler {
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     AppLogger.info('NexusTaskHandler: Isolate started, fetching data');
-    
+
     final type = await FlutterForegroundTask.getData<String>(key: 'type');
     final taskId = await FlutterForegroundTask.getData<String>(key: 'id');
     final path = await FlutterForegroundTask.getData<String>(key: 'path');
     final pwd = await FlutterForegroundTask.getData<String>(key: 'pwd') ?? '';
-    final videoId = await FlutterForegroundTask.getData<String>(key: 'video_id');
-    final fileName = await FlutterForegroundTask.getData<String>(key: 'file_name');
+    final videoId = await FlutterForegroundTask.getData<String>(
+      key: 'video_id',
+    );
+    final fileName = await FlutterForegroundTask.getData<String>(
+      key: 'file_name',
+    );
     final token = await FlutterForegroundTask.getData<String>(key: 'token');
 
-    AppLogger.info('NexusTaskHandler: Sending start_task to Main Isolate for $taskId');
+    AppLogger.info(
+      'NexusTaskHandler: Sending start_task to Main Isolate for $taskId',
+    );
 
     FlutterForegroundTask.sendDataToMain({
       'action': 'start_task',

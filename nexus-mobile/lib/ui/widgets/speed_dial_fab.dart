@@ -55,7 +55,8 @@ class _SpeedDialFabState extends State<SpeedDialFab>
   }
 
   void _handleAction(String actionName) {
-    if (widget.nestedActions != null && widget.nestedActions!.containsKey(actionName)) {
+    if (widget.nestedActions != null &&
+        widget.nestedActions!.containsKey(actionName)) {
       // Enter nested menu
       setState(() {
         _activeMenu = actionName;
@@ -71,11 +72,11 @@ class _SpeedDialFabState extends State<SpeedDialFab>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final mainFabBg =
-        isDark ? const Color(0xFF6366F1) : const Color(0xFF1A73E8);
+    final mainFabBg = isDark
+        ? const Color(0xFF6366F1)
+        : const Color(0xFF1A73E8);
     final miniFabBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final miniFabIconColor =
-        isDark ? Colors.white : const Color(0xFF1A73E8);
+    final miniFabIconColor = isDark ? Colors.white : const Color(0xFF1A73E8);
 
     return Stack(
       children: [
@@ -92,7 +93,10 @@ class _SpeedDialFabState extends State<SpeedDialFab>
               },
               behavior: HitTestBehavior.opaque,
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4), // Reduced blur from 10
+                filter: ImageFilter.blur(
+                  sigmaX: 4,
+                  sigmaY: 4,
+                ), // Reduced blur from 10
                 child: Container(
                   color: isDark
                       ? Colors.black.withValues(alpha: 0.40)
@@ -114,8 +118,7 @@ class _SpeedDialFabState extends State<SpeedDialFab>
               clipBehavior: Clip.none,
               children: [
                 // ── Child action buttons ─────────────────────────────────
-                ..._buildActionButtons(
-                    isDark, miniFabBg, miniFabIconColor),
+                ..._buildActionButtons(isDark, miniFabBg, miniFabIconColor),
 
                 // ── Main FAB ─────────────────────────────────────────────
                 _AnimatedFab(
@@ -133,11 +136,14 @@ class _SpeedDialFabState extends State<SpeedDialFab>
   }
 
   List<Widget> _buildActionButtons(
-      bool isDark, Color bgColor, Color iconColor) {
-    final Map<String, IconData> currentActions = _activeMenu != null 
+    bool isDark,
+    Color bgColor,
+    Color iconColor,
+  ) {
+    final Map<String, IconData> currentActions = _activeMenu != null
         ? (widget.nestedActions![_activeMenu!] ?? {})
         : widget.actions;
-        
+
     final int count = currentActions.length;
     const double radius = 115.0;
     final List<Widget> result = [];
@@ -158,7 +164,9 @@ class _SpeedDialFabState extends State<SpeedDialFab>
       result.add(
         AnimatedBuilder(
           animation: _controller,
-          key: ValueKey('$_activeMenu-$actionName'), // Force rebuild for nested transitions
+          key: ValueKey(
+            '$_activeMenu-$actionName',
+          ), // Force rebuild for nested transitions
           builder: (context, child) {
             double t = 0.0;
             if (_controller.value > 0.1) {
@@ -232,7 +240,8 @@ class _AnimatedFab extends StatelessWidget {
             return const Icon(Icons.arrow_back, color: Colors.white, size: 28);
           }
           return Transform.rotate(
-            angle: controller.value * (math.pi / 4), // 45 degrees to look like 'X'
+            angle:
+                controller.value * (math.pi / 4), // 45 degrees to look like 'X'
             child: const Icon(Icons.add, color: Colors.white, size: 28),
           );
         },

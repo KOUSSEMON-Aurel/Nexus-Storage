@@ -26,9 +26,11 @@ class L10n {
     'empty_trash_now': 'Vider la corbeille maintenant',
     'security_privacy': 'Sécurité & Confidentialité',
     'zk_encryption': 'Chiffrement Zero-Knowledge',
-    'zk_desc': 'Les fichiers sont automatiquement chiffrés avec XChaCha20-Poly1305. Vos clés sont dérivées de votre identité Google.',
+    'zk_desc':
+        'Les fichiers sont automatiquement chiffrés avec XChaCha20-Poly1305. Vos clés sont dérivées de votre identité Google.',
     'camouflage_title': 'Camouflage (Trojan Horse)',
-    'camouflage_desc': 'Les fichiers sont injectés dans des médias MP4 pour rester invisibles.',
+    'camouflage_desc':
+        'Les fichiers sont injectés dans des médias MP4 pour rester invisibles.',
     'view_on_github': 'Voir sur GitHub',
     'logout': 'Déconnexion',
     'connect': 'Connexion',
@@ -40,7 +42,8 @@ class L10n {
     'activity': 'Activité',
     'database_sync': 'Synchronisation Cloud',
     'auth_required': 'Authentification Requise',
-    'please_connect_google': 'Veuillez connecter votre compte Google dans les paramètres pour uploader des fichiers.',
+    'please_connect_google':
+        'Veuillez connecter votre compte Google dans les paramètres pour uploader des fichiers.',
     'initializing': 'Initialisation...',
     'no_active_tasks': 'Aucune activité en cours',
   };
@@ -58,9 +61,11 @@ class L10n {
     'empty_trash_now': 'Empty Trash Now',
     'security_privacy': 'Security & Privacy',
     'zk_encryption': 'Zero-Knowledge Encryption',
-    'zk_desc': 'Files are automatically encrypted with XChaCha20-Poly1305. Your keys are derived from your Google identity.',
+    'zk_desc':
+        'Files are automatically encrypted with XChaCha20-Poly1305. Your keys are derived from your Google identity.',
     'camouflage_title': 'Camouflage (Trojan Horse)',
-    'camouflage_desc': 'Storage files are injected into MP4 media to remain invisible.',
+    'camouflage_desc':
+        'Storage files are injected into MP4 media to remain invisible.',
     'view_on_github': 'View on GitHub',
     'logout': 'Logout',
     'connect': 'Connect',
@@ -72,7 +77,8 @@ class L10n {
     'activity': 'Activity',
     'database_sync': 'Cloud Sync',
     'auth_required': 'Authentication Required',
-    'please_connect_google': 'Please connect your Google account in Settings to upload files.',
+    'please_connect_google':
+        'Please connect your Google account in Settings to upload files.',
     'initializing': 'Initializing...',
     'no_active_tasks': 'No active tasks',
   };

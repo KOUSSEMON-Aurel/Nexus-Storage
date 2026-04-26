@@ -47,15 +47,25 @@ class FileSkeletonList extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: AppSpacing.md),
           child: Row(
             children: [
-              const SkeletonItem(width: 48, height: 48, borderRadius: AppSpacing.radiusMd),
+              const SkeletonItem(
+                width: 48,
+                height: 48,
+                borderRadius: AppSpacing.radiusMd,
+              ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SkeletonItem(width: MediaQuery.of(context).size.width * 0.4, height: 16),
+                    SkeletonItem(
+                      width: MediaQuery.of(context).size.width * 0.4,
+                      height: 16,
+                    ),
                     const SizedBox(height: AppSpacing.xs),
-                    SkeletonItem(width: MediaQuery.of(context).size.width * 0.6, height: 12),
+                    SkeletonItem(
+                      width: MediaQuery.of(context).size.width * 0.6,
+                      height: 12,
+                    ),
                   ],
                 ),
               ),

@@ -7,17 +7,17 @@ class SettingsService {
   SettingsService._internal();
 
   final DatabaseService _db = DatabaseService();
-  
+
   // Theme state
   final ValueNotifier<ThemeMode> themeMode = ValueNotifier(ThemeMode.system);
-  
+
   // Language state
   final ValueNotifier<String> language = ValueNotifier('fr');
 
   Future<void> init() async {
     final theme = await _db.getKV('app_theme') ?? 'system';
     final lang = await _db.getKV('app_language') ?? 'auto';
-    
+
     themeMode.value = parseTheme(theme);
     language.value = lang;
   }
@@ -34,9 +34,12 @@ class SettingsService {
 
   ThemeMode parseTheme(String theme) {
     switch (theme) {
-      case 'light': return ThemeMode.light;
-      case 'dark': return ThemeMode.dark;
-      default: return ThemeMode.system;
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
     }
   }
 }

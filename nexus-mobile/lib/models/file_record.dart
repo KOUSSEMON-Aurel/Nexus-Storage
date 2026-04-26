@@ -121,12 +121,7 @@ class FolderRecord {
   final int? parentId;
   final String? playlistId;
 
-  FolderRecord({
-    this.id,
-    required this.name,
-    this.parentId,
-    this.playlistId,
-  });
+  FolderRecord({this.id, required this.name, this.parentId, this.playlistId});
 
   factory FolderRecord.fromMap(Map<String, dynamic> map) {
     return FolderRecord(

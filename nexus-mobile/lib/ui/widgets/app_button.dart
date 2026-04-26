@@ -24,20 +24,28 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
       height: 52, // Ensures 48x48px min touch target
       child: ElevatedButton(
-        onPressed: isLoading || onPressed == null ? null : () {
-          HapticFeedback.lightImpact();
-          onPressed!();
-        },
+        onPressed: isLoading || onPressed == null
+            ? null
+            : () {
+                HapticFeedback.lightImpact();
+                onPressed!();
+              },
         style: ElevatedButton.styleFrom(
           backgroundColor: backgroundColor ?? AppColors.primary,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: (isDark ? AppColors.surfaceElevated : AppColors.surfaceElevatedLight).withValues(alpha: 0.5),
-          disabledForegroundColor: isDark ? AppColors.textDisabled : AppColors.textDisabledLight,
+          disabledBackgroundColor:
+              (isDark
+                      ? AppColors.surfaceElevated
+                      : AppColors.surfaceElevatedLight)
+                  .withValues(alpha: 0.5),
+          disabledForegroundColor: isDark
+              ? AppColors.textDisabled
+              : AppColors.textDisabledLight,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),

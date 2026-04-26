@@ -7,14 +7,17 @@ class WorkerService {
 
   // final DatabaseService _db = DatabaseService();
   // final NexusService _nexus = NexusService();
-  
+
   bool _isRunning = false;
   Timer? _timer;
 
   void start() {
     if (_isRunning) return;
     _isRunning = true;
-    _timer = Timer.periodic(const Duration(seconds: 10), (timer) => _processTasks());
+    _timer = Timer.periodic(
+      const Duration(seconds: 10),
+      (timer) => _processTasks(),
+    );
   }
 
   void stop() {
@@ -24,8 +27,8 @@ class WorkerService {
 
   Future<void> _processTasks() async {
     // 1. Fetch pending tasks from DB
-    // final tasks = await _db.getPendingTasks(); 
-    
+    // final tasks = await _db.getPendingTasks();
+
     // 2. Process them one by one
     // For now, this is a placeholder for the full job queue logic
     // we'll implement in the next iteration.

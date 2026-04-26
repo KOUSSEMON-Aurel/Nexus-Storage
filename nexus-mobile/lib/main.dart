@@ -14,6 +14,7 @@ import 'package:nexus_mobile/services/nexus_service.dart';
 import 'package:nexus_mobile/services/task_handler.dart';
 import 'package:nexus_mobile/models/file_record.dart';
 import 'package:nexus_mobile/ui/files_page.dart';
+import 'package:nexus_mobile/ui/widgets/banner_ad_widget.dart';
 import 'package:nexus_mobile/ui/tasks_page.dart';
 import 'package:nexus_mobile/ui/settings_page.dart';
 import 'package:nexus_mobile/ui/widgets/speed_dial_fab.dart';
@@ -29,6 +30,7 @@ import 'package:nexus_mobile/ui/widgets/glass_card.dart';
 import 'package:nexus_mobile/ui/widgets/app_button.dart';
 
 import 'package:nexus_mobile/services/cleanup_service.dart';
+import 'package:nexus_mobile/services/ad_service.dart';
 
 void main() async {
   try {
@@ -46,6 +48,7 @@ void main() async {
       DatabaseService().database,
       SettingsService().init(),
       AuthService().signInSilently(),
+      AdService().init(),
     ]);
 
     // Cleanup orphaned sessions
@@ -242,17 +245,43 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
+
+    // Trigger App Open Ad on first genuine launch robustly
+    _checkAndShowAppOpenAd();
+  }
+
+  void _checkAndShowAppOpenAd() async {
+    // Poll for up to 5 seconds to show the ad as soon as it's ready
+    for (int i = 0; i < 10; i++) {
+      if (!mounted) return;
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        if (AdService().appOpenAdManager.isAdAvailable) {
+          AdService().appOpenAdManager.showAdIfAvailable();
+          break;
+        }
+      }
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      AdService().appOpenAdManager.showAdIfAvailable();
+    }
   }
 
   void _onReceiveTaskData(dynamic data) async {
@@ -494,6 +523,11 @@ class _MainScreenState extends State<MainScreen> {
           .then((_) {
             FlutterForegroundTask.stopService();
             DatabaseService().notifyChange();
+
+            if (WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed) {
+              AdService().interstitialAdManager.showAd();
+            }
           })
           .catchError((e) {
             AppLogger.error('Upload Process Error: $e');
@@ -528,6 +562,12 @@ class _MainScreenState extends State<MainScreen> {
           .then((_) {
             FlutterForegroundTask.stopService();
             DatabaseService().notifyChange();
+
+            // Execute safe Interstitial logic
+            if (WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed) {
+              AdService().interstitialAdManager.showAd();
+            }
           })
           .catchError((e) {
             AppLogger.error('Download Process Error: $e');
@@ -545,6 +585,7 @@ class _MainScreenState extends State<MainScreen> {
     return AnnotatedRegion<services.SystemUiOverlayStyle>(
       value: _getSystemUIStyle(context),
       child: Scaffold(
+        bottomNavigationBar: const BannerAdWidget(),
         body: Stack(
           children: [
             Container(color: AppColors.getBackground(context)),

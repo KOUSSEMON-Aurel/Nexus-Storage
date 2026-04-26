@@ -12,12 +12,24 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.OutputStream
+import io.flutter.plugins.googlemobileads.GoogleMobileAdsPlugin
+import com.google.android.gms.ads.nativead.NativeAd
+import com.google.android.gms.ads.nativead.NativeAdView
+import android.view.LayoutInflater
+import android.widget.ImageView
+import android.widget.TextView
+import android.widget.Button
 
 class MainActivity: FlutterActivity() {
     private val MEDIA_CHANNEL = "com.aurel.nexus/media_store"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        
+        // Register Native Ad Factory
+        GoogleMobileAdsPlugin.registerNativeAdFactory(
+            flutterEngine, "listTile", ListTileNativeAdFactory(context)
+        )
         
         // Media Store Channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_CHANNEL).setMethodCallHandler { call, result ->
@@ -89,5 +101,54 @@ class MainActivity: FlutterActivity() {
             resolver.delete(uri, null, null)
             false
         }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        super.cleanUpFlutterEngine(flutterEngine)
+        GoogleMobileAdsPlugin.unregisterNativeAdFactory(flutterEngine, "listTile")
+    }
+}
+
+class ListTileNativeAdFactory(val context: Context) : GoogleMobileAdsPlugin.NativeAdFactory {
+    override fun createNativeAd(
+        nativeAd: NativeAd,
+        customOptions: MutableMap<String, Any>?
+    ): NativeAdView {
+        val adView = LayoutInflater.from(context)
+            .inflate(R.layout.native_ad_list_tile, null) as NativeAdView
+
+        // Headline
+        adView.headlineView = adView.findViewById(R.id.ad_headline)
+        (adView.headlineView as TextView).text = nativeAd.headline
+
+        // Body
+        adView.bodyView = adView.findViewById(R.id.ad_body)
+        if (nativeAd.body == null) {
+            adView.bodyView!!.visibility = android.view.View.INVISIBLE
+        } else {
+            adView.bodyView!!.visibility = android.view.View.VISIBLE
+            (adView.bodyView as TextView).text = nativeAd.body
+        }
+
+        // Call to action
+        adView.callToActionView = adView.findViewById(R.id.ad_call_to_action)
+        if (nativeAd.callToAction == null) {
+            adView.callToActionView!!.visibility = android.view.View.INVISIBLE
+        } else {
+            adView.callToActionView!!.visibility = android.view.View.VISIBLE
+            (adView.callToActionView as Button).text = nativeAd.callToAction
+        }
+
+        // Icon
+        adView.iconView = adView.findViewById(R.id.ad_app_icon)
+        if (nativeAd.icon == null) {
+            adView.iconView!!.visibility = android.view.View.GONE
+        } else {
+            (adView.iconView as ImageView).setImageDrawable(nativeAd.icon!!.drawable)
+            adView.iconView!!.visibility = android.view.View.VISIBLE
+        }
+
+        adView.setNativeAd(nativeAd)
+        return adView
     }
 }

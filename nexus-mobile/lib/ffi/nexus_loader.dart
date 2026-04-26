@@ -29,6 +29,8 @@ class NexusLoader {
     if (Platform.isMacOS) {
       return DynamicLibrary.open('lib$_libName.dylib');
     }
-    throw UnsupportedError('Platform not supported: ${Platform.operatingSystem}');
+    throw UnsupportedError(
+      'Platform not supported: ${Platform.operatingSystem}',
+    );
   }
 }

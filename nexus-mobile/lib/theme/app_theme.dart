@@ -19,11 +19,10 @@ class AppTheme {
         onSurface: AppColors.textPrimaryLight,
         primary: AppColors.primary,
         secondary: AppColors.secondary,
-        error: AppColors.errorLight, // Utiliser la couleur sémantique plus sombre
+        error:
+            AppColors.errorLight, // Utiliser la couleur sémantique plus sombre
         surfaceTint: Colors.white,
-      ).copyWith(
-        error: AppColors.errorLight,
-      ),
+      ).copyWith(error: AppColors.errorLight),
       textTheme: textTheme.copyWith(
         displayLarge: textTheme.displayLarge?.copyWith(
           fontSize: 28,
@@ -61,7 +60,9 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-          side: BorderSide(color: Colors.grey.withValues(alpha: 0.1)), // Bordure subtile pour le light mode
+          side: BorderSide(
+            color: Colors.grey.withValues(alpha: 0.1),
+          ), // Bordure subtile pour le light mode
         ),
       ),
       appBarTheme: const AppBarTheme(
@@ -104,7 +105,7 @@ class AppTheme {
         secondary: AppColors.secondary,
         error: AppColors.error,
       ),
-      
+
       textTheme: textTheme.copyWith(
         displayLarge: textTheme.displayLarge?.copyWith(
           fontSize: 28,
@@ -145,7 +146,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         ),
       ),
-      
+
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,

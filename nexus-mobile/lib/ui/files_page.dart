@@ -17,6 +17,7 @@ import 'package:nexus_mobile/ui/settings_page.dart';
 import 'package:nexus_mobile/services/logger_service.dart';
 import 'package:nexus_mobile/services/sync_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:nexus_mobile/widgets/native_ad_widget.dart';
 
 class FilesPage extends StatefulWidget {
   final Function(FileRecord)? onDownload;
@@ -241,7 +242,12 @@ class _FilesPageState extends State<FilesPage> {
                 else if (_files.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
-                    child: _buildEmptyState(),
+                    child: Column(
+                      children: [
+                        const NativeAdWidget(),
+                        Expanded(child: _buildEmptyState()),
+                      ],
+                    ),
                   )
                 else
                   SliverPadding(
@@ -250,9 +256,22 @@ class _FilesPageState extends State<FilesPage> {
                     ),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate((context, index) {
-                        final file = _files[index];
+                        // Insert a Native Ad at index 0 and every 4 items
+                        if (index % 4 == 0) {
+                          return const NativeAdWidget();
+                        }
+
+                        // Calculate correct file index
+                        final int adCount = (index ~/ 4) + 1;
+                        final int fileIndex = index - adCount;
+
+                        if (fileIndex >= _files.length) return null;
+
+                        final file = _files[fileIndex];
                         return TweenAnimationBuilder<double>(
-                          duration: Duration(milliseconds: 350 + (index * 60)),
+                          duration: Duration(
+                            milliseconds: 350 + (fileIndex * 60),
+                          ),
                           tween: Tween(begin: 0.0, end: 1.0),
                           curve: Curves.easeOutCubic,
                           builder: (context, value, child) =>
@@ -262,7 +281,7 @@ class _FilesPageState extends State<FilesPage> {
                               ),
                           child: _buildFileItem(file, lang),
                         );
-                      }, childCount: _files.length),
+                      }, childCount: _files.length + (_files.length ~/ 3) + 1),
                     ),
                   ),
 

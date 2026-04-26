@@ -18,10 +18,14 @@ class ThermalMonitor {
           // Hysteresis: Throttle at 42°C, Resume at 38°C
           if (temp > 42.0 && !_throttled) {
             _throttled = true;
-            AppLogger.warn('THERMAL THROTTLE: CPU Temp $temp°C. Slowing down...');
+            AppLogger.warn(
+              'THERMAL THROTTLE: CPU Temp $temp°C. Slowing down...',
+            );
           } else if (temp < 38.0 && _throttled) {
             _throttled = false;
-            AppLogger.info('THERMAL RESUME: CPU Temp $temp°C. Resuming normal speed.');
+            AppLogger.info(
+              'THERMAL RESUME: CPU Temp $temp°C. Resuming normal speed.',
+            );
           }
         }
       } catch (_) {

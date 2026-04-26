@@ -3,7 +3,8 @@ class NexusException implements Exception {
   final String? code;
   NexusException(this.message, {this.code});
   @override
-  String toString() => 'NexusException: $message ${code != null ? "($code)" : ""}';
+  String toString() =>
+      'NexusException: $message ${code != null ? "($code)" : ""}';
 }
 
 class SyncException extends NexusException {

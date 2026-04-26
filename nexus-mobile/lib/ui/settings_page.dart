@@ -514,7 +514,8 @@ class _SettingsPageState extends State<SettingsPage> {
       isScrollControlled: true,
       builder: (bottomSheetContext) {
         final bottomPad =
-            MediaQuery.of(bottomSheetContext).viewPadding.bottom + AppSpacing.xl;
+            MediaQuery.of(bottomSheetContext).viewPadding.bottom +
+            AppSpacing.xl;
         return GlassCard(
           customBorderRadius: const BorderRadius.vertical(
             top: Radius.circular(AppSpacing.radiusLg),
@@ -587,9 +588,9 @@ class _SettingsPageState extends State<SettingsPage> {
             onPressed: () {
               Navigator.pop(ctx);
               if (mounted) {
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  const SnackBar(content: Text('Trash emptied')),
-                );
+                ScaffoldMessenger.of(
+                  this.context,
+                ).showSnackBar(const SnackBar(content: Text('Trash emptied')));
               }
             },
             child: const Text('Empty', style: TextStyle(color: Colors.red)),
@@ -611,7 +612,8 @@ class _SettingsPageState extends State<SettingsPage> {
       isScrollControlled: true,
       builder: (bottomSheetContext) {
         final bottomPad =
-            MediaQuery.of(bottomSheetContext).viewPadding.bottom + AppSpacing.xl;
+            MediaQuery.of(bottomSheetContext).viewPadding.bottom +
+            AppSpacing.xl;
         return GlassCard(
           customBorderRadius: const BorderRadius.vertical(
             top: Radius.circular(AppSpacing.radiusLg),

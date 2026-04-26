@@ -12,16 +12,16 @@ class DeviceProfiler {
     final ram = await _getRamMb();
 
     _cached = switch ((cores, ram)) {
-      (>= 8, >= 6000) => DeviceTier.high,  // Flagship
-      (>= 4, >= 3000) => DeviceTier.mid,   // Mid-range
-      _               => DeviceTier.low,   // Budget / vieux
+      (>= 8, >= 6000) => DeviceTier.high, // Flagship
+      (>= 4, >= 3000) => DeviceTier.mid, // Mid-range
+      _ => DeviceTier.low, // Budget / vieux
     };
     return _cached!;
   }
 
   static Future<int> _getRamMb() async {
     if (!Platform.isAndroid) return 8000; // Fallback for Desktop/iOS if needed
-    
+
     try {
       final f = File('/proc/meminfo');
       if (await f.exists()) {
