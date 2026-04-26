@@ -591,14 +591,16 @@ class _SettingsPageState extends State<SettingsPage> {
               Navigator.pop(ctx);
               final db = DatabaseService();
               final yt = YouTubeService();
-              
+
+              final messenger = ScaffoldMessenger.of(context);
+
               // Récupérer TOUS les fichiers en corbeille
               final trashFiles = await db.listFiles(category: 'trash');
-              
+
               if (trashFiles.isEmpty) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Trash is already empty'))
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Trash is already empty')),
                   );
                 }
                 return;
@@ -612,17 +614,23 @@ class _SettingsPageState extends State<SettingsPage> {
                   if (file.videoId.isNotEmpty) {
                     await yt.deleteVideo(file.videoId);
                   }
-                  await sqlite.delete('files', where: 'id = ?', whereArgs: [file.id]);
+                  await sqlite.delete(
+                    'files',
+                    where: 'id = ?',
+                    whereArgs: [file.id],
+                  );
                   count++;
                 } catch (e) {
-                  AppLogger.error('Settings: Failed to delete ${file.path}: $e');
+                  AppLogger.error(
+                    'Settings: Failed to delete ${file.path}: $e',
+                  );
                 }
               }
 
               if (mounted) {
-                ScaffoldMessenger.of(
-                  this.context,
-                ).showSnackBar(SnackBar(content: Text('Trash emptied ($count items)')));
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Trash emptied ($count items)')),
+                );
                 db.notifyChange();
               }
             },
