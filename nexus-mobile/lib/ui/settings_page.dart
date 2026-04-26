@@ -9,6 +9,8 @@ import 'package:nexus_mobile/theme/app_colors.dart';
 import 'package:nexus_mobile/theme/app_spacing.dart';
 import 'package:nexus_mobile/ui/widgets/glass_card.dart';
 import 'package:nexus_mobile/ui/widgets/app_button.dart';
+import 'package:nexus_mobile/services/youtube_service.dart';
+import 'package:nexus_mobile/services/logger_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -585,12 +587,43 @@ class _SettingsPageState extends State<SettingsPage> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              final db = DatabaseService();
+              final yt = YouTubeService();
+              
+              // Récupérer TOUS les fichiers en corbeille
+              final trashFiles = await db.listFiles(category: 'trash');
+              
+              if (trashFiles.isEmpty) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Trash is already empty'))
+                  );
+                }
+                return;
+              }
+
+              final sqlite = await db.database;
+              int count = 0;
+
+              for (var file in trashFiles) {
+                try {
+                  if (file.videoId.isNotEmpty) {
+                    await yt.deleteVideo(file.videoId);
+                  }
+                  await sqlite.delete('files', where: 'id = ?', whereArgs: [file.id]);
+                  count++;
+                } catch (e) {
+                  AppLogger.error('Settings: Failed to delete ${file.path}: $e');
+                }
+              }
+
               if (mounted) {
                 ScaffoldMessenger.of(
                   this.context,
-                ).showSnackBar(const SnackBar(content: Text('Trash emptied')));
+                ).showSnackBar(SnackBar(content: Text('Trash emptied ($count items)')));
+                db.notifyChange();
               }
             },
             child: const Text('Empty', style: TextStyle(color: Colors.red)),

@@ -47,14 +47,12 @@ Afin d'éviter que les vidéos de données ne soient classées comme spam par Yo
 
 * **LAN Sync :** Implémenter une synchronisation directe via réseau local (Desktop ↔ Mobile) en complément de la synchronisation cloud via Drive.
 
-
-### 8. Ram et performance 
+### 8. Ram et performance
 
 * **Réduire l'utilisation de la RAM **
-
 * **optimiser traitement fichier et ,upload et download pour pas faire en un chunk dans la ramm, mais en streaming ou similaire .**
-
 * **Optimiser le code pour qu'il soit plus rapide**
+
 ### 9. Sécurité et Conformité (Pipeline Upload)
 
 * **Vérification du type de fichier (Magika) :** Intégrer Magika pour s'assurer que le contenu réel des fichiers correspond à leur extension avant le chiffrement.
@@ -67,3 +65,5 @@ Afin d'éviter que les vidéos de données ne soient classées comme spam par Yo
 
 * **Mobile (Android/iOS) :** Intégrer **AdMob** pour afficher des bannières et des publicités interstitielles lors des transferts.
 * **Desktop (Linux/Windows/macOS) :** Maintenir la version Desktop **totalement gratuite** et sans publicité pour favoriser l'adoption et offrir une expérience premium "épurée".
+
+**Quota Proxy** (pour tes clients), passage aux  **IDs AdMob réels** , et gestion multi-compte.

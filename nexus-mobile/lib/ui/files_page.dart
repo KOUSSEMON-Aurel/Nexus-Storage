@@ -129,7 +129,20 @@ class _FilesPageState extends State<FilesPage> {
         }
       } else if (action == 'delete') {
         final db = await _db.database;
+        final yt = YouTubeService();
         for (var id in ids) {
+          try {
+            final maps =
+                await db.query('files', where: 'id = ?', whereArgs: [id]);
+            if (maps.isNotEmpty) {
+              final videoId = maps.first['video_id'] as String?;
+              if (videoId != null && videoId.isNotEmpty) {
+                await yt.deleteVideo(videoId);
+              }
+            }
+          } catch (e) {
+            AppLogger.warn('Failed to delete video from YouTube during bulk: $e');
+          }
           await db.delete('files', where: 'id = ?', whereArgs: [id]);
         }
       } else if (action == 'restore') {
@@ -732,6 +745,15 @@ class _FilesPageState extends State<FilesPage> {
                   onTap: () {
                     Navigator.pop(context);
                     _db.database.then((db) async {
+                      if (file.videoId.isNotEmpty) {
+                        try {
+                          await YouTubeService().deleteVideo(file.videoId);
+                        } catch (e) {
+                          AppLogger.warn(
+                            'Failed to delete video from YouTube: $e',
+                          );
+                        }
+                      }
                       await db.delete(
                         'files',
                         where: 'id = ?',

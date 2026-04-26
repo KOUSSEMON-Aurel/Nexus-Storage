@@ -457,6 +457,17 @@ class DatabaseService {
     return crypto.sha256.convert(utf8.encode(content)).toString();
   }
 
+  Future<List<FileRecord>> getExpiredTrashFiles(int days) async {
+    final db = await database;
+    final cutoff = DateTime.now().subtract(Duration(days: days)).toIso8601String();
+    final List<Map<String, dynamic>> maps = await db.query(
+      'files',
+      where: 'deleted_at IS NOT NULL AND deleted_at < ?',
+      whereArgs: [cutoff],
+    );
+    return List.generate(maps.length, (i) => FileRecord.fromMap(maps[i]));
+  }
+
   Future<void> deleteTask(String id) async {
     final db = await database;
     await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
