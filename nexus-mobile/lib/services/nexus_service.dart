@@ -23,6 +23,7 @@ import '../models/file_record.dart';
 import 'logger_service.dart';
 import '../utils/exceptions.dart';
 import '../core/task_config.dart';
+import '../core/transfer_state.dart';
 
 class NexusService {
   final NexusCoreBindings _native = NexusLoader.bindings;
@@ -59,7 +60,7 @@ class NexusService {
     String? fileName,
   }) async {
     final now = DateTime.now();
-    if (now.difference(_lastProgressUpdate).inMilliseconds < 250 &&
+    if (now.difference(_lastProgressUpdate).inMilliseconds < 500 &&
         status != 'completed' &&
         !status.startsWith('Failed') &&
         progress > 0.05 &&
@@ -81,7 +82,9 @@ class NexusService {
       if (now.difference(_lastRefreshTime).inMilliseconds > 1500 ||
           status == 'completed' ||
           status.startsWith('Failed')) {
-        await _db.checkpointWAL();
+        if (status == 'completed' || status.startsWith('Failed')) {
+          await _db.checkpointWAL();
+        }
         FlutterForegroundTask.sendDataToMain('refresh');
         _lastRefreshTime = now;
       }
@@ -123,6 +126,7 @@ class NexusService {
     String password, {
     String? explicitTaskId,
   }) async {
+    TransferState.activeTaskCount++;
     final taskId =
         explicitTaskId ?? DateTime.now().millisecondsSinceEpoch.toString();
     final fileName = inputFile.path.split('/').last;
@@ -422,6 +426,7 @@ class NexusService {
       if (videoFile != null && await videoFile.exists()) {
         await videoFile.delete();
       }
+      TransferState.activeTaskCount--;
     }
   }
 
@@ -487,6 +492,7 @@ class NexusService {
     String password, {
     String? explicitTaskId,
   }) async {
+    TransferState.activeTaskCount++;
     final taskId =
         explicitTaskId ?? DateTime.now().millisecondsSinceEpoch.toString();
     final fileName = record.path.split('/').last;
@@ -527,42 +533,60 @@ class NexusService {
       final targetHeight = isHighMode ? 2160 : 720;
 
       AppLogger.info(
-        'NexusService: Starting Direct Pipeline. Target: ${targetWidth}x$targetHeight',
+        'NexusService: Starting Sequential Pipeline. Target: ${targetWidth}x$targetHeight',
       );
-
-      final inputPipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
-      final outputPipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
-
-      if (inputPipePath == null || outputPipePath == null) {
-        throw NexusException('Failed to create FFmpeg pipes');
-      }
 
       final videoStream = await _youtube.getVideoStream(record.videoId);
       if (videoStream == null) throw NexusException('YouTube stream failed');
 
-      // Start the stream pump in background
-      final inputPipeFile = File(inputPipePath);
-      final _ = () async {
-        try {
-          final sink = inputPipeFile.openWrite();
-          await sink.addStream(videoStream);
-          await sink.close();
-          AppLogger.info('NexusService: Input pipe pump finished');
-        } catch (e) {
-          AppLogger.error('NexusService: Input pipe pump error: $e');
-        }
-      }();
+      // Phase 1: Download strictly to temp file
+      final cacheDir = await getTemporaryDirectory();
+      final videoFile = File('${cacheDir.path}/nexus_dl_tmp_$taskId.mp4');
+      if (await videoFile.exists()) await videoFile.delete();
 
-      // Force scaling to target resolution with neighbor flags to maintain block alignment
-      // Improvement: Force 16:9 aspect ratio with increase/crop to avoid black bars on unusual YT sources
-      // 'flags=neighbor' is attached to 'scale' specifically to ensure block alignment doesn't get smoothed out
-      // Use grayscale extraction to match the encoder's Luma frames and avoid color conversion artifacts
+      AppLogger.info(
+        'NexusService: Phase 1 - Downloading to ${videoFile.path}',
+      );
+      final fileSink = videoFile.openWrite();
 
-      final pipePath = outputPipePath;
+      // Use addStream for automatic backpressure management
+      // This prevents the network from overwhelming the disk, stabilizing RAM and CPU.
+      await _updateStatus(
+        taskId,
+        0.10,
+        'Downloading video data...',
+        fileName: fileName,
+      );
+
+      await fileSink.addStream(videoStream);
+      await fileSink.flush();
+      await fileSink.close();
+
+      final downloadedBytes = await videoFile.length();
+      AppLogger.info('NexusService: Download complete: $downloadedBytes bytes');
+
+      await _updateStatus(
+        taskId,
+        0.40,
+        'Download complete. Starting decryption...',
+        fileName: fileName,
+      );
+
+      // Phase 2: Decrypt from file
+      String? outputPipePath;
+      for (int retry = 0; retry < 3; retry++) {
+        outputPipePath = await FFmpegKitConfig.registerNewFFmpegPipe();
+        if (outputPipePath != null) break;
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      if (outputPipePath == null) {
+        throw NexusException('Failed to create FFmpeg output pipe');
+      }
 
       final ffmpegArgs = [
         '-i',
-        inputPipePath,
+        videoFile.path,
         '-vf',
         'scale=$targetWidth:$targetHeight:force_original_aspect_ratio=increase:flags=neighbor,crop=$targetWidth:$targetHeight,format=gray',
         '-f',
@@ -627,7 +651,7 @@ class NexusService {
       final sessionPromise = FFmpegKit.executeWithArgumentsAsync(ffmpegArgs);
 
       AppLogger.info('NexusService: Reading frames from FFmpeg pipe...');
-      final pipeStream = File(pipePath).openRead();
+      final pipeStream = File(outputPipePath).openRead();
 
       bool initializedCrypto = false;
       Uint8List nonceBuffer = Uint8List(0);
@@ -838,6 +862,19 @@ class NexusService {
       if (decoderCtx != null) _native.nexus_decoder_stream_drop(decoderCtx);
       if (cryptoCtx != null) _native.nexus_crypto_stream_drop(cryptoCtx);
       if (keyPtr != null) malloc.free(keyPtr);
+
+      // Cleanup sequential file
+      final cacheDir = await getTemporaryDirectory();
+      final videoFile = File('${cacheDir.path}/nexus_dl_tmp_$taskId.mp4');
+      if (await videoFile.exists()) {
+        try {
+          await videoFile.delete();
+          AppLogger.info('NexusService: Cleaned up temporary video file.');
+        } catch (e) {
+          AppLogger.warn('NexusService: Failed to delete temp video: $e');
+        }
+      }
+      TransferState.activeTaskCount--;
     }
   }
 }

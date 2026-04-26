@@ -9,6 +9,7 @@ import 'auth_service.dart';
 import 'logger_service.dart';
 import '../utils/exceptions.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import '../core/transfer_state.dart';
 
 class SyncService {
   static final SyncService _instance = SyncService._internal();
@@ -27,6 +28,10 @@ class SyncService {
 
   Future<void> sync() async {
     try {
+      if (TransferState.activeTaskCount > 0) {
+        AppLogger.info('Sync skipped: Nexus transfer in progress.');
+        return;
+      }
       await _checkConnectivity();
       final token = await _auth.getAccessToken();
       if (token == null) {
