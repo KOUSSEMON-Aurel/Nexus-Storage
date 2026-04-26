@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Policy — Nexus Storage</title>
+    <title>Privacy Policy — Nexus Media Archiver</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
+
 <body>
     <div class="container">
         <header>
             <a href="index.html" class="logo">
                 <img src="assets/logo.png" alt="Nexus Logo">
-                Nexus Storage
+                Nexus Media Archiver
             </a>
             <nav>
                 <a href="index.html#features">Features</a>
@@ -24,44 +26,81 @@
 
         <section class="legal-content">
             <h1>Privacy Policy</h1>
-            <p><strong>Effective Date:</strong> January 1, 2024</p>
-            <p>This Privacy Policy explains how Nexus Storage ("we," "us," or "our") collects, uses, and discloses information from users ("you") when you use the Nexus Storage application.</p>
+            <p><strong>Effective Date:</strong> April 26, 2026</p>
+            <p>This Privacy Policy explains how Nexus Media Archiver ("we," "us," or "our") collects, uses, and
+                discloses information from users ("you") when you use the Nexus application.</p>
 
-            <h2>1. Information Collection</h2>
-            <p>Nexus Storage is a decentralized archival tool. We collect minimum information to function:</p>
+            <h2>1. Information Access and Collection</h2>
+            <p>Nexus is designed to be a secure media archival tool. To provide its core features, our application
+                requests access to specific categories of data through Google OAuth 2.0:</p>
             <ul>
-                <li><strong>Google Account Identifiers:</strong> We use OAuth 2.0 to authenticate your session. We only receive your unique Google ID (`sub`) to derive your encryption key locally.</li>
-                <li><strong>Application Data:</strong> We access your YouTube playlists and a specific file in your Google Drive (`nexus.db`) solely for storage and synchronization.</li>
+                <li><strong>Google Identity Information:</strong> We access your unique Google ID (`sub`) and email
+                    address to authenticate your session and derivation of your private encryption keys locally on your
+                    device.</li>
+                <li><strong>YouTube Data:</strong> We access your YouTube account to upload your designated media
+                    content to private playlists and to manage these archives for recovery purposes.</li>
+                <li><strong>Google Drive Files:</strong> We access your Google Drive to store and synchronize a small
+                    metadata index file (`nexus.db`) that keeps track of your media archives.</li>
             </ul>
 
             <h2>2. Use of Google User Data</h2>
-            <p>We strictly use the information received from Google APIs for the following purposes:</p>
+            <p>We use the information received from Google APIs strictly to provide and improve the functionality of the
+                Nexus Media Archiver. Specifically:</p>
             <ul>
-                <li><strong>YouTube Upload:</strong> To upload encrypted binary data sharded as video frames to your private playlists.</li>
-                <li><strong>Google Drive Storage:</strong> To store and retrieve your decentralized file index (`nexus.db`) across your own devices.</li>
+                <li><strong>Archival Management:</strong> Encrypted media is packaged and uploaded to your private cloud
+                    playlists for backup.</li>
+                <li><strong>Metadata Synchronization:</strong> The metadata index is synced via your Google Drive to
+                    allow you to see your archive tree across your authorized devices.</li>
             </ul>
+            <p>We do not use your Google user data for any other purpose, such as advertising, marketing, or profiling.
+            </p>
 
             <div class="alert">
                 <strong>Google API Limited Use Disclosure:</strong><br>
-                Nexus Storage's use and transfer to any other app of information received from Google APIs will adhere to 
-                <a href="https://developers.google.com/terms/api-services-user-data-policy#limited-use-requirements" style="color: var(--primary);">Google API Services User Data Policy</a>, including the Limited Use requirements.
+                Nexus Media Archiver's use and transfer to any other app of information received from Google APIs will
+                adhere to the
+                <a href="https://developers.google.com/terms/api-services-user-data-policy#limited-use-requirements"
+                    style="color: var(--primary);">Google API Services User Data Policy</a>, including the Limited Use
+                requirements.
             </div>
 
-            <h2>3. Information Sharing</h2>
-            <p><strong>Nexus Storage does not share your data with third parties.</strong> Your encryption keys are derived locally and never leave your device. Google only sees encrypted "static" video noise when you upload files.</p>
+            <h2>3. Data Storage and Protection</h2>
+            <p><strong>Security Mechanisms:</strong> All user content is protected by high-grade XChaCha20-Poly1305
+                (256-bit) authenticated encryption. This encryption happens <strong>locally</strong> on your device
+                before the data is transmitted to any cloud service. We have a zero-knowledge architecture: we do not
+                possess the keys to decrypt your information.</p>
+            <p><strong>Storage:</strong> Your data is stored within your own Google accounts (YouTube and Google Drive).
+                We do not host your data on our own servers.</p>
 
-            <h2>4. Security</h2>
-            <p>Your files are protected by XChaCha20-Poly1305 (256-bit) authenticated encryption. We employ zero-knowledge architecture, meaning we have no access to your decrypted content or passwords.</p>
+            <h2>4. Data Retention and Deletion</h2>
+            <p><strong>Retention:</strong> We do not personally retain your Google user data. Your archives remain in
+                your Google account as long as you choose to keep them there.</p>
+            <p><strong>Deletion:</strong> You have full control over your data. You can delete your media archives at
+                any time by removing the playlists or videos from your YouTube account and deleting the `nexus.db` file
+                from your Google Drive. If you uninstall Nexus, your cloud-stored data remains untouched until you
+                manually delete it through Google's interface.</p>
 
-            <h2>5. Changes to This Policy</h2>
-            <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.</p>
+            <h2>5. Information Sharing and Disclosure</h2>
+            <p><strong>No Sharing:</strong> Nexus does not share, transfer, or disclose Google user data to any
+                third-party entities, with the following very narrow exceptions:</p>
+            <ul>
+                <li>To comply with valid legal processes.</li>
+                <li>Where specifically required to provide or improve the core features of the application.</li>
+            </ul>
+            <p><strong>No Sale of Data:</strong> We do NOT sell your Google user data to any third parties.</p>
 
-            <h2>6. Contact Us</h2>
-            <p>If you have any questions about this Privacy Policy, please contact us at our <a href="https://github.com/KOUSSEMON-Aurel/Nexus-Storage" style="color: var(--primary);">GitHub Repository</a>.</p>
+            <h2>6. Changes to This Policy</h2>
+            <p>We may update our Privacy Policy once we add new features. We recommend users review this page
+                periodically for any changes. Use of the app constitutes acceptance of the current policy.</p>
+
+            <h2>7. Contact Us</h2>
+            <p>For support or legal inquiries, please contact us at our <a
+                    href="https://github.com/KOUSSEMON-Aurel/Nexus-Storage" style="color: var(--primary);">GitHub
+                    Repository</a>.</p>
         </section>
 
         <footer>
-            <p>&copy; 2024 Nexus Storage Project. Open Source under MIT License.</p>
+            <p>&copy; 2026 Nexus Media Archiver. Open Source under MIT License.</p>
             <div class="footer-links">
                 <a href="index.html">Home</a>
                 <a href="terms.html">Terms of Service</a>
@@ -70,4 +109,5 @@
         </footer>
     </div>
 </body>
+
 </html>
