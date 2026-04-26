@@ -40,3 +40,9 @@ client_secret.json
 !README.md
 !TODO.md
 .secrets/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
