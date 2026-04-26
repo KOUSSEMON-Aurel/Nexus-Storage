@@ -16,6 +16,7 @@ import 'package:nexus_mobile/ui/widgets/skeleton_item.dart';
 import 'package:nexus_mobile/ui/settings_page.dart';
 import 'package:nexus_mobile/services/logger_service.dart';
 import 'package:nexus_mobile/services/sync_service.dart';
+import 'package:nexus_mobile/services/youtube_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:nexus_mobile/widgets/native_ad_widget.dart';
 
@@ -132,8 +133,11 @@ class _FilesPageState extends State<FilesPage> {
         final yt = YouTubeService();
         for (var id in ids) {
           try {
-            final maps =
-                await db.query('files', where: 'id = ?', whereArgs: [id]);
+            final maps = await db.query(
+              'files',
+              where: 'id = ?',
+              whereArgs: [id],
+            );
             if (maps.isNotEmpty) {
               final videoId = maps.first['video_id'] as String?;
               if (videoId != null && videoId.isNotEmpty) {
@@ -141,7 +145,9 @@ class _FilesPageState extends State<FilesPage> {
               }
             }
           } catch (e) {
-            AppLogger.warn('Failed to delete video from YouTube during bulk: $e');
+            AppLogger.warn(
+              'Failed to delete video from YouTube during bulk: $e',
+            );
           }
           await db.delete('files', where: 'id = ?', whereArgs: [id]);
         }
