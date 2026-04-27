@@ -1,0 +1,89 @@
+name: Manual Linux Publish (AUR & Flathub)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version à publier (ex: 7.2.0)'
+        required: true
+      publish_aur:
+        description: 'Publier vers AUR'
+        type: boolean
+        default: true
+      publish_flathub:
+        description: 'Publier vers Flathub'
+        type: boolean
+        default: false
+
+jobs:
+  aur-publish:
+    if: ${{ github.event.inputs.publish_aur == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get AppImage SHA256
+        id: get_sha
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          URL="https://github.com/${{ github.repository }}/releases/download/app-v${VERSION}/nexus_${VERSION}_amd64.AppImage"
+          echo "Downloading from $URL"
+          curl -L "$URL" -o nexus.AppImage
+          SHA256=$(sha256sum nexus.AppImage | cut -d ' ' -f 1)
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+          echo "SHA256: $SHA256"
+
+      - name: Prepare PKGBUILD
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          SHA256="${{ steps.get_sha.outputs.sha256 }}"
+          sed -e "s/__VERSION__/${VERSION}/g" \
+              -e "s/__SHA256__/${SHA256}/g" \
+              packaging/aur/PKGBUILD.template > packaging/aur/PKGBUILD
+
+      - name: Publish to AUR
+        uses: KSauraj/aur-action@v3
+        with:
+          pkgname: nexus-bin
+          pkgbuild: ./packaging/aur/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to ${{ github.event.inputs.version }}"
+
+  flathub-publish:
+    if: ${{ github.event.inputs.publish_flathub == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get AppImage SHA256
+        id: get_sha
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          URL="https://github.com/${{ github.repository }}/releases/download/app-v${VERSION}/nexus_${VERSION}_amd64.AppImage"
+          curl -L "$URL" -o nexus.AppImage
+          SHA256=$(sha256sum nexus.AppImage | cut -d ' ' -f 1)
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+
+      - name: Prepare Flathub Manifest
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          SHA256="${{ steps.get_sha.outputs.sha256 }}"
+          sed -e "s/__VERSION__/${VERSION}/g" \
+              -e "s/__SHA256__/${SHA256}/g" \
+              packaging/flathub/com.aurel.Nexus.yaml > com.aurel.Nexus.yaml
+
+      - name: Upload Manifest Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flathub-manifest
+          path: com.aurel.Nexus.yaml
+
+      - name: Informational
+        run: |
+          echo "Le manifeste Flathub a été généré et est disponible dans les artefacts."
+          echo "Une fois votre app acceptée sur Flathub, nous pourrons automatiser le push direct vers leur dépôt Git."
