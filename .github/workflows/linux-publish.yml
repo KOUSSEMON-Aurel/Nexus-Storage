@@ -44,7 +44,7 @@ jobs:
               packaging/aur/PKGBUILD.template > packaging/aur/PKGBUILD
 
       - name: Publish to AUR
-        uses: KSauraj/aur-action@v3
+        uses: ulises-jeremias/github-actions-aur-publish@v1.0.16
         with:
           pkgname: nexus-bin
           pkgbuild: ./packaging/aur/PKGBUILD
@@ -52,6 +52,7 @@ jobs:
           commit_email: ${{ secrets.AUR_EMAIL }}
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: "Update to ${{ github.event.inputs.version }}"
+          # L'action s'occupera de générer le .SRCINFO automatiquement
 
   flathub-publish:
     if: ${{ github.event.inputs.publish_flathub == 'true' }}
